@@ -13,7 +13,8 @@ DEBUG=True
 N = 8
 
 # Number of range filters in filter unit
-M = 2
+# This number must always be <=N
+M = 4 
 
 # Input buffer depth
 IB_DEPTH = 4
@@ -53,25 +54,41 @@ class CISC():
 
         def step(self,input_value):
 
-        	# 
+        	# Check if the vector is within M ranges
+        	log.debug('Filtering using the following ranges:'+str(self.vrf[self.addr:self.addr+M+1]))
         	for i in range(M):
         		low_range = self.vrf[self.addr+i]
         		high_range = self.vrf[self.addr+i+1]
         		within_range = np.all([self.input>low_range, self.input<=high_range],axis=0)
         		self.output[i]=within_range[:]
 
-        	print(self.output)	
-        	#self.output=tmp_output
+        	self.input=input_value
+        	return self.output
+
+    # This block will reduce the matrix along a given axis
+    # If M<N, then the results will be padded with zeros
+    class MatrixVectorReduce():
+        def __init__(self,N,M):
+            self.input=np.zeros((M,N))
+            self.output=np.zeros(N)
+            self.axis=0
+
+        def step(self,input_value):
+        	log.debug('Reducing matrix along axis '+str(self.axis))
+        	self.output=self.output
         	self.input=input_value
         	return self.output
 
     def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE):
-        self.ib = self.InputBuffer(N,IB_DEPTH)
-        self.fu = self.FilterUnit(N,M,FUVRF_SIZE)
+        self.ib   = self.InputBuffer(N,IB_DEPTH)
+        self.fu   = self.FilterUnit(N,M,FUVRF_SIZE)
+        self.mvru = self.MatrixVectorReduce(N,M)
 
     def step(self):
+    	log.debug('New step')
     	chain = self.ib.step()
-    	self.fu.step(chain)
+    	chain = self.fu.step(chain)
+    	self.mvru.step(chain)
 
 
 # Instantiate processor
