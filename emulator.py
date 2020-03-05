@@ -101,7 +101,7 @@ class CISC():
 
         def step(self,input_value):
             if self.reset:
-            	log.debug('Resetting vector-vector ALU output')
+                log.debug('Resetting vector-vector ALU output')
                 self.output = np.zeros(N)
             if self.op==0:
                 log.debug('Adding using vector-vector ALU')
@@ -135,14 +135,63 @@ proc.mvru.axis=1
 proc.vvalu.reset=0
 proc.vvalu.op=0
 
+class compiler():
+    # ISA
+    def begin_chain(self):
+        self.fu={"addr":0}
+        self.mvru={"axis":0}
+        self.vvalu={"reset":0,"op":0}
+    def filter(self,addr):
+        self.fu={"addr":addr}
+    def reduceN(self):
+        self.mvru={"axis":0}
+    def reduceM(self):
+        self.mvru={"axis":1}
+    def vv_add_new(self):
+        self.vvalu={"reset":1,"op":0}
+    def vv_add(self):
+        self.vvalu={"reset":0,"op":0}
+    def end_chain(self):
+        chain_instrs = {"fu":self.fu,"mvru":self.mvru,"vvalu":self.vvalu}
+        self.firmware.append([chain_instrs])
+    def compile():
+    	# We will compile to abstract away the idea of cycles
+    	CONTINUE HERE
+    	return compiled_firmware
+
+    def __init__(self):
+        self.firmware = []
+        self.fu=None
+        self.mvru=None
+        self.vvalu=None
+
+# Firmware for a generic distribution
+def distribution(bins):
+    assert bins%M==0, "Number of bins must be divisible by M for now"
+    cp = compiler()
+    for i in range(bins/M):
+        cp.begin_chain()
+        cp.filter(i*M)
+        cp.reduceN()
+        cp.vv_add()
+        cp.end_chain()
+    return cp.compile()
+
+compiled_firmware = distribution(2*M)
+
+print(compiled_firmware)
+
 # Feed one value to input buffer
 input_vector = np.random.rand(N)*4
 proc.ib.push(input_vector)
 
+
 # Step through it until we get the result
-for i in range(4):
-    proc.step()
-    print(proc.fu.output)
-    print(proc.mvru.output)
-    print(proc.vvalu.output)
-    print("\n")
+proc.step()
+proc.step()
+proc.step()
+proc.step()
+print(proc.fu.output)
+print(proc.mvru.output)
+print(proc.vvalu.output)
+    
