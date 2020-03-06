@@ -4,7 +4,7 @@ import numpy as np
 from copy import deepcopy as copy
 
 # Setting Debug level (can be debug, info, warning, error and critical)
-log.basicConfig(stream=sys.stderr, level=log.DEBUG)
+log.basicConfig(stream=sys.stderr, level=log.INFO)
 
 ''' Emulation settings '''
 DEBUG=True
@@ -143,9 +143,6 @@ class CISC():
         chain = self.fu.step(chain)
         chain = self.mvru.step(chain)
         chain = self.vvalu.step(chain)
-        #print(self.fu.output)
-        print(self.mvru.output)
-        print(self.vvalu.output)
 
     def run(self,compiled_firmware):
         for idx, instr in enumerate(compiled_firmware):
@@ -235,8 +232,13 @@ input_vector = np.random.rand(N)*8
 proc.ib.push(input_vector)
 proc.step()
 
+
 # Step through it until we get the result
 proc.run(compiled_firmware)
-#print(proc.fu.output)
-#print(proc.mvru.output)
-#print(proc.vvalu.output)
+
+print("\nInputs:")
+print(input_vector)
+print("\nResults stored in VVALU VRF")
+for i in [0,1]:
+	print("\tRange: "+str(proc.fu.vrf[i*M:i*M+M+1]))
+	print("\tDistribution: "+str(proc.vvalu.vrf[i*N:i*N+N][:M]))
