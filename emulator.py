@@ -19,8 +19,11 @@ M = 4
 # Input buffer depth
 IB_DEPTH = 4
 
-# Size of FUVRF
+# Size of FUVRF in elements
 FUVRF_SIZE=64
+
+# SIze of VVVRF in N*elements
+VVVRF_SIZE=8
 
 ''' Verifying parameters '''
 assert math.log(N, 2).is_integer(), "N must be a power of 2" 
@@ -101,29 +104,32 @@ class CISC():
 
     # This block will reduce the matrix along a given axis
     class VectorVectorALU():
-        def __init__(self,N):
+        def __init__(self,N,VVVRF_SIZE):
             self.input=np.zeros(N)
             self.output=np.zeros(N)
-            self.config=struct(reset=0,op=0)
+            self.vrf=np.zeros(N*VVVRF_SIZE)
+            self.config=struct(op=0,addr1=0,addr2=0)
 
         def step(self,input_value):
-            if self.config.reset:
-                log.debug('Resetting vector-vector ALU output')
-                self.output = np.zeros(N)
             if self.config.op==0:
             	log.debug('ALU is passing values through')
             	self.output = self.input
             elif self.config.op==1:
                 log.debug('Adding using vector-vector ALU')
-                self.output = self.output + self.input
+                self.output = self.vrf[self.config.addr1*N:self.config.addr1*N+N] + self.input
+                self.vrf[self.config.addr2*N:self.config.addr2*N+N] = self.output 
+            elif self.config.op==2:
+                log.debug('Storing values in VVALU_VRF and passing through')
+                self.output = self.input
+                self.vrf[self.config.addr1*N:self.config.addr1*N+N] = self.output 
             self.input=copy(input_value)
             return self.output
 
-    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE):
+    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE):
         self.ib   = self.InputBuffer(N,IB_DEPTH)
         self.fu   = self.FilterUnit(N,M,FUVRF_SIZE)
         self.mvru = self.MatrixVectorReduce(N,M)
-        self.vvalu= self.VectorVectorALU(N)
+        self.vvalu= self.VectorVectorALU(N,VVVRF_SIZE)
 
     def step(self):
         log.debug('New step')
@@ -131,7 +137,7 @@ class CISC():
         chain = self.fu.step(chain)
         chain = self.mvru.step(chain)
         chain = self.vvalu.step(chain)
-        print(self.fu.output)
+        #print(self.fu.output)
         print(self.mvru.output)
         print(self.vvalu.output)
 
@@ -145,7 +151,7 @@ class CISC():
 
 
 # Instantiate processor
-proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE)
+proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
 
 # Initial hardware setup
 proc.fu.vrf=list(range(FUVRF_SIZE)) # Initializing fuvrf
@@ -161,12 +167,14 @@ class compiler():
         self.mvru.axis=0
     def reduceM(self):
         self.mvru.axis=1
-    def vv_add_new(self):
-        self.vvalu.reset=1
+    def vv_add_new(self,addr1):
+        self.vvalu.op=2
+        self.addr1=addr1
+        self.addr2=None
+    def vv_add(self,addr1,addr2):
         self.vvalu.op=1
-    def vv_add(self):
-        self.vvalu.reset=0
-        self.vvalu.op=1
+        self.vvalu.addr1=addr1
+        self.vvalu.addr2=addr2
     def end_chain(self):
         self.firmware.append(copy([self.fu,self.mvru,self.vvalu]))
     def compile(self):
@@ -186,7 +194,7 @@ class compiler():
 
     def __init__(self):
         self.firmware = []
-        self.pass_through = [struct(addr=0),struct(axis=0),struct(reset=0,op=0)]
+        self.pass_through = [struct(addr=0),struct(axis=0),struct(op=0,addr1=0,addr2=0)]
         self.fu, self.mvru, self.vvalu = self.pass_through[:]
 
 # Firmware for a generic distribution
@@ -197,7 +205,7 @@ def distribution(bins):
         cp.begin_chain()
         cp.filter(i*M)
         cp.reduceM()
-        cp.vv_add()
+        cp.vv_add(i,i)
         cp.end_chain()
     return cp.compile()
 
@@ -219,4 +227,3 @@ proc.run(compiled_firmware)
 #print(proc.fu.output)
 #print(proc.mvru.output)
 #print(proc.vvalu.output)
-    
