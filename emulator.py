@@ -109,20 +109,26 @@ class CISC():
             self.output=np.zeros(N)
             self.vrf=np.zeros(N*VVVRF_SIZE)
             self.config=struct(op=0,addr1=0,addr2=0)
+            self.delay1=np.zeros(N)
+            self.delay2=np.zeros(N)
 
         def step(self,input_value):
+        	# Delay for 2 cycles, so this FU takes 3 cycles (read, calculate, write)
+            self.output = self.delay2
+            self.delay2 = self.delay1
             if self.config.op==0:
             	log.debug('ALU is passing values through')
-            	self.output = self.input
+            	self.delay1 = self.input
             elif self.config.op==1:
                 log.debug('Adding using vector-vector ALU')
-                self.output = self.vrf[self.config.addr1*N:self.config.addr1*N+N] + self.input
-                self.vrf[self.config.addr2*N:self.config.addr2*N+N] = self.output 
+                self.delay1 = self.vrf[self.config.addr1*N:self.config.addr1*N+N] + self.input
+                self.vrf[self.config.addr2*N:self.config.addr2*N+N] = self.delay1 
             elif self.config.op==2:
                 log.debug('Storing values in VVALU_VRF and passing through')
-                self.output = self.input
-                self.vrf[self.config.addr1*N:self.config.addr1*N+N] = self.output 
+                self.delay1 = self.input
+                self.vrf[self.config.addr1*N:self.config.addr1*N+N] = self.delay1 
             self.input=copy(input_value)
+            
             return self.output
 
     def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE):
@@ -182,13 +188,23 @@ class compiler():
         # Input: List of operations each chain needs to perform
         # Output: For each cycle, which operation each function unit should perform
         compiled_firmware=[]
-        pipeline_depth=3
+        pipeline_depth=5
         number_of_chains=len(self.firmware)
         for i in range(pipeline_depth+number_of_chains-1):
             chain_instrs = self.pass_through[:]
-            for j in range(pipeline_depth):
-                if i<number_of_chains+j and i>j-1:
-                    chain_instrs[j]=self.firmware[i-j][j]
+            # For the FU, which takes 1 cycle
+            if i<number_of_chains:
+                    chain_instrs[0]=self.firmware[i][0]
+            # For the MVRU, which takes 1 cycle
+            if i<number_of_chains+1 and i>0:
+                    chain_instrs[1]=self.firmware[i-1][1]
+            # For the VVALU, which takes 3 cycles
+            if i<number_of_chains+2 and i>1:
+                    chain_instrs[2]=self.firmware[i-2][2]
+
+            #for j in range(pipeline_depth):
+            #    if i<number_of_chains+j and i>j-1:
+            #        chain_instrs[j]=self.firmware[i-j][j]
             compiled_firmware.append(chain_instrs)
         return compiled_firmware
 
