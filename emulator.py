@@ -19,8 +19,8 @@ M = 4
 # Input buffer depth
 IB_DEPTH = 4
 
-# Size of FUVRF in elements
-FUVRF_SIZE=64
+# Size of FUVRF in M*elements
+FUVRF_SIZE=4
 
 # SIze of VVVRF in N*elements
 VVVRF_SIZE=8
@@ -64,16 +64,16 @@ class CISC():
         def __init__(self,N,M,FUVRF_SIZE):
             self.input=np.zeros(N)
             self.output=np.zeros((M,N))
-            self.vrf=np.zeros(FUVRF_SIZE)
+            self.vrf=np.zeros(FUVRF_SIZE*M)
             self.config=struct(addr=0)
 
         def step(self,input_value):
             # Check if the vector is within M ranges
             log.debug('Filter input:'+str(self.input))
-            log.debug('Filtering using the following ranges:'+str(self.vrf[self.config.addr:self.config.addr+M+1]))
+            log.debug('Filtering using the following ranges:'+str(self.vrf[self.config.addr*M:self.config.addr*M+M+1]))
             for i in range(M):
-                low_range = self.vrf[self.config.addr+i]
-                high_range = self.vrf[self.config.addr+i+1]
+                low_range = self.vrf[self.config.addr*M+i]
+                high_range = self.vrf[self.config.addr*M+i+1]
                 within_range = np.all([self.input>low_range, self.input<=high_range],axis=0)
                 self.output[i]=within_range[:]
 
@@ -160,7 +160,7 @@ class CISC():
 proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
 
 # Initial hardware setup
-proc.fu.vrf=list(range(FUVRF_SIZE)) # Initializing fuvrf
+proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
 
 # Hardware configurations (that can be done by VLIW instruction)
 class compiler():
@@ -202,9 +202,6 @@ class compiler():
             if i<number_of_chains+2 and i>1:
                     chain_instrs[2]=self.firmware[i-2][2]
 
-            #for j in range(pipeline_depth):
-            #    if i<number_of_chains+j and i>j-1:
-            #        chain_instrs[j]=self.firmware[i-j][j]
             compiled_firmware.append(chain_instrs)
         return compiled_firmware
 
@@ -219,7 +216,7 @@ def distribution(bins):
     cp = compiler()
     for i in range(bins/M):
         cp.begin_chain()
-        cp.filter(i*M)
+        cp.filter(i)
         cp.reduceM()
         cp.vv_add(i,i)
         cp.end_chain()
