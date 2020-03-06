@@ -111,6 +111,9 @@ class CISC():
                 log.debug('Resetting vector-vector ALU output')
                 self.output = np.zeros(N)
             if self.config.op==0:
+            	log.debug('ALU is passing values through')
+            	self.output = self.input
+            elif self.config.op==1:
                 log.debug('Adding using vector-vector ALU')
                 self.output = self.output + self.input
             self.input=copy(input_value)
@@ -160,10 +163,10 @@ class compiler():
         self.mvru.axis=1
     def vv_add_new(self):
         self.vvalu.reset=1
-        self.vvalu.op=0
+        self.vvalu.op=1
     def vv_add(self):
         self.vvalu.reset=0
-        self.vvalu.op=0
+        self.vvalu.op=1
     def end_chain(self):
         self.firmware.append(copy([self.fu,self.mvru,self.vvalu]))
     def compile(self):
