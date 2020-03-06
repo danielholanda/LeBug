@@ -66,6 +66,7 @@ class CISC():
 
         def step(self,input_value):
             # Check if the vector is within M ranges
+            log.debug('Filter input:'+str(self.input))
             log.debug('Filtering using the following ranges:'+str(self.vrf[self.config.addr:self.config.addr+M+1]))
             for i in range(M):
                 low_range = self.vrf[self.config.addr+i]
@@ -73,7 +74,7 @@ class CISC():
                 within_range = np.all([self.input>low_range, self.input<=high_range],axis=0)
                 self.output[i]=within_range[:]
 
-            self.input=input_value
+            self.input=copy(input_value)
             return self.output
 
     # This block will reduce the matrix along a given axis
@@ -95,7 +96,7 @@ class CISC():
                     log.debug('Padding results with '+str(N-M)+' zeros')
                     self.output=np.concatenate((self.output,np.zeros(N-M)))
 
-            self.input=input_value
+            self.input=copy(input_value)
             return self.output
 
     # This block will reduce the matrix along a given axis
@@ -112,7 +113,7 @@ class CISC():
             if self.config.op==0:
                 log.debug('Adding using vector-vector ALU')
                 self.output = self.output + self.input
-            self.input=input_value
+            self.input=copy(input_value)
             return self.output
 
     def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE):
@@ -127,9 +128,12 @@ class CISC():
         chain = self.fu.step(chain)
         chain = self.mvru.step(chain)
         chain = self.vvalu.step(chain)
+        print(self.fu.output)
+        print(self.mvru.output)
+        print(self.vvalu.output)
 
     def run(self,compiled_firmware):
-        for instr in compiled_firmware:
+        for idx, instr in enumerate(compiled_firmware):
             # Dispatch Instructions to each functional unit
             self.fu.config ,self.mvru.config, self.vvalu.config = instr
             # Keep stepping through the circuit as long as we have instructions to execute
@@ -169,11 +173,11 @@ class compiler():
         compiled_firmware=[]
         pipeline_depth=3
         number_of_chains=len(self.firmware)
-        for i in range(pipeline_depth+number_of_chains):
+        for i in range(pipeline_depth+number_of_chains-1):
             chain_instrs = self.pass_through[:]
             for j in range(pipeline_depth):
-                if i<number_of_chains and i>j-1:
-                    chain_instrs[j]=self.firmware[i][j]
+                if i<number_of_chains+j and i>j-1:
+                    chain_instrs[j]=self.firmware[i-j][j]
             compiled_firmware.append(chain_instrs)
         return compiled_firmware
 
@@ -186,7 +190,12 @@ class compiler():
 def distribution(bins):
     assert bins%M==0, "Number of bins must be divisible by M for now"
     cp = compiler()
-    for i in range(bins/M):
+    cp.begin_chain()
+    cp.filter(0)
+    cp.reduceM()
+    cp.vv_add_new()
+    cp.end_chain()
+    for i in range(1,bins/M):
         cp.begin_chain()
         cp.filter(i*M)
         cp.reduceM()
@@ -196,17 +205,20 @@ def distribution(bins):
 
 compiled_firmware = distribution(2*M)
 
-for chain in compiled_firmware:
-    print(chain)
+# Printing sequence of instructions that will be executed at each cycle
+print("\nSequence of operations per cycle:")
+for idx, chain_instr in enumerate(compiled_firmware):
+    print("\tCycle #"+str(idx)+" "+str(chain_instr))
 
 
 # Feed one value to input buffer
-input_vector = np.random.rand(N)*4
+input_vector = np.random.rand(N)*8
 proc.ib.push(input_vector)
+proc.step()
 
 # Step through it until we get the result
 proc.run(compiled_firmware)
-print(proc.fu.output)
-print(proc.mvru.output)
-print(proc.vvalu.output)
+#print(proc.fu.output)
+#print(proc.mvru.output)
+#print(proc.vvalu.output)
     
