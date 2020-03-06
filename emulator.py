@@ -193,12 +193,7 @@ class compiler():
 def distribution(bins):
     assert bins%M==0, "Number of bins must be divisible by M for now"
     cp = compiler()
-    cp.begin_chain()
-    cp.filter(0)
-    cp.reduceM()
-    cp.vv_add_new()
-    cp.end_chain()
-    for i in range(1,bins/M):
+    for i in range(bins/M):
         cp.begin_chain()
         cp.filter(i*M)
         cp.reduceM()
