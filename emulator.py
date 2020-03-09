@@ -5,6 +5,7 @@ from copy import deepcopy as copy
 
 # Setting Debug level (can be debug, info, warning, error and critical)
 log.basicConfig(stream=sys.stderr, level=log.INFO)
+np.random.seed(42)
 
 ''' Emulation settings '''
 DEBUG=True
@@ -65,17 +66,22 @@ class CISC():
             self.input=np.zeros(N)
             self.output=np.zeros((M,N))
             self.vrf=np.zeros(FUVRF_SIZE*M)
-            self.config=struct(addr=0)
+            self.config=struct(filter=0,addr=0)
 
         def step(self,input_value):
             # Check if the vector is within M ranges
             log.debug('Filter input:'+str(self.input))
             log.debug('Filtering using the following ranges:'+str(self.vrf[self.config.addr*M:self.config.addr*M+M+1]))
-            for i in range(M):
-                low_range = self.vrf[self.config.addr*M+i]
-                high_range = self.vrf[self.config.addr*M+i+1]
-                within_range = np.all([self.input>low_range, self.input<=high_range],axis=0)
-                self.output[i]=within_range[:]
+            if self.config.filter==1:
+	            for i in range(M):
+	                low_range = self.vrf[self.config.addr*M+i]
+	                high_range = self.vrf[self.config.addr*M+i+1]
+	                within_range = np.all([self.input>low_range, self.input<=high_range],axis=0)
+	                self.output[i]=within_range[:]
+            # If we are not filtering, just pass the value through 
+            else:
+            	for i in range(M):
+            		self.output[i] = self.input if i==0 else np.zeros(N)
 
             self.input=copy(input_value)
             return self.output
@@ -165,6 +171,7 @@ class compiler():
     def begin_chain(self):
         self.fu, self.mvru, self.vvalu = copy(self.pass_through)
     def filter(self,addr):
+    	self.fu.filter=1
         self.fu.addr=addr
     def reduceN(self):
         self.mvru.axis=0
@@ -204,7 +211,7 @@ class compiler():
 
     def __init__(self):
         self.firmware = []
-        self.pass_through = [struct(addr=0),struct(axis=0),struct(op=0,addr1=0,addr2=0)]
+        self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0,addr1=0,addr2=0)]
         self.fu, self.mvru, self.vvalu = self.pass_through[:]
 
 # Firmware for a generic distribution
