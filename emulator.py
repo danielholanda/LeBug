@@ -26,6 +26,9 @@ FUVRF_SIZE=4
 # SIze of VVVRF in N*elements
 VVVRF_SIZE=8
 
+# SIze of Trace Buffer in N*elements
+TB_SIZE=64
+
 ''' Verifying parameters '''
 assert math.log(N, 2).is_integer(), "N must be a power of 2" 
 assert math.log(M, 2).is_integer(), "N must be a power of 2" 
@@ -141,7 +144,7 @@ class CISC():
             
             return self.output
 
-        # This block will reduce the matrix along a given axis
+    # Packs data efficiently
     class DataPacker():
         def __init__(self,N,M):
             self.input=np.zeros(N)
@@ -158,16 +161,33 @@ class CISC():
                     self.output = np.append(self.output,self.input[:self.config.size])
                 self.output_size=self.output_size+self.config.size
                 if self.output_size==N:
-                    print('Data Packer full. Pushing values to Trace Buffer')
+                    log.debug('Data Packer full. Pushing values to Trace Buffer')
                     self.output_valid=1
                 else:
                     self.output_valid=0
             else:
-            	self.output_valid=0
+                self.output_valid=0
             
             self.input=copy(input_value)
             
             return self.output, self.output_valid
+
+    # Packs data efficiently
+    class TraceBuffer():
+        def __init__(self,N,TB_SIZE):
+            self.input=np.zeros(N)
+            self.mem=np.zeros((TB_SIZE,N))
+            self.size=0
+
+        def step(self,packed_data):
+            output, output_valid = packed_data
+            if output_valid:
+                if self.size==TB_SIZE-1:
+                    self.size=0
+                self.mem[self.size]=output
+                self.size=self.size+1
+            self.input=copy(packed_data)
+            
 
     def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE):
         self.ib   = self.InputBuffer(N,IB_DEPTH)
@@ -175,6 +195,7 @@ class CISC():
         self.mvru = self.MatrixVectorReduce(N,M)
         self.vvalu= self.VectorVectorALU(N,VVVRF_SIZE)
         self.dp   = self.DataPacker(N,M)
+        self.tb   = self.TraceBuffer(N,TB_SIZE)
 
     def step(self):
         log.debug('New step')
@@ -182,10 +203,8 @@ class CISC():
         chain = self.fu.step(chain)
         chain = self.mvru.step(chain)
         chain = self.vvalu.step(chain)
-        output, output_valid = self.dp.step(chain)
-        if output_valid:
-        	print("Received this value from data packer:")
-        	print(output)
+        packed_data = self.dp.step(chain)
+        self.tb.step(packed_data)
 
     def run(self,compiled_firmware):
         for idx, instr in enumerate(compiled_firmware):
@@ -193,6 +212,7 @@ class CISC():
             self.fu.config ,self.mvru.config, self.vvalu.config, self.dp.config = instr
             # Keep stepping through the circuit as long as we have instructions to execute
             self.step()
+        return self.tb.mem
 
 
 
@@ -239,7 +259,7 @@ class compiler():
         # Input: List of operations each chain needs to perform
         # Output: For each cycle, which operation each function unit should perform
         compiled_firmware=[]
-        pipeline_depth=6
+        pipeline_depth=7
         number_of_chains=len(self.firmware)
         for i in range(pipeline_depth+number_of_chains-1):
             chain_instrs = self.pass_through[:]
@@ -255,6 +275,7 @@ class compiler():
             # For the Data Packer, which takes 1 cycle
             if i<number_of_chains+5 and i>4:
                     chain_instrs[3]=self.firmware[i-5][3]
+            # There is one more cycle for writing the data in the trace buffer
 
             compiled_firmware.append(chain_instrs)
         return compiled_firmware
@@ -264,40 +285,35 @@ class compiler():
         self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0,addr=0,cache=0,cache_addr=0),struct(commit=0,size=0)]
         self.fu, self.mvru, self.vvalu, self.dp = self.pass_through[:]
 
-# Firmware for a generic distribution
-def distribution(bins):
-    assert bins%M==0, "Number of bins must be divisible by M for now"
-    cp = compiler()
-    for i in range(bins/M):
-        cp.begin_chain()
-        cp.filter(i)
-        cp.reduceM()
-        cp.vv_add(i)
-        cp.v_cache(i)
-        cp.commitM()
-        cp.end_chain()
-    return cp.compile()
+def testSimpleDistribution():
+    # Firmware for a generic distribution
+    def distribution(bins):
+        assert bins%M==0, "Number of bins must be divisible by M for now"
+        cp = compiler()
+        for i in range(bins/M):
+            cp.begin_chain()
+            cp.filter(i)
+            cp.reduceM()
+            cp.vv_add(i)
+            cp.commitM()
+            cp.end_chain()
+        return cp.compile()
 
-compiled_firmware = distribution(2*M)
+    compiled_firmware = distribution(2*M)
 
-# Printing sequence of instructions that will be executed at each cycle
-print("\nSequence of operations per cycle:")
-for idx, chain_instr in enumerate(compiled_firmware):
-    print("\tCycle #"+str(idx)+" "+str(chain_instr))
+    # Printing sequence of instructions that will be executed at each cycle
+    print("\nSequence of operations per cycle:")
+    for idx, chain_instr in enumerate(compiled_firmware):
+        print("\tCycle #"+str(idx)+" "+str(chain_instr))
 
+    # Feed one value to input buffer
+    input_vector = np.random.rand(N)*8
+    proc.ib.push(input_vector)
+    proc.step()
 
-# Feed one value to input buffer
-input_vector = np.random.rand(N)*8
-proc.ib.push(input_vector)
-proc.step()
+    # Step through it until we get the result
+    tb = proc.run(compiled_firmware)
 
+    assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with distribution failed"
 
-# Step through it until we get the result
-proc.run(compiled_firmware)
-
-print("\nInputs:")
-print(input_vector)
-print("\nResults stored in VVALU VRF")
-for i in [0,1]:
-    print("\tRange: "+str(proc.fu.vrf[i*M:i*M+M+1]))
-    print("\tDistribution: "+str(proc.vvalu.vrf[i*N:i*N+N][:M]))
+testSimpleDistribution()
