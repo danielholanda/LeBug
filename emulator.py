@@ -96,11 +96,15 @@ class CISC():
 
         def step(self,input_value):
             # Reduce matrix along a given axis
-            self.output=np.sum(self.input,axis=self.config.axis)
             if self.config.axis==0:
-                log.debug('Reducing matrix along N axis (axis = '+str(self.config.axis)+')')
+                log.debug('Passing first vector through reduce unit')
+                self.output=self.input[0]
             elif self.config.axis==1:
+                log.debug('Reducing matrix along N axis (axis = '+str(self.config.axis)+')')
+                self.output=np.sum(self.input,axis=0)
+            elif self.config.axis==2:
                 log.debug('Reducing matrix along M axis (axis = '+str(self.config.axis)+')')
+                self.output=np.sum(self.input,axis=1)
                 if N!=M:
                     log.debug('Padding results with '+str(N-M)+' zeros')
                     self.output=np.concatenate((self.output,np.zeros(N-M)))
@@ -174,9 +178,9 @@ class compiler():
     	self.fu.filter=1
         self.fu.addr=addr
     def reduceN(self):
-        self.mvru.axis=0
-    def reduceM(self):
         self.mvru.axis=1
+    def reduceM(self):
+        self.mvru.axis=2
     def vv_add_new(self,addr1):
         self.vvalu.op=2
         self.addr1=addr1
