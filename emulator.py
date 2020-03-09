@@ -141,11 +141,38 @@ class CISC():
             
             return self.output
 
+        # This block will reduce the matrix along a given axis
+    class DataPacker():
+        def __init__(self,N,M):
+            self.input=np.zeros(N)
+            self.output=np.zeros(N)
+            self.output_valid=0
+            self.output_size=0
+            self.config=struct(commit=0,size=0)
+
+        def step(self,input_value):
+            if self.config.commit:
+            	if self.output_size==0 or self.output_size==N:
+            		self.output = self.input[:self.config.size]
+            	else:
+            		self.output = np.append(self.output,self.input[:self.config.size])
+        		output_size=output_size+self.config.size
+        		if output_size==N:
+        			log.debug('Data Packer full. Pushing values to Trace Buffer')
+        			self.output_valid=1
+    			else:
+    				self.output_valid=0
+            
+            self.input=copy(input_value)
+            
+            return self.output, self.output_valid
+
     def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE):
         self.ib   = self.InputBuffer(N,IB_DEPTH)
         self.fu   = self.FilterUnit(N,M,FUVRF_SIZE)
         self.mvru = self.MatrixVectorReduce(N,M)
         self.vvalu= self.VectorVectorALU(N,VVVRF_SIZE)
+        self.dp   = self.DataPacker(N,M)
 
     def step(self):
         log.debug('New step')
@@ -153,11 +180,12 @@ class CISC():
         chain = self.fu.step(chain)
         chain = self.mvru.step(chain)
         chain = self.vvalu.step(chain)
+        output, output_valid = self.dp.step(chain)
 
     def run(self,compiled_firmware):
         for idx, instr in enumerate(compiled_firmware):
             # Dispatch Instructions to each functional unit
-            self.fu.config ,self.mvru.config, self.vvalu.config = instr
+            self.fu.config ,self.mvru.config, self.vvalu.config, self.dp.config = instr
             # Keep stepping through the circuit as long as we have instructions to execute
             self.step()
 
@@ -173,7 +201,7 @@ proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
 class compiler():
     # ISA
     def begin_chain(self):
-        self.fu, self.mvru, self.vvalu = copy(self.pass_through)
+        self.fu, self.mvru, self.vvalu, self.dp = copy(self.pass_through)
     def filter(self,addr):
         self.fu.filter=1
         self.fu.addr=addr
@@ -190,8 +218,17 @@ class compiler():
     def v_cache(self,cache_addr):
         self.vvalu.cache=1
         self.vvalu.cache_addr=cache_addr
+    def commitM(self):
+    	self.dp.commit=1
+    	self.dp.size=M
+    def commitN(self):
+    	self.dp.commit=1
+    	self.dp.size=N
+    def commit1(self):
+    	self.dp.commit=1
+    	self.dp.size=1
     def end_chain(self):
-        self.firmware.append(copy([self.fu,self.mvru,self.vvalu]))
+        self.firmware.append(copy([self.fu,self.mvru,self.vvalu,self.dp]))
     def compile(self):
         # We will compile to abstract away the idea of cycles
         # Input: List of operations each chain needs to perform
@@ -210,14 +247,17 @@ class compiler():
             # For the VVALU, which takes 3 cycles
             if i<number_of_chains+2 and i>1:
                     chain_instrs[2]=self.firmware[i-2][2]
+            # For the Data Packer, which takes 1 cycle
+            if i<number_of_chains+3 and i>2:
+                    chain_instrs[3]=self.firmware[i-3][3]
 
             compiled_firmware.append(chain_instrs)
         return compiled_firmware
 
     def __init__(self):
         self.firmware = []
-        self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0,addr=0,cache=0,cache_addr=0)]
-        self.fu, self.mvru, self.vvalu = self.pass_through[:]
+        self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0,addr=0,cache=0,cache_addr=0),struct(commit=0,size=0)]
+        self.fu, self.mvru, self.vvalu, self.dp = self.pass_through[:]
 
 # Firmware for a generic distribution
 def distribution(bins):
@@ -229,6 +269,7 @@ def distribution(bins):
         cp.reduceM()
         cp.vv_add(i)
         cp.v_cache(i)
+        cp.commitM()
         cp.end_chain()
     return cp.compile()
 
