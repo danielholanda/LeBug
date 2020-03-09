@@ -47,79 +47,87 @@ class CISC():
         def __init__(self,N,IB_DEPTH):
             self.buffer=[]
             self.size=IB_DEPTH
-            self.output=[]
 
-        def push(self,v):
-            assert list(v.shape)==[N], "Input must be Nx1"
+        def push(self,pushed_vals):
+            v_in, eof_in = pushed_vals
+            assert list(v_in.shape)==[N], "Input must be Nx1"
             assert len(self.buffer)<=self.size, "Input buffer overflowed"
-            log.debug('Vector inserted into input buffer\n'+str(v))
-            self.buffer.append(list(v))
+            log.debug('Vector inserted into input buffer\n'+str(v_in))
+            self.buffer.append([v_in,eof_in])
 
         def pop(self):
             assert len(self.buffer)>0, "Input buffer is empty"
             return self.buffer.pop(-1)
 
         def step(self):
-            self.output = np.array(self.buffer[-1])
-            return self.output
+            v_out, eof_out = self.buffer[-1]
+            return v_out, eof_out
 
     # Filter Unit
     class FilterUnit():
         def __init__(self,N,M,FUVRF_SIZE):
-            self.input=np.zeros(N)
-            self.output=np.zeros((M,N))
+            self.v_in=np.zeros(N)
+            self.m_out=np.zeros((M,N))
+            self.eof_in = False
+            self.eof_out = False
             self.vrf=np.zeros(FUVRF_SIZE*M)
             self.config=struct(filter=0,addr=0)
 
         def step(self,input_value):
             # Check if the vector is within M ranges
-            log.debug('Filter input:'+str(self.input))
+            log.debug('Filter input:'+str(self.v_in))
             log.debug('Filtering using the following ranges:'+str(self.vrf[self.config.addr*M:self.config.addr*M+M+1]))
             if self.config.filter==1:
                 for i in range(M):
                     low_range = self.vrf[self.config.addr*M+i]
                     high_range = self.vrf[self.config.addr*M+i+1]
-                    within_range = np.all([self.input>low_range, self.input<=high_range],axis=0)
-                    self.output[i]=within_range[:]
+                    within_range = np.all([self.v_in>low_range, self.v_in<=high_range],axis=0)
+                    self.m_out[i]=within_range[:]
             # If we are not filtering, just pass the value through 
             else:
                 for i in range(M):
-                    self.output[i] = self.input if i==0 else np.zeros(N)
+                    self.m_out[i] = self.v_in if i==0 else np.zeros(N)
 
-            self.input=copy(input_value)
-            return self.output
+            self.eof_out = copy(self.eof_in)
+            self.v_in, self.eof_in = copy(input_value)
+            return self.m_out, self.eof_out
 
     # This block will reduce the matrix along a given axis
     # If M<N, then the results will be padded with zeros
     class MatrixVectorReduce():
         def __init__(self,N,M):
-            self.input=np.zeros((M,N))
-            self.output=np.zeros(N)
+            self.m_in=np.zeros((M,N))
+            self.v_out=np.zeros(N)
+            self.eof_in = False
+            self.eof_out = False
             self.config=struct(axis=0)
 
         def step(self,input_value):
             # Reduce matrix along a given axis
             if self.config.axis==0:
                 log.debug('Passing first vector through reduce unit')
-                self.output=self.input[0]
+                self.v_out=self.m_in[0]
             elif self.config.axis==1:
                 log.debug('Reducing matrix along N axis (axis = '+str(self.config.axis)+')')
-                self.output=np.sum(self.input,axis=0)
+                self.v_out=np.sum(self.m_in,axis=0)
             elif self.config.axis==2:
                 log.debug('Reducing matrix along M axis (axis = '+str(self.config.axis)+')')
-                self.output=np.sum(self.input,axis=1)
+                self.v_out=np.sum(self.m_in,axis=1)
                 if N!=M:
                     log.debug('Padding results with '+str(N-M)+' zeros')
-                    self.output=np.concatenate((self.output,np.zeros(N-M)))
+                    self.v_out=np.concatenate((self.v_out,np.zeros(N-M)))
 
-            self.input=copy(input_value)
-            return self.output
+            self.eof_out = copy(self.eof_in)
+            self.m_in, self.eof_in = copy(input_value)
+            return self.v_out, self.eof_out
 
     # This block will reduce the matrix along a given axis
     class VectorVectorALU():
         def __init__(self,N,VVVRF_SIZE):
-            self.input=np.zeros(N)
-            self.output=np.zeros(N)
+            self.v_in=np.zeros(N)
+            self.v_out=np.zeros(N)
+            self.eof_in = False
+            self.eof_out = False
             self.vrf=np.zeros(N*VVVRF_SIZE)
             self.config=struct(op=0,addr=0,cache=0,cache_addr=0)
             self.delay1=np.zeros(N)
@@ -127,50 +135,52 @@ class CISC():
 
         def step(self,input_value):
             # Delay for 2 cycles, so this FU takes 3 cycles (read, calculate, write)
-            self.output = self.delay2
+            self.v_out = self.delay2
             self.delay2 = self.delay1
             if self.config.op==0:
                 log.debug('ALU is passing values through')
-                self.delay1 = self.input
+                self.delay1 = self.v_in
             elif self.config.op==1:
                 log.debug('Adding using vector-vector ALU')
-                self.delay1 = self.vrf[self.config.addr*N:self.config.addr*N+N] + self.input
+                self.delay1 = self.vrf[self.config.addr*N:self.config.addr*N+N] + self.v_in
             elif self.config.op==2:
                 log.debug('Storing values in VVALU_VRF and passing through')
-                self.delay1 = self.input
+                self.delay1 = self.v_in
             if self.config.cache:
                 self.vrf[self.config.cache_addr*N:self.config.cache_addr*N+N] = self.delay1 
-            self.input=copy(input_value)
             
-            return self.output
+            self.eof_out = copy(self.eof_in)
+            self.v_in, self.eof_in = copy(input_value)
+            return self.v_out, self.eof_out
 
     # Packs data efficiently
     class DataPacker():
         def __init__(self,N,M):
-            self.input=np.zeros(N)
-            self.output=np.zeros(N)
-            self.output_valid=0
-            self.output_size=0
+            self.v_in=np.zeros(N)
+            self.v_out=np.zeros(N)
+            self.eof_in = False
+            self.v_out_valid=0
+            self.v_out_size=0
             self.config=struct(commit=0,size=0)
 
         def step(self,input_value):
             if self.config.commit:
-                if self.output_size==0:
-                    self.output = self.input[:self.config.size]
+                if self.v_out_size==0:
+                    self.v_out = self.v_in[:self.config.size]
                 else:
-                    self.output = np.append(self.output,self.input[:self.config.size])
-                self.output_size=self.output_size+self.config.size
-                if self.output_size==N:
+                    self.v_out = np.append(self.v_out,self.v_in[:self.config.size])
+                self.v_out_size=self.v_out_size+self.config.size
+                if self.v_out_size==N:
                     log.debug('Data Packer full. Pushing values to Trace Buffer')
-                    self.output_valid=1
+                    self.v_out_valid=1
                 else:
-                    self.output_valid=0
+                    self.v_out_valid=0
             else:
-                self.output_valid=0
+                self.v_out_valid=0
             
-            self.input=copy(input_value)
+            self.v_in, self.eof_in = copy(input_value)
             
-            return self.output, self.output_valid
+            return self.v_out, self.v_out_valid
 
     # Packs data efficiently
     class TraceBuffer():
@@ -308,12 +318,42 @@ def testSimpleDistribution():
 
     # Feed one value to input buffer
     input_vector = np.random.rand(N)*8
-    proc.ib.push(input_vector)
+    proc.ib.push([input_vector,False])
     proc.step()
 
     # Step through it until we get the result
     tb = proc.run(compiled_firmware)
-
     assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with distribution failed"
 
 testSimpleDistribution()
+
+def testDualDistribution():
+    # Firmware for a distribution with 2 sets of N values
+    def distribution(bins):
+        assert bins%M==0, "Number of bins must be divisible by M for now"
+        cp = compiler()
+        for i in range(bins/M):
+            cp.begin_chain()
+            cp.filter(i)
+            cp.reduceM()
+            cp.vv_add(i)
+            cp.v_cache(i)
+            cp.commitM('eof')
+            cp.end_chain()
+        return cp.compile()
+
+    compiled_firmware = distribution(2*M)
+
+    # Printing sequence of instructions that will be executed at each cycle
+    print("\nSequence of operations per cycle:")
+    for idx, chain_instr in enumerate(compiled_firmware):
+        print("\tCycle #"+str(idx)+" "+str(chain_instr))
+
+    # Feed one value to input buffer
+    proc.ib.push(np.random.rand(N)*8)
+    proc.ib.push(np.random.rand(N)*8)
+    proc.step()
+
+    # Step through it until we get the result
+    tb = proc.run(compiled_firmware)
+    assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with distribution failed"
