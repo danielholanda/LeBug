@@ -161,10 +161,10 @@ class CISC():
             self.eof_in = False
             self.v_out_valid=0
             self.v_out_size=0
-            self.config=struct(commit=0,size=0)
+            self.config=struct(commit=0,size=0,eof_only=False)
 
         def step(self,input_value):
-            if self.config.commit:
+            if self.config.commit and (not self.config.eof_only or (self.config.eof_only and self.eof_in)):
                 if self.v_out_size==0:
                     self.v_out = self.v_in[:self.config.size]
                 else:
@@ -253,15 +253,21 @@ class compiler():
     def v_cache(self,cache_addr):
         self.vvalu.cache=1
         self.vvalu.cache_addr=cache_addr
-    def commitM(self):
+    def commitM(self,option=None):
         self.dp.commit=1
         self.dp.size=M
-    def commitN(self):
+        if option == 'eof':
+        	eof_only=True
+    def commitN(self,option=None):
         self.dp.commit=1
         self.dp.size=N
-    def commit1(self):
+        if option == 'eof':
+        	eof_only=True
+    def commit1(self,option=None):
         self.dp.commit=1
         self.dp.size=1
+        if option == 'eof':
+        	eof_only=True
     def end_chain(self):
         self.firmware.append(copy([self.fu,self.mvru,self.vvalu,self.dp]))
     def compile(self):
@@ -292,7 +298,7 @@ class compiler():
 
     def __init__(self):
         self.firmware = []
-        self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0,addr=0,cache=0,cache_addr=0),struct(commit=0,size=0)]
+        self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0,addr=0,cache=0,cache_addr=0),struct(commit=0,size=0,eof_only=False)]
         self.fu, self.mvru, self.vvalu, self.dp = self.pass_through[:]
 
 def testSimpleDistribution():
@@ -350,10 +356,19 @@ def testDualDistribution():
         print("\tCycle #"+str(idx)+" "+str(chain_instr))
 
     # Feed one value to input buffer
-    proc.ib.push(np.random.rand(N)*8)
-    proc.ib.push(np.random.rand(N)*8)
+    input_vector1=np.random.rand(N)*8
+    input_vector2=np.random.rand(N)*8
+    print(input_vector1)
+    print(input_vector2)
+
+    proc.ib.push([input_vector1,False])
+    proc.ib.push([input_vector2,True])
     proc.step()
 
     # Step through it until we get the result
     tb = proc.run(compiled_firmware)
-    assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with distribution failed"
+    print(tb[0])
+    print(tb[1])
+    assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with dual distribution failed"
+
+testDualDistribution()
