@@ -73,15 +73,15 @@ class CISC():
             log.debug('Filter input:'+str(self.input))
             log.debug('Filtering using the following ranges:'+str(self.vrf[self.config.addr*M:self.config.addr*M+M+1]))
             if self.config.filter==1:
-	            for i in range(M):
-	                low_range = self.vrf[self.config.addr*M+i]
-	                high_range = self.vrf[self.config.addr*M+i+1]
-	                within_range = np.all([self.input>low_range, self.input<=high_range],axis=0)
-	                self.output[i]=within_range[:]
+                for i in range(M):
+                    low_range = self.vrf[self.config.addr*M+i]
+                    high_range = self.vrf[self.config.addr*M+i+1]
+                    within_range = np.all([self.input>low_range, self.input<=high_range],axis=0)
+                    self.output[i]=within_range[:]
             # If we are not filtering, just pass the value through 
             else:
-            	for i in range(M):
-            		self.output[i] = self.input if i==0 else np.zeros(N)
+                for i in range(M):
+                    self.output[i] = self.input if i==0 else np.zeros(N)
 
             self.input=copy(input_value)
             return self.output
@@ -118,25 +118,25 @@ class CISC():
             self.input=np.zeros(N)
             self.output=np.zeros(N)
             self.vrf=np.zeros(N*VVVRF_SIZE)
-            self.config=struct(op=0,addr1=0,addr2=0)
+            self.config=struct(op=0,addr=0,cache=0,cache_addr=0)
             self.delay1=np.zeros(N)
             self.delay2=np.zeros(N)
 
         def step(self,input_value):
-        	# Delay for 2 cycles, so this FU takes 3 cycles (read, calculate, write)
+            # Delay for 2 cycles, so this FU takes 3 cycles (read, calculate, write)
             self.output = self.delay2
             self.delay2 = self.delay1
             if self.config.op==0:
-            	log.debug('ALU is passing values through')
-            	self.delay1 = self.input
+                log.debug('ALU is passing values through')
+                self.delay1 = self.input
             elif self.config.op==1:
                 log.debug('Adding using vector-vector ALU')
-                self.delay1 = self.vrf[self.config.addr1*N:self.config.addr1*N+N] + self.input
-                self.vrf[self.config.addr2*N:self.config.addr2*N+N] = self.delay1 
+                self.delay1 = self.vrf[self.config.addr*N:self.config.addr*N+N] + self.input
             elif self.config.op==2:
                 log.debug('Storing values in VVALU_VRF and passing through')
                 self.delay1 = self.input
-                self.vrf[self.config.addr1*N:self.config.addr1*N+N] = self.delay1 
+            if self.config.cache:
+                self.vrf[self.config.cache_addr*N:self.config.cache_addr*N+N] = self.delay1 
             self.input=copy(input_value)
             
             return self.output
@@ -175,20 +175,21 @@ class compiler():
     def begin_chain(self):
         self.fu, self.mvru, self.vvalu = copy(self.pass_through)
     def filter(self,addr):
-    	self.fu.filter=1
+        self.fu.filter=1
         self.fu.addr=addr
     def reduceN(self):
         self.mvru.axis=1
     def reduceM(self):
         self.mvru.axis=2
-    def vv_add_new(self,addr1):
+    def vv_add_new(self,addr):
         self.vvalu.op=2
-        self.addr1=addr1
-        self.addr2=None
-    def vv_add(self,addr1,addr2):
+        self.addr=addr
+    def vv_add(self,addr):
         self.vvalu.op=1
-        self.vvalu.addr1=addr1
-        self.vvalu.addr2=addr2
+        self.vvalu.addr=addr
+    def v_cache(self,cache_addr):
+        self.vvalu.cache=1
+        self.vvalu.cache_addr=cache_addr
     def end_chain(self):
         self.firmware.append(copy([self.fu,self.mvru,self.vvalu]))
     def compile(self):
@@ -215,7 +216,7 @@ class compiler():
 
     def __init__(self):
         self.firmware = []
-        self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0,addr1=0,addr2=0)]
+        self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0,addr=0,cache=0,cache_addr=0)]
         self.fu, self.mvru, self.vvalu = self.pass_through[:]
 
 # Firmware for a generic distribution
@@ -226,7 +227,8 @@ def distribution(bins):
         cp.begin_chain()
         cp.filter(i)
         cp.reduceM()
-        cp.vv_add(i,i)
+        cp.vv_add(i)
+        cp.v_cache(i)
         cp.end_chain()
     return cp.compile()
 
@@ -251,5 +253,5 @@ print("\nInputs:")
 print(input_vector)
 print("\nResults stored in VVALU VRF")
 for i in [0,1]:
-	print("\tRange: "+str(proc.fu.vrf[i*M:i*M+M+1]))
-	print("\tDistribution: "+str(proc.vvalu.vrf[i*N:i*N+N][:M]))
+    print("\tRange: "+str(proc.fu.vrf[i*M:i*M+M+1]))
+    print("\tDistribution: "+str(proc.vvalu.vrf[i*N:i*N+N][:M]))
