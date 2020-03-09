@@ -152,16 +152,18 @@ class CISC():
 
         def step(self,input_value):
             if self.config.commit:
-            	if self.output_size==0 or self.output_size==N:
-            		self.output = self.input[:self.config.size]
-            	else:
-            		self.output = np.append(self.output,self.input[:self.config.size])
-        		output_size=output_size+self.config.size
-        		if output_size==N:
-        			log.debug('Data Packer full. Pushing values to Trace Buffer')
-        			self.output_valid=1
-    			else:
-    				self.output_valid=0
+                if self.output_size==0:
+                    self.output = self.input[:self.config.size]
+                else:
+                    self.output = np.append(self.output,self.input[:self.config.size])
+                self.output_size=self.output_size+self.config.size
+                if self.output_size==N:
+                    print('Data Packer full. Pushing values to Trace Buffer')
+                    self.output_valid=1
+                else:
+                    self.output_valid=0
+            else:
+            	self.output_valid=0
             
             self.input=copy(input_value)
             
@@ -181,6 +183,9 @@ class CISC():
         chain = self.mvru.step(chain)
         chain = self.vvalu.step(chain)
         output, output_valid = self.dp.step(chain)
+        if output_valid:
+        	print("Received this value from data packer:")
+        	print(output)
 
     def run(self,compiled_firmware):
         for idx, instr in enumerate(compiled_firmware):
@@ -219,14 +224,14 @@ class compiler():
         self.vvalu.cache=1
         self.vvalu.cache_addr=cache_addr
     def commitM(self):
-    	self.dp.commit=1
-    	self.dp.size=M
+        self.dp.commit=1
+        self.dp.size=M
     def commitN(self):
-    	self.dp.commit=1
-    	self.dp.size=N
+        self.dp.commit=1
+        self.dp.size=N
     def commit1(self):
-    	self.dp.commit=1
-    	self.dp.size=1
+        self.dp.commit=1
+        self.dp.size=1
     def end_chain(self):
         self.firmware.append(copy([self.fu,self.mvru,self.vvalu,self.dp]))
     def compile(self):
@@ -234,7 +239,7 @@ class compiler():
         # Input: List of operations each chain needs to perform
         # Output: For each cycle, which operation each function unit should perform
         compiled_firmware=[]
-        pipeline_depth=5
+        pipeline_depth=6
         number_of_chains=len(self.firmware)
         for i in range(pipeline_depth+number_of_chains-1):
             chain_instrs = self.pass_through[:]
@@ -248,8 +253,8 @@ class compiler():
             if i<number_of_chains+2 and i>1:
                     chain_instrs[2]=self.firmware[i-2][2]
             # For the Data Packer, which takes 1 cycle
-            if i<number_of_chains+3 and i>2:
-                    chain_instrs[3]=self.firmware[i-3][3]
+            if i<number_of_chains+5 and i>4:
+                    chain_instrs[3]=self.firmware[i-5][3]
 
             compiled_firmware.append(chain_instrs)
         return compiled_firmware
