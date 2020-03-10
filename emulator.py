@@ -5,7 +5,6 @@ from copy import deepcopy as copy
 
 # Setting Debug level (can be debug, info, warning, error and critical)
 log.basicConfig(stream=sys.stderr, level=log.INFO)
-np.random.seed(42)
 
 ''' Emulation settings '''
 DEBUG=True
@@ -60,7 +59,7 @@ class CISC():
         def pop(self):
             log.debug("Removing element from input buffer")
             assert len(self.buffer)>0, "Input buffer is empty"
-            return self.buffer.pop(-1)
+            return self.buffer.pop(0)
 
         def step(self):
             # Dispatch a new chain if the input buffer is not empty
@@ -78,10 +77,9 @@ class CISC():
                 self.chainId_out=0
 
             if len(self.buffer)>0:
-                v_out, eof_out = self.buffer[-1]
+                v_out, eof_out = self.buffer[0]
             else:
                 v_out, eof_out = np.zeros(N), False
-            print(v_out, eof_out, self.chainId_out)
             return v_out, eof_out, self.chainId_out
 
     # Filter Unit
@@ -269,7 +267,6 @@ class CISC():
         self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0)]
         self.dp.config=[struct(commit=0,size=0,eof_only=False)]
         for idx, chain_instrs in enumerate(fw):
-            print("\tChain #"+str(idx+1)+" "+str(chain_instrs))
             self.fu.config.append(chain_instrs[0])
             self.mvru.config.append(chain_instrs[1])
             self.vvalu.config.append(chain_instrs[2])
@@ -336,6 +333,7 @@ class compiler():
         self.fu, self.mvru, self.vvalu, self.dp = self.pass_through[:]
 
 def testSimpleDistribution():
+    
     # Firmware for a generic distribution
     def distribution(bins):
         assert bins%M==0, "Number of bins must be divisible by M for now"
@@ -352,20 +350,19 @@ def testSimpleDistribution():
     fw = distribution(2*M)
 
     # Feed one value to input buffer
+    np.random.seed(42)
     input_vector = np.random.rand(N)*8
     proc.ib.push([input_vector,False])
-    #proc.step()
 
     # Step through it until we get the result
     proc.config(fw)
     tb = proc.run()
-    print("Trace buffer output:")
-    print(tb[0])
     assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with distribution failed"
 
-#testSimpleDistribution()
+testSimpleDistribution()
 
 def testDualDistribution():
+
     # Firmware for a distribution with 2 sets of N values
     def distribution(bins):
         assert bins%M==0, "Number of bins must be divisible by M for now"
@@ -383,6 +380,7 @@ def testDualDistribution():
     fw = distribution(2*M)
 
     # Feed one value to input buffer
+    np.random.seed(42)
     input_vector1=np.random.rand(N)*8
     input_vector2=np.random.rand(N)*8
     print(input_vector1)
