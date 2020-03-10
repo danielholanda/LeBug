@@ -69,8 +69,8 @@ class CISC():
                 if self.chainId_out<self.config.num_chains:
                     # Go to next element in the input buffer once we dispatched all chains for the previous element
                     if self.chainId_out==self.config.num_chains-1:
-                        self.chainId_out=0
                         self.pop()
+                        self.chainId_out = 0 if len(self.buffer)==0 else 1 
                     else:
                         self.chainId_out=self.chainId_out+1
             # If the trace buffer is full, we will dispatch chain 0, which is a pass through
