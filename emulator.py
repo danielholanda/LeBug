@@ -314,17 +314,17 @@ class compiler():
         self.dp.commit=1
         self.dp.size=M
         if option == 'eof':
-            eof_only=True
+            self.dp.eof_only=True
     def commitN(self,option=None):
         self.dp.commit=1
         self.dp.size=N
         if option == 'eof':
-            eof_only=True
+            self.dp.eof_only=True
     def commit1(self,option=None):
         self.dp.commit=1
         self.dp.size=1
         if option == 'eof':
-            eof_only=True
+            self.dp.eof_only=True
     def end_chain(self):
         self.firmware.append(copy([self.fu,self.mvru,self.vvalu,self.dp]))
     def compile(self):
