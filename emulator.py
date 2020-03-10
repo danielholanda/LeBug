@@ -213,7 +213,7 @@ class CISC():
             self.v_in=np.zeros(N)
             self.v_out=np.zeros(N)
             self.eof_in = False
-            self.bof_in = False
+            self.bof_in = True
             self.chainId_in = 0
             self.v_out_valid=0
             self.v_out_size=0
@@ -303,15 +303,20 @@ proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
 
 # Hardware configurations (that can be done by VLIW instruction)
 class compiler():
+	# MISC functions
+    def conditionParser(self,cond):
+        cond_dict={'last':False,'notlast':False,'first':False,'notfirst':True}
+        cond_dict[cond]=True
+        return cond_dict
     # ISA
     def begin_chain(self):
         self.fu, self.mvru, self.vvalu, self.dp = copy(self.pass_through)
     def filter(self,addr):
         self.fu.filter=1
         self.fu.addr=addr
-    def reduceN(self):
+    def reduce_n(self):
         self.mvru.axis=1
-    def reduceM(self):
+    def reduce_m(self):
         self.mvru.axis=2
     def vv_add_new(self,addr):
         self.vvalu.op=2
@@ -322,17 +327,17 @@ class compiler():
     def v_cache(self,cache_addr):
         self.vvalu.cache=1
         self.vvalu.cache_addr=cache_addr
-    def commitM(self,option=None):
+    def commit_m(self,option=None):
         self.dp.commit=1
         self.dp.size=M
         if option == 'eof':
             self.dp.eof_only=True
-    def commitN(self,option=None):
+    def commit_n(self,option=None):
         self.dp.commit=1
         self.dp.size=N
         if option == 'eof':
             self.dp.eof_only=True
-    def commit1(self,option=None):
+    def commit_1(self,option=None):
         self.dp.commit=1
         self.dp.size=1
         if option == 'eof':
@@ -356,9 +361,9 @@ def testSimpleDistribution():
         for i in range(bins/M):
             cp.begin_chain()
             cp.filter(i)
-            cp.reduceM()
+            cp.reduce_m()
             cp.vv_add(i)
-            cp.commitM()
+            cp.commit_m()
             cp.end_chain()
         return cp.compile()
 
@@ -385,10 +390,10 @@ def testDualDistribution():
         for i in range(bins/M):
             cp.begin_chain()
             cp.filter(i)
-            cp.reduceM()
+            cp.reduce_m()
             cp.vv_add(i)#,'notfirst')
             cp.v_cache(i)
-            cp.commitM('eof')#last')
+            cp.commit_m('eof')#last')
             cp.end_chain()
         return cp.compile()
 
