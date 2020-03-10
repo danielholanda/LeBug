@@ -48,7 +48,6 @@ class CISC():
             self.buffer=[]
             self.size=IB_DEPTH
             self.config=None
-            self.chains_dispatched=0
             self.chainId_out = 0
 
         def push(self,pushed_vals):
@@ -59,6 +58,7 @@ class CISC():
             self.buffer.append([v_in,eof_in])
 
         def pop(self):
+            log.debug("Removing element from input buffer")
             assert len(self.buffer)>0, "Input buffer is empty"
             return self.buffer.pop(-1)
 
@@ -66,20 +66,13 @@ class CISC():
             # Dispatch a new chain if the input buffer is not empty
             # Note that if our FW has 3 chains num_chains will be 4, since we need one "chain" (chainId 0) to work as a pass through
             if len(self.buffer)>0:
-                if self.chains_dispatched<self.config.num_chains:
-                    
-                    
+                if self.chainId_out<self.config.num_chains:
                     # Go to next element in the input buffer once we dispatched all chains for the previous element
-                    if self.chains_dispatched==self.config.num_chains-1:
-                        self.chains_dispatched=0
+                    if self.chainId_out==self.config.num_chains-1:
                         self.chainId_out=0
-                        print("POPPING!")
                         self.pop()
-                    # Otherwise, simply increment chains_dispatched
                     else:
-                    	self.chainId_out=self.chains_dispatched+1
-                        self.chains_dispatched=self.chains_dispatched+1
-                        
+                        self.chainId_out=self.chainId_out+1
             # If the trace buffer is full, we will dispatch chain 0, which is a pass through
             else:
                 self.chainId_out=0
@@ -88,11 +81,6 @@ class CISC():
                 v_out, eof_out = self.buffer[-1]
             else:
                 v_out, eof_out = np.zeros(N), False
-            #print(self.config)
-            
-            #print("Length of trace buffer: ")
-            #print(len(self.buffer))
-            print([v_out, eof_out, self.chainId_out])
             return v_out, eof_out, self.chainId_out
 
     # Filter Unit
@@ -288,7 +276,7 @@ class CISC():
     def run(self):
         # Keep stepping through the circuit as long as we have instructions to execute
         for i in range(10):
-        	self.step()
+            self.step()
         return self.tb.mem
 
 
