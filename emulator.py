@@ -47,7 +47,7 @@ class CISC():
         def __init__(self,N,IB_DEPTH):
             self.buffer=[]
             self.size=IB_DEPTH
-            self.config=struct(num_chains=3)
+            self.config=None
             self.chains_dispatched=0
             self.chainId_out = 0
 
@@ -67,15 +67,19 @@ class CISC():
             # Note that if our FW has 3 chains num_chains will be 4, since we need one "chain" (chainId 0) to work as a pass through
             if len(self.buffer)>0:
                 if self.chains_dispatched<self.config.num_chains:
-                    self.chainId_out=self.chains_dispatched+1
+                    
                     
                     # Go to next element in the input buffer once we dispatched all chains for the previous element
                     if self.chains_dispatched==self.config.num_chains-1:
                         self.chains_dispatched=0
+                        self.chainId_out=0
+                        print("POPPING!")
                         self.pop()
                     # Otherwise, simply increment chains_dispatched
                     else:
+                    	self.chainId_out=self.chains_dispatched+1
                         self.chains_dispatched=self.chains_dispatched+1
+                        
             # If the trace buffer is full, we will dispatch chain 0, which is a pass through
             else:
                 self.chainId_out=0
@@ -84,6 +88,11 @@ class CISC():
                 v_out, eof_out = self.buffer[-1]
             else:
                 v_out, eof_out = np.zeros(N), False
+            #print(self.config)
+            
+            #print("Length of trace buffer: ")
+            #print(len(self.buffer))
+            print([v_out, eof_out, self.chainId_out])
             return v_out, eof_out, self.chainId_out
 
     # Filter Unit
@@ -96,16 +105,17 @@ class CISC():
             self.chainId_in = 0
             self.chainId_out = 0
             self.vrf=np.zeros(FUVRF_SIZE*M)
-            self.config=struct(filter=0,addr=0)
+            self.config=None
 
         def step(self,input_value):
             # Check if the vector is within M ranges
+            cfg=self.config[self.chainId_in]
             log.debug('Filter input:'+str(self.v_in))
-            log.debug('Filtering using the following ranges:'+str(self.vrf[self.config.addr*M:self.config.addr*M+M+1]))
-            if self.config.filter==1:
+            log.debug('Filtering using the following ranges:'+str(self.vrf[cfg.addr*M:cfg.addr*M+M+1]))
+            if cfg.filter==1:
                 for i in range(M):
-                    low_range = self.vrf[self.config.addr*M+i]
-                    high_range = self.vrf[self.config.addr*M+i+1]
+                    low_range = self.vrf[cfg.addr*M+i]
+                    high_range = self.vrf[cfg.addr*M+i+1]
                     within_range = np.all([self.v_in>low_range, self.v_in<=high_range],axis=0)
                     self.m_out[i]=within_range[:]
             # If we are not filtering, just pass the value through 
@@ -128,18 +138,19 @@ class CISC():
             self.eof_out = False
             self.chainId_in = 0
             self.chainId_out = 0
-            self.config=struct(axis=0)
+            self.config=None
 
         def step(self,input_value):
             # Reduce matrix along a given axis
-            if self.config.axis==0:
+            cfg=self.config[self.chainId_in]
+            if cfg.axis==0:
                 log.debug('Passing first vector through reduce unit')
                 self.v_out=self.m_in[0]
-            elif self.config.axis==1:
-                log.debug('Reducing matrix along N axis (axis = '+str(self.config.axis)+')')
+            elif cfg.axis==1:
+                log.debug('Reducing matrix along N axis (axis = '+str(cfg.axis)+')')
                 self.v_out=np.sum(self.m_in,axis=0)
-            elif self.config.axis==2:
-                log.debug('Reducing matrix along M axis (axis = '+str(self.config.axis)+')')
+            elif cfg.axis==2:
+                log.debug('Reducing matrix along M axis (axis = '+str(cfg.axis)+')')
                 self.v_out=np.sum(self.m_in,axis=1)
                 if N!=M:
                     log.debug('Padding results with '+str(N-M)+' zeros')
@@ -160,7 +171,7 @@ class CISC():
             self.chainId_in = 0
             self.chainId_out = 0
             self.vrf=np.zeros(N*VVVRF_SIZE)
-            self.config=struct(op=0,addr=0,cache=0,cache_addr=0)
+            self.config=None
             self.v_out_d1=np.zeros(N)
             self.v_out_d2=np.zeros(N)
             self.eof_out_d1 = False
@@ -179,17 +190,18 @@ class CISC():
             self.chainId_out_d2  = self.chainId_out_d1
             self.chainId_out_d1  = self.chainId_in
 
-            if self.config.op==0:
+            cfg=self.config[self.chainId_in]
+            if cfg.op==0:
                 log.debug('ALU is passing values through')
                 self.v_out_d1 = self.v_in
-            elif self.config.op==1:
+            elif cfg.op==1:
                 log.debug('Adding using vector-vector ALU')
-                self.v_out_d1 = self.vrf[self.config.addr*N:self.config.addr*N+N] + self.v_in
-            elif self.config.op==2:
+                self.v_out_d1 = self.vrf[cfg.addr*N:cfg.addr*N+N] + self.v_in
+            elif cfg.op==2:
                 log.debug('Storing values in VVALU_VRF and passing through')
                 self.v_out_d1 = self.v_in
-            if self.config.cache:
-                self.vrf[self.config.cache_addr*N:self.config.cache_addr*N+N] = self.v_out_d1 
+            if cfg.cache:
+                self.vrf[cfg.cache_addr*N:cfg.cache_addr*N+N] = self.v_out_d1 
             
             self.v_in, self.eof_in, self.chainId_in = copy(input_value)
             return self.v_out, self.eof_out, self.chainId_out
@@ -203,15 +215,16 @@ class CISC():
             self.chainId_in = 0
             self.v_out_valid=0
             self.v_out_size=0
-            self.config=struct(commit=0,size=0,eof_only=False)
+            self.config=None
 
         def step(self,input_value):
-            if self.config.commit and (not self.config.eof_only or (self.config.eof_only and self.eof_in)):
+            cfg=self.config[self.chainId_in]
+            if cfg.commit and (not cfg.eof_only or (cfg.eof_only and self.eof_in)):
                 if self.v_out_size==0:
-                    self.v_out = self.v_in[:self.config.size]
+                    self.v_out = self.v_in[:cfg.size]
                 else:
-                    self.v_out = np.append(self.v_out,self.v_in[:self.config.size])
-                self.v_out_size=self.v_out_size+self.config.size
+                    self.v_out = np.append(self.v_out,self.v_in[:cfg.size])
+                self.v_out_size=self.v_out_size+cfg.size
                 if self.v_out_size==N:
                     log.debug('Data Packer full. Pushing values to Trace Buffer')
                     self.v_out_valid=1
@@ -247,6 +260,7 @@ class CISC():
         self.vvalu= self.VectorVectorALU(N,VVVRF_SIZE)
         self.dp   = self.DataPacker(N,M)
         self.tb   = self.TraceBuffer(N,TB_SIZE)
+        self.config()
 
     def step(self):
         log.debug('New step')
@@ -257,12 +271,24 @@ class CISC():
         packed_data = self.dp.step(chain)
         self.tb.step(packed_data)
 
-    def run(self,compiled_firmware):
-        for idx, instr in enumerate(compiled_firmware):
-            # Dispatch Instructions to each functional unit
-            self.fu.config ,self.mvru.config, self.vvalu.config, self.dp.config = instr
-            # Keep stepping through the circuit as long as we have instructions to execute
-            self.step()
+    def config(self,fw=[]):
+        #Configure processor
+        self.ib.config=struct(num_chains=len(fw)+1)
+        self.fu.config=[struct(filter=0,addr=0)]
+        self.mvru.config=[struct(axis=0)]
+        self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0)]
+        self.dp.config=[struct(commit=0,size=0,eof_only=False)]
+        for idx, chain_instrs in enumerate(fw):
+            print("\tChain #"+str(idx+1)+" "+str(chain_instrs))
+            self.fu.config.append(chain_instrs[0])
+            self.mvru.config.append(chain_instrs[1])
+            self.vvalu.config.append(chain_instrs[2])
+            self.dp.config.append(chain_instrs[3])
+
+    def run(self):
+        # Keep stepping through the circuit as long as we have instructions to execute
+        for i in range(10):
+        	self.step()
         return self.tb.mem
 
 
@@ -312,30 +338,7 @@ class compiler():
     def end_chain(self):
         self.firmware.append(copy([self.fu,self.mvru,self.vvalu,self.dp]))
     def compile(self):
-        # We will compile to abstract away the idea of cycles
-        # Input: List of operations each chain needs to perform
-        # Output: For each cycle, which operation each function unit should perform
-        compiled_firmware=[]
-        pipeline_depth=7
-        number_of_chains=len(self.firmware)
-        for i in range(pipeline_depth+number_of_chains-1):
-            chain_instrs = self.pass_through[:]
-            # For the FU, which takes 1 cycle
-            if i<number_of_chains:
-                    chain_instrs[0]=self.firmware[i][0]
-            # For the MVRU, which takes 1 cycle
-            if i<number_of_chains+1 and i>0:
-                    chain_instrs[1]=self.firmware[i-1][1]
-            # For the VVALU, which takes 3 cycles
-            if i<number_of_chains+2 and i>1:
-                    chain_instrs[2]=self.firmware[i-2][2]
-            # For the Data Packer, which takes 1 cycle
-            if i<number_of_chains+5 and i>4:
-                    chain_instrs[3]=self.firmware[i-5][3]
-            # There is one more cycle for writing the data in the trace buffer
-
-            compiled_firmware.append(chain_instrs)
-        return compiled_firmware
+        return self.firmware
 
     def __init__(self):
         self.firmware = []
@@ -356,20 +359,18 @@ def testSimpleDistribution():
             cp.end_chain()
         return cp.compile()
 
-    compiled_firmware = distribution(2*M)
-
-    # Printing sequence of instructions that will be executed at each cycle
-    print("\nSequence of operations per cycle:")
-    for idx, chain_instr in enumerate(compiled_firmware):
-        print("\tCycle #"+str(idx)+" "+str(chain_instr))
+    fw = distribution(2*M)
 
     # Feed one value to input buffer
     input_vector = np.random.rand(N)*8
     proc.ib.push([input_vector,False])
-    proc.step()
+    #proc.step()
 
     # Step through it until we get the result
-    tb = proc.run(compiled_firmware)
+    proc.config(fw)
+    tb = proc.run()
+    print("Trace buffer output:")
+    print(tb[0])
     assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with distribution failed"
 
 testSimpleDistribution()
@@ -389,12 +390,7 @@ def testDualDistribution():
             cp.end_chain()
         return cp.compile()
 
-    compiled_firmware = distribution(2*M)
-
-    # Printing sequence of instructions that will be executed at each cycle
-    print("\nSequence of operations per cycle:")
-    for idx, chain_instr in enumerate(compiled_firmware):
-        print("\tCycle #"+str(idx)+" "+str(chain_instr))
+    fw = distribution(2*M)
 
     # Feed one value to input buffer
     input_vector1=np.random.rand(N)*8
@@ -407,7 +403,7 @@ def testDualDistribution():
     proc.step()
 
     # Step through it until we get the result
-    tb = proc.run(compiled_firmware)
+    tb = proc.config(fw)
     print(tb[0])
     print(tb[1])
     assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with dual distribution failed"
