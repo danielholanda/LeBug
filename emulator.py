@@ -48,6 +48,8 @@ class CISC():
             self.size=IB_DEPTH
             self.config=None
             self.chainId_out = 0
+            self.bof_in=True
+            self.bof_out=True
 
         def push(self,pushed_vals):
             v_in, eof_in = pushed_vals
@@ -59,11 +61,13 @@ class CISC():
         def pop(self):
             log.debug("Removing element from input buffer")
             assert len(self.buffer)>0, "Input buffer is empty"
+            self.bof_in=self.buffer[0][1]
             return self.buffer.pop(0)
 
         def step(self):
             # Dispatch a new chain if the input buffer is not empty
             # Note that if our FW has 3 chains num_chains will be 4, since we need one "chain" (chainId 0) to work as a pass through
+            self.bof_out=self.bof_in
             if len(self.buffer)>0:
                 if self.chainId_out<self.config.num_chains:
                     # Go to next element in the input buffer once we dispatched all chains for the previous element
@@ -72,6 +76,7 @@ class CISC():
                         self.chainId_out = 0 if len(self.buffer)==0 else 1 
                     else:
                         self.chainId_out=self.chainId_out+1
+
             # If the trace buffer is full, we will dispatch chain 0, which is a pass through
             else:
                 self.chainId_out=0
@@ -80,7 +85,7 @@ class CISC():
                 v_out, eof_out = self.buffer[0]
             else:
                 v_out, eof_out = np.zeros(N), False
-            return v_out, eof_out, self.chainId_out
+            return v_out, eof_out, self.bof_out, self.chainId_out
 
     # Filter Unit
     class FilterUnit():
@@ -89,6 +94,8 @@ class CISC():
             self.m_out=np.zeros((M,N))
             self.eof_in = False
             self.eof_out = False
+            self.bof_in = True
+            self.bof_out = True
             self.chainId_in = 0
             self.chainId_out = 0
             self.vrf=np.zeros(FUVRF_SIZE*M)
@@ -110,10 +117,9 @@ class CISC():
                 for i in range(M):
                     self.m_out[i] = self.v_in if i==0 else np.zeros(N)
 
-            self.eof_out     = self.eof_in
-            self.chainId_out = self.chainId_in
-            self.v_in, self.eof_in, self.chainId_in = copy(input_value)
-            return self.m_out, self.eof_out, self.chainId_out
+            self.eof_out, self.bof_out, self.chainId_out = self.eof_in, self.bof_in, self.chainId_in
+            self.v_in, self.eof_in, self.bof_in, self.chainId_in = copy(input_value)
+            return self.m_out, self.eof_out, self.bof_out, self.chainId_out
 
     # This block will reduce the matrix along a given axis
     # If M<N, then the results will be padded with zeros
@@ -123,6 +129,8 @@ class CISC():
             self.v_out=np.zeros(N)
             self.eof_in = False
             self.eof_out = False
+            self.bof_in = True
+            self.bof_out = True
             self.chainId_in = 0
             self.chainId_out = 0
             self.config=None
@@ -143,10 +151,9 @@ class CISC():
                     log.debug('Padding results with '+str(N-M)+' zeros')
                     self.v_out=np.concatenate((self.v_out,np.zeros(N-M)))
 
-            self.eof_out     = self.eof_in
-            self.chainId_out = self.chainId_in
-            self.m_in, self.eof_in, self.chainId_in = copy(input_value)
-            return self.v_out, self.eof_out, self.chainId_out
+            self.eof_out, self.bof_out, self.chainId_out    = self.eof_in, self.bof_in, self.chainId_in
+            self.m_in, self.eof_in, self.bof_in, self.chainId_in = copy(input_value)
+            return self.v_out, self.eof_out, self.bof_out, self.chainId_out
 
     # This block will reduce the matrix along a given axis
     class VectorVectorALU():
@@ -155,6 +162,8 @@ class CISC():
             self.v_out=np.zeros(N)
             self.eof_in = False
             self.eof_out = False
+            self.bof_in = False
+            self.bof_out = False
             self.chainId_in = 0
             self.chainId_out = 0
             self.vrf=np.zeros(N*VVVRF_SIZE)
@@ -163,6 +172,8 @@ class CISC():
             self.v_out_d2=np.zeros(N)
             self.eof_out_d1 = False
             self.eof_out_d2 = False
+            self.bof_out_d1 = True
+            self.bof_out_d2 = True
             self.chainId_out_d2 = 0
             self.chainId_out_d1 = 0
 
@@ -173,6 +184,9 @@ class CISC():
             self.eof_out  = self.eof_out_d2
             self.eof_out_d2  = self.eof_out_d1
             self.eof_out_d1  = self.eof_in
+            self.bof_out  = self.bof_out_d2
+            self.bof_out_d2  = self.bof_out_d1
+            self.bof_out_d1  = self.bof_in
             self.chainId_out  = self.chainId_out_d2
             self.chainId_out_d2  = self.chainId_out_d1
             self.chainId_out_d1  = self.chainId_in
@@ -190,8 +204,8 @@ class CISC():
             if cfg.cache:
                 self.vrf[cfg.cache_addr*N:cfg.cache_addr*N+N] = self.v_out_d1 
             
-            self.v_in, self.eof_in, self.chainId_in = copy(input_value)
-            return self.v_out, self.eof_out, self.chainId_out
+            self.v_in, self.eof_in, self.bof_in, self.chainId_in = copy(input_value)
+            return self.v_out, self.eof_out, self.bof_out, self.chainId_out
 
     # Packs data efficiently
     class DataPacker():
@@ -199,6 +213,7 @@ class CISC():
             self.v_in=np.zeros(N)
             self.v_out=np.zeros(N)
             self.eof_in = False
+            self.bof_in = False
             self.chainId_in = 0
             self.v_out_valid=0
             self.v_out_size=0
@@ -221,7 +236,7 @@ class CISC():
             else:
                 self.v_out_valid=0
             
-            self.v_in, self.eof_in, self.chainId_in = copy(input_value)
+            self.v_in, self.eof_in, self.bof_in, self.chainId_in = copy(input_value)
             return self.v_out, self.v_out_valid
 
     # Packs data efficiently
@@ -359,7 +374,7 @@ def testSimpleDistribution():
     tb = proc.run()
     assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with distribution failed"
 
-testSimpleDistribution()
+#testSimpleDistribution()
 
 def testDualDistribution():
 
@@ -371,9 +386,9 @@ def testDualDistribution():
             cp.begin_chain()
             cp.filter(i)
             cp.reduceM()
-            cp.vv_add(i)
+            cp.vv_add(i)#,'notfirst')
             cp.v_cache(i)
-            cp.commitM('eof')
+            cp.commitM('eof')#last')
             cp.end_chain()
         return cp.compile()
 
