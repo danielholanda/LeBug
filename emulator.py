@@ -81,6 +81,7 @@ class CISC():
                 v_out, eof_out = self.buffer[-1]
             else:
                 v_out, eof_out = np.zeros(N), False
+            print(v_out, eof_out, self.chainId_out)
             return v_out, eof_out, self.chainId_out
 
     # Filter Unit
@@ -216,6 +217,7 @@ class CISC():
                 if self.v_out_size==N:
                     log.debug('Data Packer full. Pushing values to Trace Buffer')
                     self.v_out_valid=1
+                    self.v_out_size = 0
                 else:
                     self.v_out_valid=0
             else:
@@ -275,7 +277,7 @@ class CISC():
 
     def run(self):
         # Keep stepping through the circuit as long as we have instructions to execute
-        for i in range(10):
+        for i in range(20):
             self.step()
         return self.tb.mem
 
@@ -361,7 +363,7 @@ def testSimpleDistribution():
     print(tb[0])
     assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with distribution failed"
 
-testSimpleDistribution()
+#testSimpleDistribution()
 
 def testDualDistribution():
     # Firmware for a distribution with 2 sets of N values
@@ -388,12 +390,12 @@ def testDualDistribution():
 
     proc.ib.push([input_vector1,False])
     proc.ib.push([input_vector2,True])
-    proc.step()
 
     # Step through it until we get the result
-    tb = proc.config(fw)
+    proc.config(fw)
+    tb = proc.run()
     print(tb[0])
     print(tb[1])
-    assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with dual distribution failed"
+    #assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with dual distribution failed"
 
-#testDualDistribution()
+testDualDistribution()
