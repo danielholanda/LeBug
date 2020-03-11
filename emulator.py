@@ -221,7 +221,11 @@ class CISC():
 
         def step(self,input_value):
             cfg=self.config[self.chainId_in]
-            if cfg.commit and (not cfg.eof_only or (cfg.eof_only and self.eof_in)):
+            if (cfg.commit and 
+                (not cfg.cond['last']     or (cfg.cond['last']     and     self.eof_in)) and
+                (not cfg.cond['notlast']  or (cfg.cond['notlast']  and not self.eof_in)) and
+                (not cfg.cond['first']    or (cfg.cond['first']    and     self.bof_in)) and
+                (not cfg.cond['notfirst'] or (cfg.cond['notfirst'] and not self.bof_in))):
                 if self.v_out_size==0:
                     self.v_out = self.v_in[:cfg.size]
                 else:
@@ -280,7 +284,7 @@ class CISC():
         self.fu.config=[struct(filter=0,addr=0)]
         self.mvru.config=[struct(axis=0)]
         self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0)]
-        self.dp.config=[struct(commit=0,size=0,eof_only=False)]
+        self.dp.config=[struct(commit=0,size=0,cond={'last':False,'notlast':False,'first':False,'notfirst':False})]
         for idx, chain_instrs in enumerate(fw):
             self.fu.config.append(chain_instrs[0])
             self.mvru.config.append(chain_instrs[1])
@@ -303,11 +307,6 @@ proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
 
 # Hardware configurations (that can be done by VLIW instruction)
 class compiler():
-	# MISC functions
-    def conditionParser(self,cond):
-        cond_dict={'last':False,'notlast':False,'first':False,'notfirst':True}
-        cond_dict[cond]=True
-        return cond_dict
     # ISA
     def begin_chain(self):
         self.fu, self.mvru, self.vvalu, self.dp = copy(self.pass_through)
@@ -330,18 +329,15 @@ class compiler():
     def commit_m(self,option=None):
         self.dp.commit=1
         self.dp.size=M
-        if option == 'eof':
-            self.dp.eof_only=True
+        self.dp.cond[option]=True
     def commit_n(self,option=None):
         self.dp.commit=1
         self.dp.size=N
-        if option == 'eof':
-            self.dp.eof_only=True
+        self.dp.cond[option]=True
     def commit_1(self,option=None):
         self.dp.commit=1
         self.dp.size=1
-        if option == 'eof':
-            self.dp.eof_only=True
+        self.dp.cond[option]=True
     def end_chain(self):
         self.firmware.append(copy([self.fu,self.mvru,self.vvalu,self.dp]))
     def compile(self):
@@ -349,7 +345,7 @@ class compiler():
 
     def __init__(self):
         self.firmware = []
-        self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0,addr=0,cache=0,cache_addr=0),struct(commit=0,size=0,eof_only=False)]
+        self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0,addr=0,cache=0,cache_addr=0),struct(commit=0,size=0,cond={'last':False,'notlast':False,'first':False,'notfirst':False})]
         self.fu, self.mvru, self.vvalu, self.dp = self.pass_through[:]
 
 def testSimpleDistribution():
@@ -393,7 +389,7 @@ def testDualDistribution():
             cp.reduce_m()
             cp.vv_add(i)#,'notfirst')
             cp.v_cache(i)
-            cp.commit_m('eof')#last')
+            cp.commit_m('last')
             cp.end_chain()
         return cp.compile()
 
