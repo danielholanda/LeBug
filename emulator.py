@@ -17,7 +17,7 @@ N = 8
 M = 4 
 
 # Input buffer depth
-IB_DEPTH = 4
+IB_DEPTH = 8
 
 # Size of FUVRF in M*elements
 FUVRF_SIZE=4
@@ -153,6 +153,34 @@ class CISC():
             self.m_in, self.eof_in, self.bof_in, self.chainId_in = copy(input_value)
             return self.v_out, self.eof_out, self.bof_out, self.chainId_out
 
+    # This block will reduce a vector to a scalar and pad with zeros
+    class VectorScalarReduce():
+        def __init__(self,N):
+            self.v_in=np.zeros(N)
+            self.v_out=np.zeros(N)
+            self.eof_in = False
+            self.eof_out = False
+            self.bof_in = True
+            self.bof_out = True
+            self.chainId_in = 0
+            self.chainId_out = 0
+            self.config=None
+
+        def step(self,input_value):
+            # Reduce matrix along a given axis
+            cfg=self.config[self.chainId_in]
+            
+            if cfg.op==0:
+                log.debug('Passing first vector through vs reduce unit')
+                self.v_out=self.v_in
+            elif cfg.op==1:
+                log.debug('Sum vector scalar reduce')
+                self.v_out=np.concatenate(([np.sum(self.v_in)],np.zeros(N-1))) 
+              
+            self.eof_out, self.bof_out, self.chainId_out = self.eof_in, self.bof_in, self.chainId_in
+            self.v_in, self.eof_in, self.bof_in, self.chainId_in = copy(input_value)
+            return self.v_out, self.eof_out, self.bof_out, self.chainId_out
+
     # This block will reduce the matrix along a given axis
     class VectorVectorALU():
         def __init__(self,N,VVVRF_SIZE):
@@ -242,7 +270,6 @@ class CISC():
                     self.v_out_valid=0
             else:
                 self.v_out_valid=0
-            
             self.v_in, self.eof_in, self.bof_in, self.chainId_in = copy(input_value)
             return self.v_out, self.v_out_valid
 
@@ -267,6 +294,7 @@ class CISC():
         self.ib   = self.InputBuffer(N,IB_DEPTH)
         self.fu   = self.FilterUnit(N,M,FUVRF_SIZE)
         self.mvru = self.MatrixVectorReduce(N,M)
+        self.vsru = self.VectorScalarReduce(N)
         self.vvalu= self.VectorVectorALU(N,VVVRF_SIZE)
         self.dp   = self.DataPacker(N,M)
         self.tb   = self.TraceBuffer(N,TB_SIZE)
@@ -277,6 +305,7 @@ class CISC():
         chain = self.ib.step()
         chain = self.fu.step(chain)
         chain = self.mvru.step(chain)
+        chain = self.vsru.step(chain)
         chain = self.vvalu.step(chain)
         packed_data = self.dp.step(chain)
         self.tb.step(packed_data)
@@ -286,29 +315,27 @@ class CISC():
         self.ib.config=struct(num_chains=len(fw)+1)
         self.fu.config=[struct(filter=0,addr=0)]
         self.mvru.config=[struct(axis=0)]
+        self.vsru.config=[struct(op=0)]
         self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0)]
         self.dp.config=[struct(commit=0,size=0,cond={'last':False,'notlast':False,'first':False,'notfirst':False})]
         for idx, chain_instrs in enumerate(fw):
             self.fu.config.append(chain_instrs[0])
             self.mvru.config.append(chain_instrs[1])
-            self.vvalu.config.append(chain_instrs[2])
-            self.dp.config.append(chain_instrs[3])
+            self.vsru.config.append(chain_instrs[2])
+            self.vvalu.config.append(chain_instrs[3])
+            self.dp.config.append(chain_instrs[4])
 
     def run(self):
         # Keep stepping through the circuit as long as we have instructions to execute
-        for i in range(20):
+        for i in range(50):
             self.step()
         return self.tb.mem
-
-
-
-
 
 # Hardware configurations (that can be done by VLIW instruction)
 class compiler():
     # ISA
     def begin_chain(self):
-        self.fu, self.mvru, self.vvalu, self.dp = copy(self.pass_through)
+        self.fu, self.mvru, self.vsru, self.vvalu, self.dp = copy(self.pass_through)
     def vv_filter(self,addr):
         self.fu.filter=1
         self.fu.addr=addr
@@ -319,6 +346,8 @@ class compiler():
             self.mvru.axis=2
         else:
             assert False, "Unknown axis for instruction m_reduce"
+    def v_reduce(self):
+        self.vsru.op=1
     def vv_add(self,addr,condition=None):
         self.vvalu.op=1
         self.vvalu.addr=addr
@@ -340,15 +369,15 @@ class compiler():
         else:
             assert False, "Condition not understood"
     def end_chain(self):
-        self.firmware.append(copy([self.fu,self.mvru,self.vvalu,self.dp]))
+        self.firmware.append(copy([self.fu,self.mvru,self.vsru,self.vvalu,self.dp]))
     def compile(self):
         return self.firmware
 
     def __init__(self):
         self.firmware = []
         no_cond={'last':False,'notlast':False,'first':False,'notfirst':False}
-        self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0,addr=0,cond=copy(no_cond),cache=0,cache_addr=0),struct(commit=0,size=0,cond=copy(no_cond))]
-        self.fu, self.mvru, self.vvalu, self.dp = self.pass_through[:]
+        self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0),struct(op=0,addr=0,cond=copy(no_cond),cache=0,cache_addr=0),struct(commit=0,size=0,cond=copy(no_cond))]
+        self.fu, self.mvru, self.vsru, self.vvalu, self.dp = self.pass_through[:]
 
 def testSimpleDistribution():
     
@@ -430,19 +459,20 @@ def testSummaryStats():
 
     # Instantiate processor
     proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
+    cp = compiler()
 
     # Firmware for a distribution with 2 sets of N values
-    def summaryStats(bins):
+    def summaryStats():
         
         cp.begin_chain()
         cp.v_reduce()
-        cp.vv_add(i,'notfirst')
-        cp.v_cache(i)
-        cp.commit_m('last')
+        cp.vv_add(0,'notfirst')
+        cp.v_cache(0)
+        cp.v_commit(1,'last')
         cp.end_chain()
         return cp.compile()
 
-    fw = distribution(2*M)
+    fw = summaryStats()
 
     # Feed one value to input buffer
     np.random.seed(42)
@@ -450,10 +480,18 @@ def testSummaryStats():
     input_vector2=np.random.rand(N)*8
 
     proc.ib.push([input_vector1,False])
+    proc.ib.push([input_vector1,False])
+    proc.ib.push([input_vector1,False])
+    proc.ib.push([input_vector1,False])
+    proc.ib.push([input_vector1,False])
+    proc.ib.push([input_vector1,False])
+    proc.ib.push([input_vector1,False])
     proc.ib.push([input_vector2,True])
 
     # Step through it until we get the result
     proc.config(fw)
     tb = proc.run()
-    assert np.allclose(tb[0],[ 2.,5.,1.,0.,2.,2.,2.,2.]), "Test with dual distribution failed"
-    print("Passed test #2")
+    assert np.isclose(proc.dp.v_out[0],np.sum(input_vector1)*7+np.sum(input_vector2)), "Reduce sum failed"
+    print("Passed test #3")
+
+testSummaryStats()
