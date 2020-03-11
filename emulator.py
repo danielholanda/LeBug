@@ -194,14 +194,14 @@ class CISC():
                 log.debug('ALU is passing values through')
                 self.v_out_d1 = self.v_in
             elif cfg.op==1:
-            	if ((not cfg.cond['last']     or (cfg.cond['last']     and     self.eof_in)) and
+                if ((not cfg.cond['last']     or (cfg.cond['last']     and     self.eof_in)) and
                     (not cfg.cond['notlast']  or (cfg.cond['notlast']  and not self.eof_in)) and
                     (not cfg.cond['first']    or (cfg.cond['first']    and     self.bof_in)) and
                     (not cfg.cond['notfirst'] or (cfg.cond['notfirst'] and not self.bof_in))):
                     log.debug('Adding using vector-vector ALU')
                     self.v_out_d1 = self.vrf[cfg.addr*N:cfg.addr*N+N] + self.v_in
                 else:
-                	self.v_out_d1 = self.v_in
+                    self.v_out_d1 = self.v_in
 
 
             if cfg.cache:
@@ -302,43 +302,43 @@ class CISC():
 
 
 
-# Instantiate processor
-proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
 
-# Initial hardware setup
-proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
 
 # Hardware configurations (that can be done by VLIW instruction)
 class compiler():
     # ISA
     def begin_chain(self):
         self.fu, self.mvru, self.vvalu, self.dp = copy(self.pass_through)
-    def filter(self,addr):
+    def vv_filter(self,addr):
         self.fu.filter=1
         self.fu.addr=addr
-    def reduce_n(self):
-        self.mvru.axis=1
-    def reduce_m(self):
-        self.mvru.axis=2
+    def m_reduce(self,axis='N'):
+        if axis=='N':
+            self.mvru.axis=1
+        elif axis=='M':
+            self.mvru.axis=2
+        else:
+            assert False, "Unknown axis for instruction m_reduce"
     def vv_add(self,addr,condition=None):
         self.vvalu.op=1
         self.vvalu.addr=addr
-        self.vvalu.cond[condition]=True
+        if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
+            self.vvalu.cond[condition]=True
+        else:
+            assert False, "Condition not understood"
     def v_cache(self,cache_addr):
         self.vvalu.cache=1
         self.vvalu.cache_addr=cache_addr
-    def commit_m(self,condition=None):
+    def v_commit(self,size=N,condition=None):
         self.dp.commit=1
-        self.dp.size=M
-        self.dp.cond[condition]=True
-    def commit_n(self,condition=None):
-        self.dp.commit=1
-        self.dp.size=N
-        self.dp.cond[condition]=True
-    def commit_1(self,condition=None):
-        self.dp.commit=1
-        self.dp.size=1
-        self.dp.cond[condition]=True
+        if size==N or size==M or size==1:
+            self.dp.size=size
+        else:
+            assert False, "Cannot commit "+str(size)+" elements"
+        if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
+            self.dp.cond[condition]=True
+        else:
+            assert False, "Condition not understood"
     def end_chain(self):
         self.firmware.append(copy([self.fu,self.mvru,self.vvalu,self.dp]))
     def compile(self):
@@ -352,16 +352,22 @@ class compiler():
 
 def testSimpleDistribution():
     
+    # Instantiate processor
+    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
+
+    # Initial hardware setup
+    proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
+
     # Firmware for a generic distribution
     def distribution(bins):
         assert bins%M==0, "Number of bins must be divisible by M for now"
         cp = compiler()
         for i in range(bins/M):
             cp.begin_chain()
-            cp.filter(i)
-            cp.reduce_m()
+            cp.vv_filter(i)
+            cp.m_reduce(axis='M')
             cp.vv_add(i)
-            cp.commit_m()
+            cp.v_commit(M)
             cp.end_chain()
         return cp.compile()
 
@@ -376,10 +382,17 @@ def testSimpleDistribution():
     proc.config(fw)
     tb = proc.run()
     assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with distribution failed"
+    print("Passed test #1")
 
-#testSimpleDistribution()
+testSimpleDistribution()
 
 def testDualDistribution():
+
+    # Instantiate processor
+    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
+
+    # Initial hardware setup
+    proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
 
     # Firmware for a distribution with 2 sets of N values
     def distribution(bins):
@@ -387,11 +400,11 @@ def testDualDistribution():
         cp = compiler()
         for i in range(bins/M):
             cp.begin_chain()
-            cp.filter(i)
-            cp.reduce_m()
+            cp.vv_filter(i)
+            cp.m_reduce('M')
             cp.vv_add(i,'notfirst')
             cp.v_cache(i)
-            cp.commit_m('last')
+            cp.v_commit(M,'last')
             cp.end_chain()
         return cp.compile()
 
@@ -401,8 +414,6 @@ def testDualDistribution():
     np.random.seed(42)
     input_vector1=np.random.rand(N)*8
     input_vector2=np.random.rand(N)*8
-    print(input_vector1)
-    print(input_vector2)
 
     proc.ib.push([input_vector1,False])
     proc.ib.push([input_vector2,True])
@@ -410,8 +421,39 @@ def testDualDistribution():
     # Step through it until we get the result
     proc.config(fw)
     tb = proc.run()
-    print(tb[0])
-    print(tb[1])
-    #assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with dual distribution failed"
+    assert np.allclose(tb[0],[ 2.,5.,1.,0.,2.,2.,2.,2.]), "Test with dual distribution failed"
+    print("Passed test #2")
 
 testDualDistribution()
+
+def testSummaryStats():
+
+    # Instantiate processor
+    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
+
+    # Firmware for a distribution with 2 sets of N values
+    def summaryStats(bins):
+        
+        cp.begin_chain()
+        cp.v_reduce()
+        cp.vv_add(i,'notfirst')
+        cp.v_cache(i)
+        cp.commit_m('last')
+        cp.end_chain()
+        return cp.compile()
+
+    fw = distribution(2*M)
+
+    # Feed one value to input buffer
+    np.random.seed(42)
+    input_vector1=np.random.rand(N)*8
+    input_vector2=np.random.rand(N)*8
+
+    proc.ib.push([input_vector1,False])
+    proc.ib.push([input_vector2,True])
+
+    # Step through it until we get the result
+    proc.config(fw)
+    tb = proc.run()
+    assert np.allclose(tb[0],[ 2.,5.,1.,0.,2.,2.,2.,2.]), "Test with dual distribution failed"
+    print("Passed test #2")
