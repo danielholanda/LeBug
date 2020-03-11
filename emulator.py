@@ -48,7 +48,6 @@ class CISC():
             self.size=IB_DEPTH
             self.config=None
             self.chainId_out = 0
-            self.bof_in=True
             self.bof_out=True
 
         def push(self,pushed_vals):
@@ -61,13 +60,12 @@ class CISC():
         def pop(self):
             log.debug("Removing element from input buffer")
             assert len(self.buffer)>0, "Input buffer is empty"
-            self.bof_in=self.buffer[0][1]
+            self.bof_out=self.buffer[0][1]
             return self.buffer.pop(0)
 
         def step(self):
             # Dispatch a new chain if the input buffer is not empty
             # Note that if our FW has 3 chains num_chains will be 4, since we need one "chain" (chainId 0) to work as a pass through
-            self.bof_out=self.bof_in
             if len(self.buffer)>0:
                 if self.chainId_out<self.config.num_chains:
                     # Go to next element in the input buffer once we dispatched all chains for the previous element
@@ -196,11 +194,16 @@ class CISC():
                 log.debug('ALU is passing values through')
                 self.v_out_d1 = self.v_in
             elif cfg.op==1:
-                log.debug('Adding using vector-vector ALU')
-                self.v_out_d1 = self.vrf[cfg.addr*N:cfg.addr*N+N] + self.v_in
-            elif cfg.op==2:
-                log.debug('Storing values in VVALU_VRF and passing through')
-                self.v_out_d1 = self.v_in
+            	if ((not cfg.cond['last']     or (cfg.cond['last']     and     self.eof_in)) and
+                    (not cfg.cond['notlast']  or (cfg.cond['notlast']  and not self.eof_in)) and
+                    (not cfg.cond['first']    or (cfg.cond['first']    and     self.bof_in)) and
+                    (not cfg.cond['notfirst'] or (cfg.cond['notfirst'] and not self.bof_in))):
+                    log.debug('Adding using vector-vector ALU')
+                    self.v_out_d1 = self.vrf[cfg.addr*N:cfg.addr*N+N] + self.v_in
+                else:
+                	self.v_out_d1 = self.v_in
+
+
             if cfg.cache:
                 self.vrf[cfg.cache_addr*N:cfg.cache_addr*N+N] = self.v_out_d1 
             
@@ -317,27 +320,25 @@ class compiler():
         self.mvru.axis=1
     def reduce_m(self):
         self.mvru.axis=2
-    def vv_add_new(self,addr):
-        self.vvalu.op=2
-        self.addr=addr
-    def vv_add(self,addr):
+    def vv_add(self,addr,condition=None):
         self.vvalu.op=1
         self.vvalu.addr=addr
+        self.vvalu.cond[condition]=True
     def v_cache(self,cache_addr):
         self.vvalu.cache=1
         self.vvalu.cache_addr=cache_addr
-    def commit_m(self,option=None):
+    def commit_m(self,condition=None):
         self.dp.commit=1
         self.dp.size=M
-        self.dp.cond[option]=True
-    def commit_n(self,option=None):
+        self.dp.cond[condition]=True
+    def commit_n(self,condition=None):
         self.dp.commit=1
         self.dp.size=N
-        self.dp.cond[option]=True
-    def commit_1(self,option=None):
+        self.dp.cond[condition]=True
+    def commit_1(self,condition=None):
         self.dp.commit=1
         self.dp.size=1
-        self.dp.cond[option]=True
+        self.dp.cond[condition]=True
     def end_chain(self):
         self.firmware.append(copy([self.fu,self.mvru,self.vvalu,self.dp]))
     def compile(self):
@@ -345,7 +346,8 @@ class compiler():
 
     def __init__(self):
         self.firmware = []
-        self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0,addr=0,cache=0,cache_addr=0),struct(commit=0,size=0,cond={'last':False,'notlast':False,'first':False,'notfirst':False})]
+        no_cond={'last':False,'notlast':False,'first':False,'notfirst':False}
+        self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0,addr=0,cond=copy(no_cond),cache=0,cache_addr=0),struct(commit=0,size=0,cond=copy(no_cond))]
         self.fu, self.mvru, self.vvalu, self.dp = self.pass_through[:]
 
 def testSimpleDistribution():
@@ -387,7 +389,7 @@ def testDualDistribution():
             cp.begin_chain()
             cp.filter(i)
             cp.reduce_m()
-            cp.vv_add(i)#,'notfirst')
+            cp.vv_add(i,'notfirst')
             cp.v_cache(i)
             cp.commit_m('last')
             cp.end_chain()
