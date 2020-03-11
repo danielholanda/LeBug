@@ -461,13 +461,27 @@ def testSummaryStats():
     proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
     cp = compiler()
 
+    proc.fu.vrf=list(np.concatenate(([0.,float('inf')],list(reversed(range(FUVRF_SIZE*M-2)))))) # Initializing fuvrf for sparsity
+
+
     # Firmware for a distribution with 2 sets of N values
     def summaryStats():
         
+        # Sum of all values
         cp.begin_chain()
         cp.v_reduce()
         cp.vv_add(0,'notfirst')
         cp.v_cache(0)
+        cp.v_commit(1,'last')
+        cp.end_chain()
+
+        # Average sparsity
+        cp.begin_chain()
+        cp.vv_filter(0)
+        cp.m_reduce('N')
+        cp.v_reduce()
+        cp.vv_add(1,'notfirst')
+        cp.v_cache(1)
         cp.v_commit(1,'last')
         cp.end_chain()
         return cp.compile()
@@ -475,9 +489,9 @@ def testSummaryStats():
     fw = summaryStats()
 
     # Feed one value to input buffer
-    np.random.seed(42)
-    input_vector1=np.random.rand(N)*8
-    input_vector2=np.random.rand(N)*8
+    np.random.seed(0)
+    input_vector1=np.random.rand(N)*8-4
+    input_vector2=np.random.rand(N)*8-4
 
     proc.ib.push([input_vector1,False])
     proc.ib.push([input_vector1,False])
@@ -492,6 +506,7 @@ def testSummaryStats():
     proc.config(fw)
     tb = proc.run()
     assert np.isclose(proc.dp.v_out[0],np.sum(input_vector1)*7+np.sum(input_vector2)), "Reduce sum failed"
+    assert 47==int(proc.dp.v_out[1]), "Sparsity sum failed"
     print("Passed test #3")
 
 testSummaryStats()
