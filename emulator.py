@@ -218,19 +218,19 @@ class CISC():
             self.chainId_out_d1  = self.chainId_in
 
             cfg=self.config[self.chainId_in]
-            if cfg.op==0:
+            condition_met = ((not cfg.cond['last']     or (cfg.cond['last']     and     self.eof_in)) and
+                    		 (not cfg.cond['notlast']  or (cfg.cond['notlast']  and not self.eof_in)) and
+                    		 (not cfg.cond['first']    or (cfg.cond['first']    and     self.bof_in)) and
+                    		 (not cfg.cond['notfirst'] or (cfg.cond['notfirst'] and not self.bof_in)))
+            if cfg.op==0 or not condition_met:
                 log.debug('ALU is passing values through')
                 self.v_out_d1 = self.v_in
             elif cfg.op==1:
-                if ((not cfg.cond['last']     or (cfg.cond['last']     and     self.eof_in)) and
-                    (not cfg.cond['notlast']  or (cfg.cond['notlast']  and not self.eof_in)) and
-                    (not cfg.cond['first']    or (cfg.cond['first']    and     self.bof_in)) and
-                    (not cfg.cond['notfirst'] or (cfg.cond['notfirst'] and not self.bof_in))):
-                    log.debug('Adding using vector-vector ALU')
-                    self.v_out_d1 = self.vrf[cfg.addr*N:cfg.addr*N+N] + self.v_in
-                else:
-                    self.v_out_d1 = self.v_in
-
+                log.debug('Adding using vector-vector ALU')
+                self.v_out_d1 = self.vrf[cfg.addr*N:cfg.addr*N+N] + self.v_in
+            elif cfg.op==2:
+                log.debug('Multiplying using vector-vector ALU')
+                self.v_out_d1 = self.vrf[cfg.addr*N:cfg.addr*N+N] * self.v_in
 
             if cfg.cache:
                 self.vrf[cfg.cache_addr*N:cfg.cache_addr*N+N] = self.v_out_d1 
@@ -312,12 +312,13 @@ class CISC():
 
     def config(self,fw=[]):
         #Configure processor
+        cond={'last':False,'notlast':False,'first':False,'notfirst':False}
         self.ib.config=struct(num_chains=len(fw)+1)
         self.fu.config=[struct(filter=0,addr=0)]
         self.mvru.config=[struct(axis=0)]
         self.vsru.config=[struct(op=0)]
-        self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0)]
-        self.dp.config=[struct(commit=0,size=0,cond={'last':False,'notlast':False,'first':False,'notfirst':False})]
+        self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0,cond=cond)]
+        self.dp.config=[struct(commit=0,size=0,cond=cond)]
         for idx, chain_instrs in enumerate(fw):
             self.fu.config.append(chain_instrs[0])
             self.mvru.config.append(chain_instrs[1])
@@ -350,6 +351,13 @@ class compiler():
         self.vsru.op=1
     def vv_add(self,addr,condition=None):
         self.vvalu.op=1
+        self.vvalu.addr=addr
+        if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
+            self.vvalu.cond[condition]=True
+        else:
+            assert False, "Condition not understood"
+    def vv_mul(self,addr,condition=None):
+        self.vvalu.op=2
         self.vvalu.addr=addr
         if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
             self.vvalu.cond[condition]=True
@@ -475,7 +483,7 @@ def testSummaryStats():
         cp.v_commit(1,'last')
         cp.end_chain()
 
-        # Average sparsity
+        # Number of sparse elements
         cp.begin_chain()
         cp.vv_filter(0)
         cp.m_reduce('N')
@@ -510,3 +518,59 @@ def testSummaryStats():
     print("Passed test #3")
 
 testSummaryStats()
+
+    
+def testSpatialSparsity():
+
+    # Instantiate processor
+    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
+    cp = compiler()
+
+    proc.fu.vrf=list(np.concatenate(([0.,float('inf')],list(reversed(range(FUVRF_SIZE*M-2)))))) # Initializing fuvrf for sparsity
+
+
+    # Firmware for a distribution with 2 sets of N values
+    def summaryStats():
+
+        # Spatial sparsity
+        cp.begin_chain()
+        cp.vv_filter(0)
+        cp.m_reduce('N')
+        cp.v_commit(N)
+        cp.end_chain()
+        return cp.compile()
+
+    fw = summaryStats()
+
+    # Feed one value to input buffer
+    np.random.seed(0)
+    input_vector1=np.random.rand(N)*8-4
+    input_vector2=np.random.rand(N)*8-4
+
+    proc.ib.push([input_vector1,False])
+    proc.ib.push([input_vector2,True])
+
+    # Step through it until we get the result
+    proc.config(fw)
+    tb = proc.run()
+    assert np.isclose(tb[0],[ 1.,1.,1.,1.,0.,1.,0.,1.]).all(), "Spatial Sparsity Failed"
+    assert np.isclose(tb[1],[ 1.,0.,1.,1.,1.,1.,0.,0.]).all(), "Spatial Sparsity Failed"
+    print("Passed test #4")
+
+testSpatialSparsity()
+
+# Ideas for new instruments:
+# - Check elements that are between -inf and min_range OR NaN OR between max_range and Inf
+# - How often is the entire vector changing? (one bit per sample) [Would be more useful at each cyle]
+#		First vector - Save to memory addr0
+#		All other 
+#			Chain1
+#				Subtract saved and current value
+#				Save subtracted value to addr2
+#			Chain2
+#				Save original value to addr0
+#			Chain3
+#				Reduce subtracted value (reduce must be after ALU)
+#				Commit 1
+# Correlation in a tricky way
+# https://www.investopedia.com/terms/c/correlation.asp
