@@ -1,4 +1,5 @@
 from emulator import *
+import math
 
 def testSimpleDistribution():
     
@@ -173,6 +174,67 @@ def testSpatialSparsity():
 testSpatialSparsity()
 
 
+def testCorrelation():
+
+    # Instantiate processor
+    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
+    cp = compiler()
+
+    # Firmware for a distribution with 2 sets of N values
+    def correlation():
+
+        # sum(X*Y) [Assuming that Y is stored in addr0]
+        cp.begin_chain()
+        cp.vv_mul(0)
+        cp.v_reduce()
+        cp.v_commit(1)
+        cp.end_chain()
+
+        # sum(X) [Storing X in addr0, which will become the Y of next vector]
+        cp.begin_chain()
+        cp.v_cache(0)
+        cp.v_reduce()
+        cp.v_commit(1)
+        cp.end_chain()
+
+        # sum(X*X)
+        cp.begin_chain()
+        cp.vv_mul(0)
+        cp.v_reduce()
+        cp.v_commit(1)
+        cp.end_chain()
+        return cp.compile()
+
+    fw = correlation()
+
+    # Feed one value to input buffer
+    np.random.seed(0)
+    input_vector1=np.random.rand(N)*8-4
+    input_vector2=np.random.rand(N)*8-4
+
+    proc.ib.push([input_vector1,False])
+    proc.ib.push([input_vector2,True])
+
+    # Step through it until we get the result
+    proc.config(fw)
+    tb = proc.run()
+
+    # Note that this is the Cross-correlation of two 1-dimensional sequences, not the coeficient
+    numpy_correlate = np.corrcoef(input_vector1,input_vector2)
+
+    v = proc.dp.v_out
+    x, y, xx, yy, xy = v[1], v[4], v[2], v[5], v[3]
+    #x, y, xx, yy, xy = np.sum(input_vector1), np.sum(input_vector2), np.sum(input_vector1*input_vector1), np.sum(input_vector2*input_vector2), np.sum(input_vector1*input_vector2)
+
+    # Note that the equation in this website is wrong, but the math is correct
+    # https://www.investopedia.com/terms/c/correlation.asp
+    corr = (N*xy-x*y)/math.sqrt((N*xx-x*x)*(N*yy-y*y))
+    assert np.isclose(numpy_correlate[0][1],corr), "Correlation matches"
+    print("Passed test #5")
+
+testCorrelation()
+
+
 # Ideas for new instruments:
 # - Check elements that are between -inf and min_range OR NaN OR between max_range and Inf (given a specific activation)
 # - How often is the entire vector changing? (one bit per sample) [Would be more useful at each cyle]
@@ -186,5 +248,11 @@ testSpatialSparsity()
 #			Chain3
 #				Reduce subtracted value (reduce must be after ALU)
 #				Commit 1
-# Correlation in a tricky way
-# https://www.investopedia.com/terms/c/correlation.asp
+# - Correlation in a tricky way
+#       Done, but need to show steve how I did it
+#       Take away 
+#           - Calculating the correlation is quite complex
+#           - We can calulate the correlation using either 2 matrices of size (N) or 5 values
+#           - 2 of those values can be cached to the next cycle
+#           -> Instead of computing everything and ending up with one value, I ended up with 3 values
+#              -> The rest of the math is done offline  
