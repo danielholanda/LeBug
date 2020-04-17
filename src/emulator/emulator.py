@@ -231,6 +231,9 @@ class CISC():
             elif cfg.op==2:
                 log.debug('Multiplying using vector-vector ALU')
                 self.v_out_d1 = self.vrf[cfg.addr*N:cfg.addr*N+N] * self.v_in
+            elif cfg.op==3:
+                log.debug('Subtracting using vector-vector ALU')
+                self.v_out_d1 = self.vrf[cfg.addr*N:cfg.addr*N+N] - self.v_in
 
             if cfg.cache:
                 self.vrf[cfg.cache_addr*N:cfg.cache_addr*N+N] = self.v_out_d1 
@@ -358,6 +361,13 @@ class compiler():
             assert False, "Condition not understood"
     def vv_mul(self,addr,condition=None):
         self.vvalu.op=2
+        self.vvalu.addr=addr
+        if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
+            self.vvalu.cond[condition]=True
+        else:
+            assert False, "Condition not understood"
+    def vv_sub(self,addr,condition=None):
+        self.vvalu.op=3
         self.vvalu.addr=addr
         if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
             self.vvalu.cond[condition]=True
