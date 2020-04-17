@@ -1,24 +1,15 @@
+import sys
+sys.path.insert(1, '../../src/emulator/')
 from emulator import *
-import math
+import math, yaml
 
-''' Parameters of processor '''
-# Input vector width
-N = 8
+# Read YAML configuration file and declare those as global variables
+def readConf():
+    with open(r'config.yaml') as file:
+        yaml_dict = yaml.load(file, Loader=yaml.FullLoader)
+        globals().update(yaml_dict)
 
-# Number of range filters in filter unit
-M = 4 
-
-# Input buffer depth
-IB_DEPTH = 8
-
-# Size of FUVRF in M*elements
-FUVRF_SIZE=4
-
-# SIze of VVVRF in N*elements
-VVVRF_SIZE=8
-
-# Size of Trace Buffer in N*elements
-TB_SIZE=64
+readConf()
 
 def testSimpleDistribution():
     
