@@ -1,10 +1,29 @@
 from emulator import *
 import math
 
+''' Parameters of processor '''
+# Input vector width
+N = 8
+
+# Number of range filters in filter unit
+M = 4 
+
+# Input buffer depth
+IB_DEPTH = 8
+
+# Size of FUVRF in M*elements
+FUVRF_SIZE=4
+
+# SIze of VVVRF in N*elements
+VVVRF_SIZE=8
+
+# Size of Trace Buffer in N*elements
+TB_SIZE=64
+
 def testSimpleDistribution():
     
     # Instantiate processor
-    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
+    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
 
     # Initial hardware setup
     proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
@@ -12,7 +31,7 @@ def testSimpleDistribution():
     # Firmware for a generic distribution
     def distribution(bins):
         assert bins%M==0, "Number of bins must be divisible by M for now"
-        cp = compiler()
+        cp = compiler(N,M)
         for i in range(bins/M):
             cp.begin_chain()
             cp.vv_filter(i)
@@ -40,7 +59,7 @@ testSimpleDistribution()
 def testDualDistribution():
 
     # Instantiate processor
-    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
+    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
 
     # Initial hardware setup
     proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
@@ -48,7 +67,7 @@ def testDualDistribution():
     # Firmware for a distribution with 2 sets of N values
     def distribution(bins):
         assert bins%M==0, "Number of bins must be divisible by M for now"
-        cp = compiler()
+        cp = compiler(N,M)
         for i in range(bins/M):
             cp.begin_chain()
             cp.vv_filter(i)
@@ -80,8 +99,8 @@ testDualDistribution()
 def testSummaryStats():
 
     # Instantiate processor
-    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
-    cp = compiler()
+    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    cp = compiler(N,M)
 
     proc.fu.vrf=list(np.concatenate(([0.,float('inf')],list(reversed(range(FUVRF_SIZE*M-2)))))) # Initializing fuvrf for sparsity
 
@@ -137,8 +156,8 @@ testSummaryStats()
 def testSpatialSparsity():
 
     # Instantiate processor
-    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
-    cp = compiler()
+    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    cp = compiler(N,M)
 
     proc.fu.vrf=list(np.concatenate(([0.,float('inf')],list(reversed(range(FUVRF_SIZE*M-2)))))) # Initializing fuvrf for sparsity
 
@@ -177,8 +196,8 @@ testSpatialSparsity()
 def testCorrelation():
 
     # Instantiate processor
-    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
-    cp = compiler()
+    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    cp = compiler(N,M)
 
     # Firmware for a distribution with 2 sets of N values
     def correlation():
@@ -238,8 +257,8 @@ testCorrelation()
 def testVectorChange():
 
     # Instantiate processor
-    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE)
-    cp = compiler()
+    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    cp = compiler(N,M)
 
     # Firmware for a distribution with 2 sets of N values
     def vectorChange():
