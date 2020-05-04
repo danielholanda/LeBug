@@ -18,22 +18,38 @@ class struct:
 
 class rtlHw():
     
-    def generateRtl(self,rtl):
+    # This is a python class that holds RTL code
+    class rtlFile():
+
+        # All include files go here
+        def include(self,file):
+            self.includes.append(file)
+
+        # Dump RTL class into readable RTL
+        def dump(self):
+            rtl=[]
+            for i in self.includes:
+                rtl.append('`include "'+i+'"')
+            return rtl
+
+        # Initializes the RTL file class
+        def __init__(self):
+            self.includes=[]
+
+    def generateRtl(self):
 
         # Create subfolder where all files will be generated
         rtl_folder=os.getcwd()+"/rtl"
         if os.path.isdir(rtl_folder):
             shutil.rmtree(rtl_folder)
-
-        # Copy all rtl blocks to folder
-        #def copyRtlFile(file_name):
-        #    copyfile(self.hwFolder+"/"+file_name, rtl_folder+"/"+file_name)
-        #copyRtlFile("inputBuffer.sv")
         shutil.copytree(self.hwFolder+"/buildingBlocks", rtl_folder)
 
-        # Connect all blocks in the processor
+        # Includes all needed files
+        self.rtl.include("inputBuffer.sv")
+
+        # Writes to file
         f = open(rtl_folder+"/debugProcessor.sv", "w")
-        for l in rtl:
+        for l in self.rtl.dump():
             f.write(l+"\n")
         f.close()
 
@@ -44,4 +60,6 @@ class rtlHw():
         assert M<=N, "M must be less or equal to N" 
 
         self.hwFolder = os.path.dirname(os.path.realpath(__file__))
-        self.generateRtl(["empty","fgawga"])
+        self.rtl = self.rtlFile()
+
+        self.generateRtl()
