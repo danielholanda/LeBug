@@ -16,7 +16,7 @@ class struct:
     def __repr__(self):
         return str(self.__dict__)
 
-class emu():
+class emulatedHw():
 
     # Input buffer class 
     class InputBuffer():

@@ -1,6 +1,6 @@
 import sys
 sys.path.insert(1, '../../src/')
-from emulator.emulator import emu
+from emulator.emulator import emulatedHw
 import firmware.firmware as firm
 import math, yaml
 import numpy as np
@@ -16,7 +16,7 @@ readConf()
 def testSimpleDistribution():
     
     # Instantiate processor
-    proc = emu(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
 
     # Initial hardware setup
     proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
@@ -40,7 +40,7 @@ testSimpleDistribution()
 def testDualDistribution():
 
     # Instantiate processor
-    proc = emu(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
 
     # Initial hardware setup
     proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
@@ -67,7 +67,7 @@ testDualDistribution()
 def testSummaryStats():
 
     # Instantiate processor
-    proc = emu(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
     cp = proc.compiler(N,M)
 
     proc.fu.vrf=list(np.concatenate(([0.,float('inf')],list(reversed(range(FUVRF_SIZE*M-2)))))) # Initializing fuvrf for sparsity
@@ -100,7 +100,7 @@ testSummaryStats()
 def testSpatialSparsity():
 
     # Instantiate processor
-    proc = emu(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
     cp = proc.compiler(N,M)
     proc.fu.vrf=list(np.concatenate(([0.,float('inf')],list(reversed(range(FUVRF_SIZE*M-2)))))) # Initializing fuvrf for sparsity
     fw = firm.spatialSparsity(cp,N)
@@ -126,7 +126,7 @@ testSpatialSparsity()
 def testCorrelation():
 
     # Instantiate processor
-    proc = emu(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
     cp = proc.compiler(N,M)
     fw = firm.correlation(cp)
 
@@ -160,7 +160,7 @@ testCorrelation()
 def testVectorChange():
 
     # Instantiate processor
-    proc = emu(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
     cp = proc.compiler(N,M)
     fw = firm.vectorChange(cp)
 
