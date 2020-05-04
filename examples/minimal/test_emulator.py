@@ -1,6 +1,7 @@
 import sys
 sys.path.insert(1, '../../src/')
 from emulator.emulator import emulatedHw
+from hardware.hardware import rtlHw
 import firmware.firmware as firm
 import math, yaml
 import numpy as np
@@ -176,3 +177,12 @@ def testVectorChange():
     print("Passed test #6")
 
 testVectorChange()
+
+def testNakedRtl():
+
+    # Instantiate processor
+    proc = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    assert True
+    print("Passed test #7")
+
+testNakedRtl()
