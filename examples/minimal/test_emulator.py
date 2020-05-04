@@ -21,8 +21,7 @@ def testSimpleDistribution():
     # Initial hardware setup
     proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
 
-    cp = proc.compiler(N,M)
-    fw = firm.distribution(cp,bins=2*M,M=M)
+    fw = firm.distribution(proc.compiler,bins=2*M,M=M)
 
     # Feed one value to input buffer
     np.random.seed(42)
@@ -45,8 +44,7 @@ def testDualDistribution():
     # Initial hardware setup
     proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
 
-    cp = proc.compiler(N,M)
-    fw = firm.distribution(cp,bins=2*M,M=M)
+    fw = firm.distribution(proc.compiler,bins=2*M,M=M)
 
     # Feed one value to input buffer
     np.random.seed(42)
@@ -68,10 +66,9 @@ def testSummaryStats():
 
     # Instantiate processor
     proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
-    cp = proc.compiler(N,M)
 
     proc.fu.vrf=list(np.concatenate(([0.,float('inf')],list(reversed(range(FUVRF_SIZE*M-2)))))) # Initializing fuvrf for sparsity
-    fw = firm.summaryStats(cp)
+    fw = firm.summaryStats(proc.compiler)
 
     # Feed one value to input buffer
     np.random.seed(0)
@@ -101,9 +98,8 @@ def testSpatialSparsity():
 
     # Instantiate processor
     proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
-    cp = proc.compiler(N,M)
     proc.fu.vrf=list(np.concatenate(([0.,float('inf')],list(reversed(range(FUVRF_SIZE*M-2)))))) # Initializing fuvrf for sparsity
-    fw = firm.spatialSparsity(cp,N)
+    fw = firm.spatialSparsity(proc.compiler,N)
 
     # Feed one value to input buffer
     np.random.seed(0)
@@ -127,8 +123,7 @@ def testCorrelation():
 
     # Instantiate processor
     proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
-    cp = proc.compiler(N,M)
-    fw = firm.correlation(cp)
+    fw = firm.correlation(proc.compiler)
 
     # Feed one value to input buffer
     np.random.seed(0)
@@ -161,8 +156,7 @@ def testVectorChange():
 
     # Instantiate processor
     proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
-    cp = proc.compiler(N,M)
-    fw = firm.vectorChange(cp)
+    fw = firm.vectorChange(proc.compiler)
 
     # Feed one value to input buffer
     np.random.seed(0)

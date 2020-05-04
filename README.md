@@ -21,8 +21,6 @@ Each example is composed of those main files:
 
 ## Functions supported by both emulatedHw and rtlHw
 
-- compiler()
-  - Initializes the compiler
 - config()
   - Sets up run-time parameters including
     - Firmware
@@ -30,4 +28,6 @@ Each example is composed of those main files:
 - run()
   - Starts either simulation or emulation
   - Returns results from simulation/emulation
+- compiler
+  - Shoudl be able to handle all ISA instructions and compile() at the end
 

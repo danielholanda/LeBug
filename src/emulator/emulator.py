@@ -277,21 +277,6 @@ class emulatedHw():
                 self.mem[self.size]=output
                 self.size=self.size+1
             self.input=copy(packed_data)
-            
-    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE):
-        ''' Verifying parameters '''
-        assert math.log(N, 2).is_integer(), "N must be a power of 2" 
-        assert math.log(M, 2).is_integer(), "N must be a power of 2" 
-        assert M<=N, "M must be less or equal to N" 
-
-        self.ib   = self.InputBuffer(N,IB_DEPTH)
-        self.fu   = self.FilterUnit(N,M,FUVRF_SIZE)
-        self.mvru = self.MatrixVectorReduce(N,M)
-        self.vsru = self.VectorScalarReduce(N)
-        self.vvalu= self.VectorVectorALU(N,VVVRF_SIZE)
-        self.dp   = self.DataPacker(N,M)
-        self.tb   = self.TraceBuffer(N,TB_SIZE)
-        self.config()
 
     def step(self):
         log.debug('New step')
@@ -391,3 +376,20 @@ class emulatedHw():
             self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0),struct(op=0,addr=0,cond=copy(no_cond),cache=0,cache_addr=0),struct(commit=0,size=0,cond=copy(no_cond))]
             self.fu, self.mvru, self.vsru, self.vvalu, self.dp = self.pass_through[:]
 
+
+    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE):
+        ''' Verifying parameters '''
+        assert math.log(N, 2).is_integer(), "N must be a power of 2" 
+        assert math.log(M, 2).is_integer(), "N must be a power of 2" 
+        assert M<=N, "M must be less or equal to N" 
+
+        self.ib   = self.InputBuffer(N,IB_DEPTH)
+        self.fu   = self.FilterUnit(N,M,FUVRF_SIZE)
+        self.mvru = self.MatrixVectorReduce(N,M)
+        self.vsru = self.VectorScalarReduce(N)
+        self.vvalu= self.VectorVectorALU(N,VVVRF_SIZE)
+        self.dp   = self.DataPacker(N,M)
+        self.tb   = self.TraceBuffer(N,TB_SIZE)
+        self.config()
+
+        self.compiler = self.compiler(M,N)
