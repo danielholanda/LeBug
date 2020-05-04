@@ -1,8 +1,9 @@
 import sys
 sys.path.insert(1, '../../src/')
-from emulator.emulator import *
+from emulator.emulator import emu
 import firmware.firmware as firm
 import math, yaml
+import numpy as np
 
 # Read YAML configuration file and declare those as global variables
 def readConf():
@@ -15,12 +16,12 @@ readConf()
 def testSimpleDistribution():
     
     # Instantiate processor
-    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    proc = emu(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
 
     # Initial hardware setup
     proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
 
-    cp = compiler(N,M)
+    cp = proc.compiler(N,M)
     fw = firm.distribution(cp,bins=2*M,M=M)
 
     # Feed one value to input buffer
@@ -39,12 +40,12 @@ testSimpleDistribution()
 def testDualDistribution():
 
     # Instantiate processor
-    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    proc = emu(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
 
     # Initial hardware setup
     proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
 
-    cp = compiler(N,M)
+    cp = proc.compiler(N,M)
     fw = firm.distribution(cp,bins=2*M,M=M)
 
     # Feed one value to input buffer
@@ -66,8 +67,8 @@ testDualDistribution()
 def testSummaryStats():
 
     # Instantiate processor
-    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
-    cp = compiler(N,M)
+    proc = emu(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    cp = proc.compiler(N,M)
 
     proc.fu.vrf=list(np.concatenate(([0.,float('inf')],list(reversed(range(FUVRF_SIZE*M-2)))))) # Initializing fuvrf for sparsity
     fw = firm.summaryStats(cp)
@@ -99,8 +100,8 @@ testSummaryStats()
 def testSpatialSparsity():
 
     # Instantiate processor
-    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
-    cp = compiler(N,M)
+    proc = emu(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    cp = proc.compiler(N,M)
     proc.fu.vrf=list(np.concatenate(([0.,float('inf')],list(reversed(range(FUVRF_SIZE*M-2)))))) # Initializing fuvrf for sparsity
     fw = firm.spatialSparsity(cp,N)
 
@@ -125,8 +126,8 @@ testSpatialSparsity()
 def testCorrelation():
 
     # Instantiate processor
-    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
-    cp = compiler(N,M)
+    proc = emu(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    cp = proc.compiler(N,M)
     fw = firm.correlation(cp)
 
     # Feed one value to input buffer
@@ -159,8 +160,8 @@ testCorrelation()
 def testVectorChange():
 
     # Instantiate processor
-    proc = CISC(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
-    cp = compiler(N,M)
+    proc = emu(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    cp = proc.compiler(N,M)
     fw = firm.vectorChange(cp)
 
     # Feed one value to input buffer
