@@ -25,9 +25,12 @@ class rtlHw():
         def include(self,file):
             self.includes.append(file)
 
+        def addInputLogic(self,il):
+            self.inputLogic=self.inputLogic+il
+
         # Recursively adds submodules to module
-        def declareSubmodule(self,sm_name,inputLogic=[],outputLogic=[]):
-            self.sm.__dict__[sm_name]=self.parent.rtlModule(self,sm_name,inputLogic,outputLogic)
+        def declareSubmodule(self,sm_name):
+            self.sm.__dict__[sm_name]=self.parent.rtlModule(self,sm_name)
 
         # Dump RTL class into readable RTL
         def dump(self):
@@ -56,14 +59,14 @@ class rtlHw():
             return rtl 
 
         # Initializes the RTL file class
-        def __init__(self,parent,name,inputLogic=[],outputLogic=[]):
+        def __init__(self,parent,name):
             self.name=name
             self.parent = parent        # name of submodule
             self.includes=[]            # Stores include files
             self.wires=[]               # Stores wires
             self.regs=[]                # Stores regs
-            self.inputLogic=inputLogic  # Store all input logic ports
-            self.outputLogic=outputLogic# Store all output logic ports
+            self.inputLogic=[]          # Store all input logic ports
+            self.outputLogic=[]         # Store all output logic ports
             self.sm=struct()            # All submodules go here
 
     def generateRtl(self):
@@ -75,8 +78,8 @@ class rtlHw():
         shutil.copytree(self.hwFolder+"/buildingBlocks", rtl_folder)
 
         # Create RTL using custom RTL class
-        inputLogic=[['clk',1],['valid',1],['vector',self.N]] 
-        rtl = self.rtlModule(self,"main",inputLogic)
+        rtl = self.rtlModule(self,"main")
+        rtl.addInputLogic([['clk',1],['valid',1],['vector',self.N]])
 
         # Includes all needed files
         rtl.include("inputBuffer.sv")
@@ -84,8 +87,11 @@ class rtlHw():
         # Tells the class about the included modules
         #rtl.includedSubmodule("inputBuffer")
 
-        inputLogic=[['clk',1],['vector',self.N]]        
-        rtl.declareSubmodule("submodule1",inputLogic)
+        # Declaring a submodule
+        rtl.declareSubmodule("submodule1")
+        rtl.sm.submodule1.addInputLogic([['clk',1],['vector',self.N]])
+
+
         rtl.declareSubmodule("submodule2")
 
         # Writes to file
