@@ -23,12 +23,12 @@ class rtlHw():
 
         # Create dict connection a module instance to signals
         def mapPorts(self,module_ports,signals_to_connect):
-            # Ports are properly mapped if they have the same size and aproximately the same name
+            # Ports are properly mapped if they have the same size and the same name before the first underscore
             portMap={}
             for i in module_ports:
                 for j in signals_to_connect:
-                    if i.bits==j.bits and (i.name==j.name or i.name==j.name[j.name.find("_")+1:]):
-                        portMap[i.name]=j.name 
+                    if i.bits==j.bits and i.name.split("_")[0]==j.name.split("_")[0]:
+                        portMap[i.name]=j.name
             assert len(portMap.keys())==len(self.module_input), "Port map failed"
             return portMap
 
@@ -60,7 +60,7 @@ class rtlHw():
 
             # Map outputs using the name of the instance
             for o in module_class.output:
-               self.instance_output[o]= self.name+"_"+o.name
+               self.instance_output[o.name]= struct(name=o.name+"_"+self.name,type=o.type,bits=o.bits) 
 
     # This class describes an RTL module
     class rtlModule():
@@ -137,11 +137,22 @@ class rtlHw():
                     inst=self.im.__dict__[i]
                     apdi('')
                     # Declare outputs
-                    for out in inst.instance_output:
-                        bits= ' ['+str(out.bits-1)+':0]' if out.bits>1 else ''
-                        apdi("output "+out.type+" "+out.name+bits+";")
+                    for key, value in inst.instance_output.iteritems():
+                        bits= ' ['+str(value.bits-1)+':0]' if value.bits>1 else ''
+                        apdi("output "+value.type+" "+value.name+bits+";")
                     # Instantiate and connect module
-                    apdi(inst.module_class.name+" "+inst.name+"();")
+                    inst_portmap=[]
+                    for key, value in inst.instance_input.iteritems():
+                        inst_portmap.append("  ."+key+"("+value+")")
+                    for key, value in inst.instance_output.iteritems():
+                        inst_portmap.append("  ."+key+"("+value.name+")")
+                    apdi(inst.module_class.name+" "+inst.name+"(")
+                    for i in inst_portmap:
+                        if i!=inst_portmap[-1]:
+                            apdi(i+",")
+                        else:
+                            apdi(i)
+                    apdi(");")
 
                 # Finish module
                 apd('endmodule')
@@ -180,8 +191,8 @@ class rtlHw():
 
         # Tells the class about the included modules
         rtl.includeModule("inputBuffer")
-        rtl.dm.inputBuffer.addInput([['clk','logic',1],['valid','logic',1],['vector','logic',self.N]])
-        rtl.dm.inputBuffer.addOutput([['valid','logic',1],['vector','logic',self.N]])
+        rtl.dm.inputBuffer.addInput([['clk_in','logic',1],['valid_in','logic',1],['vector_in','logic',self.N]])
+        rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['vector_out','logic',self.N]])
 
         # Instantiate module
         rtl.instantiateModule(rtl.dm.inputBuffer,"ib")
