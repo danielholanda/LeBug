@@ -17,28 +17,38 @@ class struct:
         return str(self.__dict__)
 
 class rtlHw():
-    
-    # This is a python class that holds RTL code
+
+    # This class describes an instantiated rtlModule
+    class rtlInstance():
+        def __init__(self,module_class,instance_name):
+            self.module_class = module_class
+            self.name = instance_name
+
+    # This class describes an RTL module
     class rtlModule():
 
         # All include files go here
         def include(self,file):
             self.includes.append(file)
 
-        def addInputLogic(self,il):
-            self.inputLogic=self.inputLogic+il
+        def addInput(self,i):
+            self.input=self.input+i
 
-        # Recursively adds submodules to module
-        def declareSubmodule(self,dm_name):
+        # Recursively adds Modules to module
+        def declareModule(self,dm_name):
             if self.included==False:
                 self.dm.__dict__[dm_name]=self.parent.rtlModule(self,dm_name)
             else:
-                print("Can't declare submodules on imported modules")
+                print("Can't declare Modules on imported modules")
 
-        # Lets us know about submodules that have been imported 
-        def includeSubmodule(self,dm_name):
-            self.declareSubmodule(dm_name)
+        # Lets us know about Modules that have been imported 
+        def includeModule(self,dm_name):
+            self.declareModule(dm_name)
             self.dm.__dict__[dm_name].included=True
+
+        # Instantiate a given module
+        def instantiateModule(self,module_class,instance_name):
+            self.im.__dict__[instance_name]=self.parent.rtlInstance(module_class,instance_name)
 
 
         # Dump RTL class into readable RTL
@@ -46,36 +56,43 @@ class rtlHw():
 
             # Append with identation
             ident=self.getDepth()*"    "
-            rtl=[]
+            rtlCode=[]
             def apd(t):
-                rtl.append(ident+t)
+                rtlCode.append(ident+t)
             
             # Add includes
-            for i in self.includes:
-                apd('`include "'+i+'"')
+            if self.includes!=[]:
+                for i in self.includes:
+                    apd('`include "'+i+'"')
+                apd('')
 
-
-            # Instantiate module if inputs are available
-            if self.inputLogic+self.outputLogic!=[]:
+            # Add declared module
+            if self.input+self.output!=[]:
                 apd('module  '+self.name+' (')
-                # Add inputs
-                for i in self.inputLogic:
-                    apd('still need to add input logic '+i[0])
+                # Add inputs and outputs
+                for i in self.input:
+                    bits= ' ['+str(i[2]-1)+':0]' if i[2]!=1 else ''
+                    comma = ',' if i!=self.input[-1] else ''
+                    apd('  input '+i[1]+' '+i[0]+bits+comma)
+                for i in self.output:
+                    bits= ' ['+str(i[2]-1)+':0]' if i[2]!=1 else ''
+                    comma = ',' if i!=self.input[-1] else ''
+                    apd('  output '+i[1]+' '+i[0]+bits+comma)
+                apd(');')
 
-                for i in self.outputLogic:
-                    apd('still need to add outputLogic logic '+i[0])
+
 
                 # Do recursive dumps for subclasses
                 for m in self.dm.__dict__.keys():
                     mod=self.dm.__dict__[m]
                     if mod.included==False:
-                        rtl=rtl+mod.dump()
+                        rtlCode=rtlCode+mod.dump()
                 apd('endmodule')
 
             else:
                 print(self.name+" has no inputs/outputs")
         
-            return rtl 
+            return rtlCode 
 
         # Get depth of instantiated module
         def getDepth(self,d=0):
@@ -86,35 +103,39 @@ class rtlHw():
         # Initializes the RTL file class
         def __init__(self,parent,name):
             self.name=name
-            self.parent = parent        # name of submodule
+            self.parent = parent        # name of Module
             self.includes=[]            # Stores include files
             self.wires=[]               # Stores wires
             self.regs=[]                # Stores regs
-            self.inputLogic=[]          # Store all input logic ports
-            self.outputLogic=[]         # Store all output logic ports
+            self.input=[]               # Store all inputs logic ports
+            self.output=[]              # Store all outputs logic ports
             self.included=False         # Is true if the module has been imported
             self.dm=struct()            # Those are the declare modules
             self.im=struct()            # Those are the instantiated modules
 
     def rtlLogic(self):
         # Create RTL using custom RTL class
-        rtl = self.rtlModule(self,"main")
-        rtl.addInputLogic([['clk',1],['valid',1],['vector',self.N]])
+        rtl = self.rtlModule(self,"debugger")
+        rtl.addInput([['clk','logic',1],['valid','logic',1],['vector','logic',self.N]])
 
         # Adds includes to the beginning of the file
         rtl.include("inputBuffer.sv")
 
         # Tells the class about the included modules
-        rtl.includeSubmodule("inputBuffer")
-        rtl.dm.inputBuffer.addInputLogic([['clk',1],['vector',self.N]])
+        rtl.includeModule("inputBuffer")
+        rtl.dm.inputBuffer.addInput([['clk','logic',1],['vector','logic',self.N]])
 
-        # Declaring a submodule
-        rtl.declareSubmodule("testbench")
-        rtl.dm.testbench.addInputLogic([['clk',1],['vector',self.N]])
+        # Instantiate module
+        rtl.instantiateModule(rtl.dm.inputBuffer,"ib")
+        #rtl.im.ib.connectInputs(rtl.input)
 
-        rtl.declareSubmodule("submodule2")
+        # Declaring a Module
+        rtl.declareModule("testbench")
+        rtl.dm.testbench.addInput([['clk','logic',1],['vector','logic',self.N]])
 
-        return rtl
+        rtl.declareModule("Module2")
+
+        return rtl.dump()
 
     def generateRtl(self):
 
@@ -124,11 +145,9 @@ class rtlHw():
             shutil.rmtree(rtl_folder)
         shutil.copytree(self.hwFolder+"/buildingBlocks", rtl_folder)
 
-        rtl=self.rtlLogic()
-
         # Writes to file
         f = open(rtl_folder+"/debugProcessor.sv", "w")
-        for l in rtl.dump():
+        for l in self.rtlLogic():
             f.write(l+"\n")
         f.close()
 
