@@ -29,34 +29,59 @@ class rtlHw():
             self.inputLogic=self.inputLogic+il
 
         # Recursively adds submodules to module
-        def declareSubmodule(self,sm_name):
-            self.sm.__dict__[sm_name]=self.parent.rtlModule(self,sm_name)
+        def declareSubmodule(self,dm_name):
+            if self.included==False:
+                self.dm.__dict__[dm_name]=self.parent.rtlModule(self,dm_name)
+            else:
+                print("Can't declare submodules on imported modules")
+
+        # Lets us know about submodules that have been imported 
+        def includeSubmodule(self,dm_name):
+            self.declareSubmodule(dm_name)
+            self.dm.__dict__[dm_name].included=True
+
 
         # Dump RTL class into readable RTL
         def dump(self):
-            rtl=[]
 
+            # Append with identation
+            ident=self.getDepth()*"    "
+            rtl=[]
+            def apd(t):
+                rtl.append(ident+t)
+            
             # Add includes
             for i in self.includes:
-                rtl.append('`include "'+i+'"')
+                apd('`include "'+i+'"')
+
 
             # Instantiate module if inputs are available
             if self.inputLogic+self.outputLogic!=[]:
-                rtl.append('module  mux_using_assign (')
+                apd('module  '+self.name+' (')
                 # Add inputs
                 for i in self.inputLogic:
-                    rtl.append('still need to add input logic '+i[0])
+                    apd('still need to add input logic '+i[0])
 
                 for i in self.outputLogic:
-                    rtl.append('still need to add outputLogic logic '+i[0])
+                    apd('still need to add outputLogic logic '+i[0])
 
                 # Do recursive dumps for subclasses
-                for m in self.sm.__dict__.keys():
-                    rtl=rtl+self.sm.__dict__[m].dump()
+                for m in self.dm.__dict__.keys():
+                    mod=self.dm.__dict__[m]
+                    if mod.included==False:
+                        rtl=rtl+mod.dump()
+                apd('endmodule')
+
             else:
                 print(self.name+" has no inputs/outputs")
-
+        
             return rtl 
+
+        # Get depth of instantiated module
+        def getDepth(self,d=0):
+            if self.parent.__class__.__name__!="rtlHw":
+                d=self.parent.getDepth(d)+1
+            return d
 
         # Initializes the RTL file class
         def __init__(self,parent,name):
@@ -67,7 +92,29 @@ class rtlHw():
             self.regs=[]                # Stores regs
             self.inputLogic=[]          # Store all input logic ports
             self.outputLogic=[]         # Store all output logic ports
-            self.sm=struct()            # All submodules go here
+            self.included=False         # Is true if the module has been imported
+            self.dm=struct()            # Those are the declare modules
+            self.im=struct()            # Those are the instantiated modules
+
+    def rtlLogic(self):
+        # Create RTL using custom RTL class
+        rtl = self.rtlModule(self,"main")
+        rtl.addInputLogic([['clk',1],['valid',1],['vector',self.N]])
+
+        # Adds includes to the beginning of the file
+        rtl.include("inputBuffer.sv")
+
+        # Tells the class about the included modules
+        rtl.includeSubmodule("inputBuffer")
+        rtl.dm.inputBuffer.addInputLogic([['clk',1],['vector',self.N]])
+
+        # Declaring a submodule
+        rtl.declareSubmodule("testbench")
+        rtl.dm.testbench.addInputLogic([['clk',1],['vector',self.N]])
+
+        rtl.declareSubmodule("submodule2")
+
+        return rtl
 
     def generateRtl(self):
 
@@ -77,22 +124,7 @@ class rtlHw():
             shutil.rmtree(rtl_folder)
         shutil.copytree(self.hwFolder+"/buildingBlocks", rtl_folder)
 
-        # Create RTL using custom RTL class
-        rtl = self.rtlModule(self,"main")
-        rtl.addInputLogic([['clk',1],['valid',1],['vector',self.N]])
-
-        # Includes all needed files
-        rtl.include("inputBuffer.sv")
-
-        # Tells the class about the included modules
-        #rtl.includedSubmodule("inputBuffer")
-
-        # Declaring a submodule
-        rtl.declareSubmodule("submodule1")
-        rtl.sm.submodule1.addInputLogic([['clk',1],['vector',self.N]])
-
-
-        rtl.declareSubmodule("submodule2")
+        rtl=self.rtlLogic()
 
         # Writes to file
         f = open(rtl_folder+"/debugProcessor.sv", "w")
