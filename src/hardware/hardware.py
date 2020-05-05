@@ -54,11 +54,13 @@ class rtlHw():
         # Dump RTL class into readable RTL
         def dump(self):
 
-            # Append with identation
+            # Append with identation (apdi is apd shifted)
             ident=self.getDepth()*"    "
             rtlCode=[]
             def apd(t):
                 rtlCode.append(ident+t)
+            def apdi(t):
+                rtlCode.append(ident+"    "+t)
             
             # Add includes
             if self.includes!=[]:
@@ -81,13 +83,22 @@ class rtlHw():
                 apd(');')
 
 
-
-                # Do recursive dumps for subclasses
+                # Do recursive dumps for submodules declared in this module
                 for m in self.dm.__dict__.keys():
                     mod=self.dm.__dict__[m]
                     if mod.included==False:
                         rtlCode=rtlCode+mod.dump()
+                
+
+                # Instantiated modules
+                for i in self.im.__dict__.keys():
+                    inst=self.im.__dict__[i]
+                    apdi('')
+                    apdi(inst.module_class.name+" "+inst.name+"();")
+
+                # Finish module
                 apd('endmodule')
+                
 
             else:
                 print(self.name+" has no inputs/outputs")
