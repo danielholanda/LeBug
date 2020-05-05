@@ -20,9 +20,40 @@ class rtlHw():
 
     # This class describes an instantiated rtlModule
     class rtlInstance():
+
+        # Connect inputs of instance
+        def connectInputs(self,signals_to_connect):
+            
+            # Add clock to signals to connect if not there
+            clock_found=False
+            for i in signals_to_connect:
+                if i.name=='clk':
+                    clock_found=True
+            if not clock_found:
+                signals_to_connect.append(struct(name='clk',type='logic',bits=1))
+
+            # Check if number of signals is the same
+            assert len(signals_to_connect)==len(self.module_input), "Not the same number of connected signals"
+
+            # Ports are properly mapped if they have the same size and aproximately the same name
+            portMap={}
+            for i in self.module_input:
+                for j in signals_to_connect:
+                    if i.bits==j.bits and (i.name==j.name or i.name==j.name[j.name.find("_")+1:]):
+                        portMap[i]=j 
+
+            assert len(portMap.keys())==len(self.module_input), "Port map failed"
+
+            self.instance_input=portMap
+
+
         def __init__(self,module_class,instance_name):
             self.module_class = module_class
             self.name = instance_name
+            self.module_input=module_class.input
+            self.module_output=module_class.output
+            self.instance_input=[]
+            self.instance_output=[struct(name=self.name+"_"+out.name,type=out.type,bits=out.bits) for out in module_class.output]
 
     # This class describes an RTL module
     class rtlModule():
@@ -31,8 +62,13 @@ class rtlHw():
         def include(self,file):
             self.includes.append(file)
 
-        def addInput(self,i):
-            self.input=self.input+i
+        def addInput(self,inputs):
+            for i in inputs:
+                self.input.append(struct(name=i[0],type=i[1],bits=i[2]))
+
+        def addOutput(self,outputs):
+            for o in outputs:
+                self.output.append(struct(name=o[0],type=o[1],bits=o[2]))
 
         # Recursively adds Modules to module
         def declareModule(self,dm_name):
@@ -73,13 +109,13 @@ class rtlHw():
                 apd('module  '+self.name+' (')
                 # Add inputs and outputs
                 for i in self.input:
-                    bits= ' ['+str(i[2]-1)+':0]' if i[2]!=1 else ''
+                    bits= ' ['+str(i.bits-1)+':0]' if i.bits<=1 else ''
                     comma = ',' if i!=self.input[-1] else ''
-                    apd('  input '+i[1]+' '+i[0]+bits+comma)
+                    apd('  input '+i.type+' '+i.name+bits+comma)
                 for i in self.output:
-                    bits= ' ['+str(i[2]-1)+':0]' if i[2]!=1 else ''
+                    bits= ' ['+str(i.bits-1)+':0]' if i.bits<=1 else ''
                     comma = ',' if i!=self.input[-1] else ''
-                    apd('  output '+i[1]+' '+i[0]+bits+comma)
+                    apd('  output '+i.type+' '+i.name+bits+comma)
                 apd(');')
 
 
@@ -89,16 +125,19 @@ class rtlHw():
                     if mod.included==False:
                         rtlCode=rtlCode+mod.dump()
                 
-
                 # Instantiated modules
                 for i in self.im.__dict__.keys():
                     inst=self.im.__dict__[i]
                     apdi('')
+                    # Declare outputs
+                    for out in inst.instance_output:
+                        bits= ' ['+str(out.bits-1)+':0]' if out.bits<=1 else ''
+                        apdi("output "+out.type+" "+out.name+bits+";")
+                    # Instantiate and connect module
                     apdi(inst.module_class.name+" "+inst.name+"();")
 
                 # Finish module
                 apd('endmodule')
-                
 
             else:
                 print(self.name+" has no inputs/outputs")
@@ -134,11 +173,12 @@ class rtlHw():
 
         # Tells the class about the included modules
         rtl.includeModule("inputBuffer")
-        rtl.dm.inputBuffer.addInput([['clk','logic',1],['vector','logic',self.N]])
+        rtl.dm.inputBuffer.addInput([['clk','logic',1],['valid','logic',1],['vector','logic',self.N]])
+        rtl.dm.inputBuffer.addOutput([['valid','logic',1],['vector','logic',self.N]])
 
         # Instantiate module
         rtl.instantiateModule(rtl.dm.inputBuffer,"ib")
-        #rtl.im.ib.connectInputs(rtl.input)
+        rtl.im.ib.connectInputs(rtl.input)
 
         # Declaring a Module
         rtl.declareModule("testbench")
