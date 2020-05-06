@@ -2,14 +2,23 @@
  // Design Name : Input Buffer
  // Function    : Buffers vectors for up to D cycles
  //-----------------------------------------------------
- module  input_buffer (
- input  wire  din_0      , // Mux first input
- input  wire  din_1      , // Mux Second input
- input  wire  sel        , // Select input
- output wire  mux_out      // Mux output
+ module  input_buffer #(
+  parameter N = 8,
+  parameter WIDTH = 32
+  )
+  (
+  input logic clk_in,
+  input logic valid_in,
+  input logic eof_in,
+  input logic [WIDTH-1:0] vector_in [N-1:0],
+  output logic valid_out,
+  output logic eof_out,
+  output logic [WIDTH-1:0] vector_out [N-1:0]
  );
  //-------------Code Start-----------------
+
+    assign valid_out = valid_in;
+    assign eof_out=eof_in;
+    assign vector_out=vector_in;
  
-     assign mux_out = (sel) ? din_1 : din_0;
- 
- endmodule //End Of Module mux
+ endmodule 

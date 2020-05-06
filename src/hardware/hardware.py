@@ -110,13 +110,13 @@ class rtlHw():
                 apd('module  '+self.name+' (')
                 # Add inputs and outputs
                 for i in self.input:
-                    bits= f' [{i.bits-1}:0]' if i.bits>1 else ''
+                    bits= f'[{i.bits-1}:0]' if i.bits>1 else ''
                     comma = ',' if i!=self.input[-1] else ''
-                    apd(f'  input {i.type} {i.name+bits+comma}')
+                    apd(f'  input {i.type} {bits} {i.name}{comma}')
                 for i in self.output:
-                    bits= f' [{i.bits-1}:0]' if i.bits>1 else ''
+                    bits= f'[{i.bits-1}:0]' if i.bits>1 else ''
                     comma = ',' if i!=self.input[-1] else ''
-                    apd(f'  output {i.type} {i.name+bits+comma}')
+                    apd(f'  output {i.type} {bits} {i.name}{comma}')
                 apd(');')
 
 
@@ -132,8 +132,8 @@ class rtlHw():
                     apdi('')
                     # Declare outputs
                     for key, value in inst.instance_output.items():
-                        bits= f' [{value.bits-1}:0]' if value.bits>1 else ''
-                        apdi("output "+value.type+" "+value.name+bits+";")
+                        bits= f'[{value.bits-1}:0]' if value.bits>1 else ''
+                        apd(f'  output {value.type} {bits} {value.name};')
                     # Instantiate and connect module
                     inst_portmap=[]
                     for key, value in inst.instance_input.items():
@@ -178,15 +178,15 @@ class rtlHw():
     def rtlLogic(self):
         # Create RTL using custom RTL class
         rtl = self.rtlModule(self,"debugger")
-        rtl.addInput([['clk','logic',1],['valid','logic',1],['vector','logic',self.N]])
+        rtl.addInput([['clk','logic',1],['valid','logic',1],['eof','logic',1],['vector','logic',self.N]])
 
         # Adds includes to the beginning of the file
         rtl.include("inputBuffer.sv")
 
         # Tells the class about the included modules
         rtl.includeModule("inputBuffer")
-        rtl.dm.inputBuffer.addInput([['clk_in','logic',1],['valid_in','logic',1],['vector_in','logic',self.N]])
-        rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['vector_out','logic',self.N]])
+        rtl.dm.inputBuffer.addInput([['clk_in','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic',self.N]])
+        rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic',self.N]])
 
         # Instantiate module
         rtl.instantiateModule(rtl.dm.inputBuffer,"ib")
@@ -202,13 +202,13 @@ class rtlHw():
         testbench=[textwrap.dedent(f"""
         `timescale 1 ns/10 ps  // time-unit = 1 ns, precision = 10 ps
         module testbench;
-            reg a, b;
-            wire sum, carry;
+            reg clk,valid,eof;
+            reg vector [{self.N-1}:0];
 
             // duration for each bit = 20 * timescale = 20 * 1 ns  = 20ns
             localparam period = 20;  
 
-            {rtl.name} dbg (.a(a), .b(b), .sum(sum), .carry(carry));
+            {rtl.name} dbg (.clk(clk), .vector(vector), .valid(valid), .eof(eof));
             
             initial
                 begin
