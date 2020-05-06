@@ -64,7 +64,7 @@ class rtlHw():
 
             # Map outputs using the name of the instance
             for o in module_class.output:
-               self.instance_output[o.name]= struct(name=o.name+"_"+self.name,type=o.type,bits=o.bits) 
+               self.instance_output[o.name]= struct(name=o.name+"_"+self.name,type=o.type,bits=o.bits,elements=o.elements) 
 
     # This class describes an RTL module
     class rtlModule():
@@ -75,11 +75,13 @@ class rtlHw():
 
         def addInput(self,inputs):
             for i in inputs:
-                self.input.append(struct(name=i[0],type=i[1],bits=i[2]))
+                elements = 1 if len(i)==3 else i[3]
+                self.input.append(struct(name=i[0],type=i[1],bits=i[2],elements=elements))
 
         def addOutput(self,outputs):
             for o in outputs:
-                self.output.append(struct(name=o[0],type=o[1],bits=o[2]))
+                elements = 1 if len(o)==3 else o[3]
+                self.output.append(struct(name=o[0],type=o[1],bits=o[2],elements=elements))
 
         def addParameter(self,params):
             for p in params:
@@ -129,8 +131,8 @@ class rtlHw():
                 apd('module  '+self.name+"(")
 
                 # Module inputs and outputs
-                apd(',\n'.join(f'  input {i.type} [{i.bits}-1:0] {i.name}'.replace("[0:0]","") for i in self.input))
-                apd(',\n'.join(f'  output {i.type} [{i.bits}-1:0] {i.name}'.replace("[0:0]","") for i in self.output))
+                apd(',\n'.join(f'  input {i.type} [{i.bits}-1:0] {i.name} [{i.elements}-1:0]'.replace("[1-1:0]","") for i in self.input))
+                apd(',\n'.join(f'  output {i.type} [{i.bits}-1:0] {i.name} [{i.elements}-1:0]'.replace("[1-1:0]","") for i in self.output))
                 apd(');')
 
                 # Module parameters
@@ -148,7 +150,7 @@ class rtlHw():
                     
                     # Declare outputs
                     apdi('')
-                    apdi('\n'.join(f'output {value.type} [{value.bits}-1:0] {value.name};'.replace("[1-1:0]","") for key, value in inst.instance_output.items()))
+                    apdi('\n'.join(f'output {value.type} [{value.bits}-1:0] {value.name} [{value.elements}-1:0];'.replace("[1-1:0]","") for key, value in inst.instance_output.items()))
 
                     # Print module name
                     apdi(inst.module_class.name+" "+inst.name+"(")
@@ -196,7 +198,7 @@ class rtlHw():
     def rtlLogic(self):
         # Create RTL using custom RTL class
         rtl = self.rtlModule(self,"debugger")
-        rtl.addInput([['clk','logic',1],['valid','logic',1],['eof','logic',1],['vector','logic','N']])
+        rtl.addInput([['clk','logic',1],['valid','logic',1],['eof','logic',1],['vector','logic','DATA_WIDTH','N']])
         rtl.addParameter(['N','DATA_WIDTH','IB_DEPTH'])
 
         # Adds includes to the beginning of the file
@@ -204,8 +206,8 @@ class rtlHw():
 
         # Tells the class about the included modules
         rtl.includeModule("inputBuffer")
-        rtl.dm.inputBuffer.addInput([['clk_in','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','N']])
-        rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','N']])
+        rtl.dm.inputBuffer.addInput([['clk_in','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
+        rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
         rtl.dm.inputBuffer.addParameter(['N','DATA_WIDTH','IB_DEPTH'])
 
         # Instantiate module
@@ -233,8 +235,8 @@ class rtlHw():
             
             initial
                 begin
-                    a = 0;
-                    b = 0;
+                    valid = 1;
+                    eof = 0;
                     #period;
                 end
         end
