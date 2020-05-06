@@ -181,7 +181,8 @@ testVectorChange()
 def testNakedRtl():
 
     # Instantiate processor
-    proc = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+    DATA_WIDTH=32
+    proc = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH)
     assert True
     print("Passed test #7")
 

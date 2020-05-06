@@ -4,16 +4,17 @@
  //-----------------------------------------------------
  module  input_buffer #(
   parameter N = 8,
-  parameter WIDTH = 32
+  parameter DATA_WIDTH = 32,
+  parameter IB_DEPTH = 8
   )
   (
   input logic clk_in,
   input logic valid_in,
   input logic eof_in,
-  input logic [WIDTH-1:0] vector_in [N-1:0],
+  input logic [DATA_WIDTH-1:0] vector_in [N-1:0],
   output logic valid_out,
   output logic eof_out,
-  output logic [WIDTH-1:0] vector_out [N-1:0]
+  output logic [DATA_WIDTH-1:0] vector_out [N-1:0]
  );
  //-------------Code Start-----------------
 

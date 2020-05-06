@@ -21,6 +21,15 @@ class rtlHw():
     # This class describes an instantiated rtlModule
     class rtlInstance():
 
+        # Set parameters
+        def setParameters(self,params):
+            for p in params:
+                parameter_name, parameter_value = p
+                if parameter_name in self.module_class.parameter:
+                    self.parameter[parameter_name]=parameter_value
+                else:
+                    assert False, f'{parameter_name} is not a parameter from {self.module_class.name}'
+
         # Connect inputs of instance
         def connectInputs(self,signals_to_connect):
             
@@ -51,6 +60,7 @@ class rtlHw():
             self.module_output=module_class.output
             self.instance_input={}
             self.instance_output={}
+            self.parameter={}
 
             # Map outputs using the name of the instance
             for o in module_class.output:
@@ -70,6 +80,10 @@ class rtlHw():
         def addOutput(self,outputs):
             for o in outputs:
                 self.output.append(struct(name=o[0],type=o[1],bits=o[2]))
+
+        def addParameter(self,params):
+            for p in params:
+                self.parameter.append(p)
 
         # Recursively adds Modules to module
         def declareModule(self,dm_name):
@@ -94,10 +108,14 @@ class rtlHw():
             # Append with identation (apdi is apd shifted)
             ident=self.getDepth()*"    "
             rtlCode=[]
-            def apd(t):
-                rtlCode.append(ident+t)
-            def apdi(t):
-                rtlCode.append(ident+"    "+t)
+            def apd(text):
+                lines=text.split("\n")
+                for l in lines:
+                    rtlCode.append(ident+l)
+            def apdi(text):
+                lines=text.split("\n")
+                for l in lines:
+                    rtlCode.append(ident+"    "+l)
             
             # Add includes
             if self.includes!=[]:
@@ -107,7 +125,7 @@ class rtlHw():
 
             # Add declared module
             if self.input+self.output!=[]:
-                apd('module  '+self.name+' (')
+                apd('module  '+self.name+"(")
                 # Add inputs and outputs
                 for i in self.input:
                     bits= f'[{i.bits-1}:0]' if i.bits>1 else ''
@@ -133,14 +151,21 @@ class rtlHw():
                     # Declare outputs
                     for key, value in inst.instance_output.items():
                         bits= f'[{value.bits-1}:0]' if value.bits>1 else ''
-                        apd(f'  output {value.type} {bits} {value.name};')
-                    # Instantiate and connect module
+                        apdi(f'output {value.type} {bits} {value.name};')
+                    # module name
+                    apdi(inst.module_class.name+" "+inst.name+"(")
+                    # Add parameters
+                    if inst.parameter!={}:
+                        apdi('#(')
+                        apdi(',\n'.join([f'  parameter {key} = {value}' for key, value in inst.parameter.items()]))
+                        apdi(')')
+                    # Mapping inputs and outputs
                     inst_portmap=[]
+                    apdi('(')
                     for key, value in inst.instance_input.items():
                         inst_portmap.append(f'  .{key}({value})')
                     for key, value in inst.instance_output.items():
                         inst_portmap.append(f'  .{key}({value.name})')
-                    apdi(inst.module_class.name+" "+inst.name+"(")
                     for i in inst_portmap:
                         if i!=inst_portmap[-1]:
                             apdi(i+",")
@@ -171,6 +196,7 @@ class rtlHw():
             self.regs=[]                # Stores regs
             self.input=[]               # Store all inputs logic ports
             self.output=[]              # Store all outputs logic ports
+            self.parameter=[]           # Store all parameters
             self.included=False         # Is true if the module has been imported
             self.dm=struct()            # Those are the declare modules
             self.im=struct()            # Those are the instantiated modules
@@ -187,10 +213,12 @@ class rtlHw():
         rtl.includeModule("inputBuffer")
         rtl.dm.inputBuffer.addInput([['clk_in','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic',self.N]])
         rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic',self.N]])
+        rtl.dm.inputBuffer.addParameter(['N','DATA_WIDTH','IB_DEPTH'])
 
         # Instantiate module
         rtl.instantiateModule(rtl.dm.inputBuffer,"ib")
         rtl.im.ib.connectInputs(rtl.input)
+        rtl.im.ib.setParameters([['N',self.N],['DATA_WIDTH',self.DATA_WIDTH],['IB_DEPTH',self.IB_DEPTH]])
 
         # Declaring a Module
         #rtl.declareModule("testbench")
@@ -234,7 +262,7 @@ class rtlHw():
             f.write(l+"\n")
         f.close()
 
-    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE):
+    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH):
         ''' Verifying parameters '''
         assert math.log(N, 2).is_integer(), "N must be a power of 2" 
         assert math.log(M, 2).is_integer(), "N must be a power of 2" 
@@ -242,6 +270,8 @@ class rtlHw():
 
         self.N=N
         self.M=M
+        self.IB_DEPTH=IB_DEPTH
+        self.DATA_WIDTH=DATA_WIDTH
         self.hwFolder = os.path.dirname(os.path.realpath(__file__))
         self.generateRtl()
         
