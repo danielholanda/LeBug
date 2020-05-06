@@ -1,5 +1,5 @@
 import logging as log
-import sys, math, os, shutil
+import sys, math, os, shutil, textwrap
 import numpy as np
 from copy import deepcopy as copy
 
@@ -21,17 +21,6 @@ class rtlHw():
     # This class describes an instantiated rtlModule
     class rtlInstance():
 
-        # Create dict connection a module instance to signals
-        def mapPorts(self,module_ports,signals_to_connect):
-            # Ports are properly mapped if they have the same size and the same name before the first underscore
-            portMap={}
-            for i in module_ports:
-                for j in signals_to_connect:
-                    if i.bits==j.bits and i.name.split("_")[0]==j.name.split("_")[0]:
-                        portMap[i.name]=j.name
-            assert len(portMap.keys())==len(self.module_input), "Port map failed"
-            return portMap
-
         # Connect inputs of instance
         def connectInputs(self,signals_to_connect):
             
@@ -46,9 +35,14 @@ class rtlHw():
             # Check if number of signals is the same
             assert len(signals_to_connect)==len(self.module_input), "Not the same number of connected signals"
 
-            # Map ports
-            self.instance_input=self.mapPorts(self.module_input,signals_to_connect)
-
+            # Ports map if the first name before the "_" is the same
+            portMap={}
+            for i in self.module_input:
+                for j in signals_to_connect:
+                    if i.bits==j.bits and i.name.split("_")[0]==j.name.split("_")[0]:
+                        portMap[i.name]=j.name
+            assert len(portMap.keys())==len(self.module_input), "Port map failed"
+            self.instance_input=portMap
 
         def __init__(self,module_class,instance_name):
             self.module_class = module_class
@@ -199,12 +193,32 @@ class rtlHw():
         rtl.im.ib.connectInputs(rtl.input)
 
         # Declaring a Module
-        rtl.declareModule("testbench")
-        rtl.dm.testbench.addInput([['clk','logic',1],['vector','logic',self.N]])
+        #rtl.declareModule("testbench")
+        #rtl.dm.testbench.addInput([['clk','logic',1],['vector','logic',self.N]])
 
         rtl.declareModule("Module2")
 
-        return rtl.dump()
+        # Prepare testbench
+        testbench=[textwrap.dedent(f"""
+        `timescale 1 ns/10 ps  // time-unit = 1 ns, precision = 10 ps
+        module testbench;
+            reg a, b;
+            wire sum, carry;
+
+            // duration for each bit = 20 * timescale = 20 * 1 ns  = 20ns
+            localparam period = 20;  
+
+            {rtl.name} dbg (.a(a), .b(b), .sum(sum), .carry(carry));
+            
+            initial
+                begin
+                    a = 0;
+                    b = 0;
+                    #period;
+                end
+        end
+        """)]
+        return rtl.dump()+testbench
 
     def generateRtl(self):
 
