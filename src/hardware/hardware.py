@@ -24,9 +24,10 @@ class rtlHw():
         # Set parameters
         def setParameters(self,params):
             for p in params:
-                parameter_name, parameter_value = p
-                if parameter_name in self.module_class.parameter:
-                    self.parameter[parameter_name]=parameter_value
+                instance_parameter_name, instance_parameter_value = p
+                module_parameter_names = [item[0] for item in self.module_class.parameter]
+                if instance_parameter_name in module_parameter_names:
+                    self.parameter[instance_parameter_name]=instance_parameter_value
                 else:
                     assert False, f'{parameter_name} is not a parameter from {self.module_class.name}'
 
@@ -128,15 +129,19 @@ class rtlHw():
             # Add declared module
             if self.input+self.output!=[]:
                 # Module name
-                apd('module  '+self.name+"(")
+                apd('module  '+self.name)
+
+                # Module parameters
+                apd("#(")
+                apd(',\n'.join([f'  parameter {parameter_name} = {parameter_value}' for parameter_name, parameter_value in self.parameter]))
+                apd(")")
 
                 # Module inputs and outputs
+                apd("(")
                 apd(',\n'.join(f'  input {i.type} [{i.bits}-1:0] {i.name} [{i.elements}-1:0]'.replace("[1-1:0]","") for i in self.input))
                 apd(',\n'.join(f'  output {i.type} [{i.bits}-1:0] {i.name} [{i.elements}-1:0]'.replace("[1-1:0]","") for i in self.output))
                 apd(');')
 
-                # Module parameters
-                apdi('\n'.join([f'parameter {p};' for p in self.parameter]))
 
                 # Do recursive dumps for submodules declared in this module
                 for m in self.dm.__dict__.keys():
@@ -152,18 +157,18 @@ class rtlHw():
                     apdi('')
                     apdi('\n'.join(f'output {value.type} [{value.bits}-1:0] {value.name} [{value.elements}-1:0];'.replace("[1-1:0]","") for key, value in inst.instance_output.items()))
 
-                    # Print module name
-                    apdi(inst.module_class.name+" "+inst.name+"(")
+                    # Print module class name
+                    apdi(inst.module_class.name)
 
                     # Print parameters
                     if inst.parameter!={}:
                         apdi('#(')
-                        apdi(',\n'.join([f'  parameter {key} = {value}' for key, value in inst.parameter.items()]))
+                        apdi(',\n'.join([f'  .{key}({value})' for key, value in inst.parameter.items()]))
                         apdi(')')
 
-                    # Print inputs and outputs
-                    apdi('(')
-                    apdi(',\n'.join([f'  .{key}({value})' for key, value in inst.instance_input.items()]))
+                    # Print instance name, inputs and outputs
+                    apdi(f'{inst.name}(')
+                    apdi('\n'.join([f'  .{key}({value}),' for key, value in inst.instance_input.items()]))
                     apdi(',\n'.join([f'  .{key}({value.name})' for key, value in inst.instance_output.items()]))
                     apdi(");")
 
@@ -199,7 +204,7 @@ class rtlHw():
         # Create RTL using custom RTL class
         rtl = self.rtlModule(self,"debugger")
         rtl.addInput([['clk','logic',1],['valid','logic',1],['eof','logic',1],['vector','logic','DATA_WIDTH','N']])
-        rtl.addParameter(['N','DATA_WIDTH','IB_DEPTH'])
+        rtl.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
 
         # Adds includes to the beginning of the file
         rtl.include("inputBuffer.sv")
@@ -208,7 +213,7 @@ class rtlHw():
         rtl.includeModule("inputBuffer")
         rtl.dm.inputBuffer.addInput([['clk_in','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
         rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
-        rtl.dm.inputBuffer.addParameter(['N','DATA_WIDTH','IB_DEPTH'])
+        rtl.dm.inputBuffer.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
 
         # Instantiate module
         rtl.instantiateModule(rtl.dm.inputBuffer,"ib")
@@ -236,12 +241,12 @@ class rtlHw():
             localparam period = 20;  
 
             // Instantiate debugger
-            {rtl.name} dbg #(
-              N=N,
-              DATA_WIDTH=DATA_WIDTH,
-              IB_DEPTH=IB_DEPTH
+            {rtl.name} #(
+              .N(N),
+              .DATA_WIDTH(DATA_WIDTH),
+              .IB_DEPTH(IB_DEPTH)
             )
-            (
+            dbg(
               .clk(clk),
               .vector(vector),
               .valid(valid),
@@ -251,11 +256,13 @@ class rtlHw():
             // Test
             initial
                 begin
+                    $display("Test Started");
                     valid = 1;
                     eof = 0;
                     #period;
+                    $finish;
                 end
-        end
+        endmodule
         """)]
         return rtl.dump()+testbench
 

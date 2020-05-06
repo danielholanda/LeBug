@@ -6,7 +6,13 @@ This first version of the documentation explains the basics of how to get starte
 
 Simply cd into examples/minimal and run 'python3 test_emulator'
 
+To simulate using iverilog use the command:
 
+iverilog -g2012 -s testbench -o debugProcessor debugProcessor.sv
+
+followed by 
+
+vvp debugProcessor
 
 ### Configuring a new example
 
