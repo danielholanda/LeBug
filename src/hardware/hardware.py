@@ -125,18 +125,13 @@ class rtlHw():
 
             # Add declared module
             if self.input+self.output!=[]:
+                # Module name
                 apd('module  '+self.name+"(")
-                # Add inputs and outputs
-                for i in self.input:
-                    bits= f'[{i.bits-1}:0]' if i.bits>1 else ''
-                    comma = ',' if i!=self.input[-1] else ''
-                    apd(f'  input {i.type} {bits} {i.name}{comma}')
-                for i in self.output:
-                    bits= f'[{i.bits-1}:0]' if i.bits>1 else ''
-                    comma = ',' if i!=self.input[-1] else ''
-                    apd(f'  output {i.type} {bits} {i.name}{comma}')
-                apd(');')
 
+                # Module inputs and outputs
+                apd(',\n'.join(f'  input {i.type} {i.bits-1}:0] {i.name}'.replace("[0:0]","") for i in self.input))
+                apd(',\n'.join(f'  output {i.type} {i.bits-1}:0] {i.name}'.replace("[0:0]","") for i in self.output))
+                apd(');')
 
                 # Do recursive dumps for submodules declared in this module
                 for m in self.dm.__dict__.keys():
@@ -205,6 +200,7 @@ class rtlHw():
         # Create RTL using custom RTL class
         rtl = self.rtlModule(self,"debugger")
         rtl.addInput([['clk','logic',1],['valid','logic',1],['eof','logic',1],['vector','logic',self.N]])
+        rtl.addParameter(['N','DATA_WIDTH','IB_DEPTH'])
 
         # Adds includes to the beginning of the file
         rtl.include("inputBuffer.sv")
