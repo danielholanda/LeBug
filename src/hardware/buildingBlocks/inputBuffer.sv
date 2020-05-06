@@ -3,9 +3,9 @@
  // Function    : Buffers vectors for up to D cycles
  //-----------------------------------------------------
  module  input_buffer #(
-  parameter N = 8,
-  parameter DATA_WIDTH = 32,
-  parameter IB_DEPTH = 8
+  parameter N,
+  parameter DATA_WIDTH,
+  parameter IB_DEPTH
   )
   (
   input logic clk_in,

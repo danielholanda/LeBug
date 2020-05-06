@@ -129,9 +129,12 @@ class rtlHw():
                 apd('module  '+self.name+"(")
 
                 # Module inputs and outputs
-                apd(',\n'.join(f'  input {i.type} {i.bits-1}:0] {i.name}'.replace("[0:0]","") for i in self.input))
-                apd(',\n'.join(f'  output {i.type} {i.bits-1}:0] {i.name}'.replace("[0:0]","") for i in self.output))
+                apd(',\n'.join(f'  input {i.type} [{i.bits}-1:0] {i.name}'.replace("[0:0]","") for i in self.input))
+                apd(',\n'.join(f'  output {i.type} [{i.bits}-1:0] {i.name}'.replace("[0:0]","") for i in self.output))
                 apd(');')
+
+                # Module parameters
+                apdi('\n'.join([f'parameter {p};' for p in self.parameter]))
 
                 # Do recursive dumps for submodules declared in this module
                 for m in self.dm.__dict__.keys():
@@ -145,11 +148,9 @@ class rtlHw():
                     
                     # Declare outputs
                     apdi('')
-                    for key, value in inst.instance_output.items():
-                        bits= f'[{value.bits-1}:0]' if value.bits>1 else ''
-                        apdi(f'output {value.type} {bits} {value.name};')
+                    apdi('\n'.join(f'output {value.type} [{value.bits}-1:0] {value.name};'.replace("[1-1:0]","") for key, value in inst.instance_output.items()))
 
-                    # Print odule name
+                    # Print module name
                     apdi(inst.module_class.name+" "+inst.name+"(")
 
                     # Print parameters
@@ -195,7 +196,7 @@ class rtlHw():
     def rtlLogic(self):
         # Create RTL using custom RTL class
         rtl = self.rtlModule(self,"debugger")
-        rtl.addInput([['clk','logic',1],['valid','logic',1],['eof','logic',1],['vector','logic',self.N]])
+        rtl.addInput([['clk','logic',1],['valid','logic',1],['eof','logic',1],['vector','logic','N']])
         rtl.addParameter(['N','DATA_WIDTH','IB_DEPTH'])
 
         # Adds includes to the beginning of the file
@@ -203,14 +204,14 @@ class rtlHw():
 
         # Tells the class about the included modules
         rtl.includeModule("inputBuffer")
-        rtl.dm.inputBuffer.addInput([['clk_in','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic',self.N]])
-        rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic',self.N]])
+        rtl.dm.inputBuffer.addInput([['clk_in','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','N']])
+        rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','N']])
         rtl.dm.inputBuffer.addParameter(['N','DATA_WIDTH','IB_DEPTH'])
 
         # Instantiate module
         rtl.instantiateModule(rtl.dm.inputBuffer,"ib")
         rtl.im.ib.connectInputs(rtl.input)
-        rtl.im.ib.setParameters([['N',self.N],['DATA_WIDTH',self.DATA_WIDTH],['IB_DEPTH',self.IB_DEPTH]])
+        rtl.im.ib.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH'],['IB_DEPTH','IB_DEPTH']])
 
         # Declaring a Module
         #rtl.declareModule("testbench")
