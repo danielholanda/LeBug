@@ -116,13 +116,13 @@ class rtlHw():
                 apd('module  '+self.name+' (')
                 # Add inputs and outputs
                 for i in self.input:
-                    bits= ' ['+str(i.bits-1)+':0]' if i.bits>1 else ''
+                    bits= f' [{i.bits-1}:0]' if i.bits>1 else ''
                     comma = ',' if i!=self.input[-1] else ''
-                    apd('  input '+i.type+' '+i.name+bits+comma)
+                    apd(f'  input {i.type} {i.name+bits+comma}')
                 for i in self.output:
-                    bits= ' ['+str(i.bits-1)+':0]' if i.bits>1 else ''
+                    bits= f' [{i.bits-1}:0]' if i.bits>1 else ''
                     comma = ',' if i!=self.input[-1] else ''
-                    apd('  output '+i.type+' '+i.name+bits+comma)
+                    apd(f'  output {i.type} {i.name+bits+comma}')
                 apd(');')
 
 
@@ -137,15 +137,15 @@ class rtlHw():
                     inst=self.im.__dict__[i]
                     apdi('')
                     # Declare outputs
-                    for key, value in inst.instance_output.iteritems():
-                        bits= ' ['+str(value.bits-1)+':0]' if value.bits>1 else ''
+                    for key, value in inst.instance_output.items():
+                        bits= f' [{value.bits-1}:0]' if value.bits>1 else ''
                         apdi("output "+value.type+" "+value.name+bits+";")
                     # Instantiate and connect module
                     inst_portmap=[]
-                    for key, value in inst.instance_input.iteritems():
-                        inst_portmap.append("  ."+key+"("+value+")")
-                    for key, value in inst.instance_output.iteritems():
-                        inst_portmap.append("  ."+key+"("+value.name+")")
+                    for key, value in inst.instance_input.items():
+                        inst_portmap.append(f'  .{key}({value})')
+                    for key, value in inst.instance_output.items():
+                        inst_portmap.append(f'  .{key}({value.name})')
                     apdi(inst.module_class.name+" "+inst.name+"(")
                     for i in inst_portmap:
                         if i!=inst_portmap[-1]:

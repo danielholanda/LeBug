@@ -4,7 +4,7 @@ This first version of the documentation explains the basics of how to get starte
 
 ### Testing the emulator
 
-Simply cd into examples/minimal and run 'python test_emulator'
+Simply cd into examples/minimal and run 'python3 test_emulator'
 
 
 

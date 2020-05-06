@@ -3,7 +3,7 @@
 # Firmware for a distribution with multiple sets of N values
 def distribution(cp,bins,M):
     assert bins%M==0, "Number of bins must be divisible by M for now"
-    for i in range(bins/M):
+    for i in range(int(bins/M)):
         cp.begin_chain()
         cp.vv_filter(i)
         cp.m_reduce('M')
