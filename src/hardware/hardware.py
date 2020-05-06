@@ -142,30 +142,26 @@ class rtlHw():
                 # Instantiated modules
                 for i in self.im.__dict__.keys():
                     inst=self.im.__dict__[i]
-                    apdi('')
+                    
                     # Declare outputs
+                    apdi('')
                     for key, value in inst.instance_output.items():
                         bits= f'[{value.bits-1}:0]' if value.bits>1 else ''
                         apdi(f'output {value.type} {bits} {value.name};')
-                    # module name
+
+                    # Print odule name
                     apdi(inst.module_class.name+" "+inst.name+"(")
-                    # Add parameters
+
+                    # Print parameters
                     if inst.parameter!={}:
                         apdi('#(')
                         apdi(',\n'.join([f'  parameter {key} = {value}' for key, value in inst.parameter.items()]))
                         apdi(')')
-                    # Mapping inputs and outputs
-                    inst_portmap=[]
+
+                    # Print inputs and outputs
                     apdi('(')
-                    for key, value in inst.instance_input.items():
-                        inst_portmap.append(f'  .{key}({value})')
-                    for key, value in inst.instance_output.items():
-                        inst_portmap.append(f'  .{key}({value.name})')
-                    for i in inst_portmap:
-                        if i!=inst_portmap[-1]:
-                            apdi(i+",")
-                        else:
-                            apdi(i)
+                    apdi(',\n'.join([f'  .{key}({value})' for key, value in inst.instance_input.items()]))
+                    apdi(',\n'.join([f'  .{key}({value.name})' for key, value in inst.instance_output.items()]))
                     apdi(");")
 
                 # Finish module
