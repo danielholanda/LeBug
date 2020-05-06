@@ -219,20 +219,36 @@ class rtlHw():
         #rtl.declareModule("testbench")
         #rtl.dm.testbench.addInput([['clk','logic',1],['vector','logic',self.N]])
 
-        rtl.declareModule("Module2")
-
         # Prepare testbench
         testbench=[textwrap.dedent(f"""
         `timescale 1 ns/10 ps  // time-unit = 1 ns, precision = 10 ps
         module testbench;
+
+            // Compile-time parameters
+            parameter N={self.N};
+            parameter DATA_WIDTH={self.DATA_WIDTH};
+            parameter IB_DEPTH={self.IB_DEPTH};
+
             reg clk,valid,eof;
-            reg vector [{self.N-1}:0];
+            reg [DATA_WIDTH-1:0] vector [N-1:0];
 
             // duration for each bit = 20 * timescale = 20 * 1 ns  = 20ns
             localparam period = 20;  
 
-            {rtl.name} dbg (.clk(clk), .vector(vector), .valid(valid), .eof(eof));
+            // Instantiate debugger
+            {rtl.name} dbg #(
+              N=N,
+              DATA_WIDTH=DATA_WIDTH,
+              IB_DEPTH=IB_DEPTH
+            )
+            (
+              .clk(clk),
+              .vector(vector),
+              .valid(valid),
+              .eof(eof)
+            );
             
+            // Test
             initial
                 begin
                     valid = 1;
