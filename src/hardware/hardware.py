@@ -1,5 +1,5 @@
 import logging as log
-import sys, math, os, shutil, textwrap
+import sys, math, os, shutil, textwrap, subprocess
 import numpy as np
 from copy import deepcopy as copy
 
@@ -15,6 +15,15 @@ class struct:
         self.__dict__.update(kwds)
     def __repr__(self):
         return str(self.__dict__)
+
+# Run a given command using subprocess
+def run(cmd):
+    proc = subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    proc.wait()
+
+    # Print results
+    result = proc.stdout.readlines()+proc.stderr.readlines()
+    [ print(r.decode("utf-8"), end = '') for r in result]
 
 class rtlHw():
 
@@ -279,6 +288,15 @@ class rtlHw():
         for l in self.rtlLogic():
             f.write(l+"\n")
         f.close()
+
+    # This will run the testbench of the generated hardware and return its results
+    def run(self):
+        current_folder=os.getcwd()
+        rtl_folder=current_folder+"/rtl/"
+        os.chdir(rtl_folder)
+        run(['iverilog','-g2012', '-stestbench','-odebugProcessor','debugProcessor.sv'])
+        run(['vvp','debugProcessor'])
+        os.chdir(current_folder)
 
     def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH):
         ''' Verifying parameters '''
