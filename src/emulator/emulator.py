@@ -288,6 +288,10 @@ class emulatedHw():
         packed_data = self.dp.step(chain)
         self.tb.step(packed_data)
 
+    # Pushes values to the input of the chain
+    def push(self,pushed_vals):
+        self.ib.push(pushed_vals)
+
     def config(self,fw=[]):
         #Configure processor
         cond={'last':False,'notlast':False,'first':False,'notfirst':False}
@@ -304,9 +308,9 @@ class emulatedHw():
             self.vvalu.config.append(chain_instrs[3])
             self.dp.config.append(chain_instrs[4])
 
-    def run(self):
+    def run(self,steps=50):
         # Keep stepping through the circuit as long as we have instructions to execute
-        for i in range(50):
+        for i in range(steps):
             self.step()
         return self.tb.mem
 

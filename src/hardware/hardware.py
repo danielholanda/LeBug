@@ -249,7 +249,31 @@ class rtlHw():
         #rtl.declareModule("testbench")
         #rtl.dm.testbench.addInput([['clk','logic',1],['vector','logic',self.N]])
 
-        # Prepare testbench
+        # Prepare testbench inputs
+        tb_inputs=[]
+        for i in self.testbench_inputs:
+            tb_inputs.append("valid = 1;")
+            tb_inputs.append(f"eof = {int(i[1])};")
+            for idx,ele in enumerate(i[0]):
+                tb_inputs.append(f"vector[{idx}]=32'd{ele};")
+            tb_inputs.append("toFile();")
+            tb_inputs.append("#half_period;")
+            tb_inputs.append("toFile();")
+            tb_inputs.append("#half_period;")
+            tb_inputs.append("")
+        tb_inputs="\n\t\t\t\t\t\t\t\t\t\t".join(tb_inputs)
+
+        # Prepare testbench steps
+        tb_steps=[]
+        for i in range(self.steps):
+            tb_steps.append("valid = 0;")
+            tb_steps.append("toFile();")
+            tb_steps.append("#half_period;")
+            tb_steps.append("toFile();")
+            tb_steps.append("#half_period;")
+            tb_steps.append("")
+        tb_steps="\n\t\t\t\t\t\t\t\t\t\t".join(tb_steps)
+
         testbench=[textwrap.dedent(f"""
         `timescale 1 ns/10 ps  // time-unit = 1 ns, precision = 10 ps
         module testbench;
@@ -312,24 +336,9 @@ class rtlHw():
                     write_data = $fopen("simulation_results.txt");
                     
                     $display("Test Started");
-                    valid = 1;
-                    eof = 0;
-                    vector[0]=32'd9;
-                    vector[1]=32'd1;
-                    vector[2]=32'd1;
-                    vector[3]=32'd2;
-                    vector[4]=32'd1;
-                    vector[5]=32'd1;
-                    vector[6]=32'd1;
-                    vector[7]=32'd6;
-                    toFile();
-                    #half_period;
+                    {tb_inputs}
 
-                    toFile();
-                    #half_period;
-
-                    toFile();
-                    #half_period;
+                    {tb_steps}
 
                     $fclose(write_data);
                     $finish;
@@ -353,13 +362,21 @@ class rtlHw():
         f.close()
 
     # This will run the testbench of the generated hardware and return its results
-    def run(self):
+    def run(self,steps=50):
+        # First, generate the RTL
+        self.steps=steps
+        self.generateRtl()
+
+        # Then, run simulation
         current_folder=os.getcwd()
         rtl_folder=current_folder+"/rtl/"
         os.chdir(rtl_folder)
         run(['iverilog','-g2012', '-stestbench','-odebugProcessor','debugProcessor.sv'])
         run(['vvp','debugProcessor'])
         os.chdir(current_folder)
+
+    def push(self,pushed_values):
+        self.testbench_inputs.append(pushed_values)
 
     def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH):
         ''' Verifying parameters '''
@@ -372,5 +389,6 @@ class rtlHw():
         self.IB_DEPTH=IB_DEPTH
         self.DATA_WIDTH=DATA_WIDTH
         self.hwFolder = os.path.dirname(os.path.realpath(__file__))
-        self.generateRtl()
+        self.testbench_inputs=[]    # Stores inputs to testbench
+        self.steps=0 # Number of steps for testbench
         

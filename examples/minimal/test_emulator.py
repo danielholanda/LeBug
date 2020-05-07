@@ -27,7 +27,7 @@ def testSimpleDistribution():
     # Feed one value to input buffer
     np.random.seed(42)
     input_vector = np.random.rand(N)*8
-    proc.ib.push([input_vector,True])
+    proc.push([input_vector,True])
 
     # Step through it until we get the result
     proc.config(fw)
@@ -52,8 +52,8 @@ def testDualDistribution():
     input_vector1=np.random.rand(N)*8
     input_vector2=np.random.rand(N)*8
 
-    proc.ib.push([input_vector1,False])
-    proc.ib.push([input_vector2,True])
+    proc.push([input_vector1,False])
+    proc.push([input_vector2,True])
 
     # Step through it until we get the result
     proc.config(fw)
@@ -76,14 +76,14 @@ def testSummaryStats():
     input_vector1=np.random.rand(N)*8-4
     input_vector2=np.random.rand(N)*8-4
 
-    proc.ib.push([input_vector1,False])
-    proc.ib.push([input_vector1,False])
-    proc.ib.push([input_vector1,False])
-    proc.ib.push([input_vector1,False])
-    proc.ib.push([input_vector1,False])
-    proc.ib.push([input_vector1,False])
-    proc.ib.push([input_vector1,False])
-    proc.ib.push([input_vector2,True])
+    proc.push([input_vector1,False])
+    proc.push([input_vector1,False])
+    proc.push([input_vector1,False])
+    proc.push([input_vector1,False])
+    proc.push([input_vector1,False])
+    proc.push([input_vector1,False])
+    proc.push([input_vector1,False])
+    proc.push([input_vector2,True])
 
     # Step through it until we get the result
     proc.config(fw)
@@ -107,8 +107,8 @@ def testSpatialSparsity():
     input_vector1=np.random.rand(N)*8-4
     input_vector2=np.random.rand(N)*8-4
 
-    proc.ib.push([input_vector1,False])
-    proc.ib.push([input_vector2,True])
+    proc.push([input_vector1,False])
+    proc.push([input_vector2,True])
 
     # Step through it until we get the result
     proc.config(fw)
@@ -131,8 +131,8 @@ def testCorrelation():
     input_vector1=np.random.rand(N)*8-4
     input_vector2=np.random.rand(N)*8-4
 
-    proc.ib.push([input_vector1,False])
-    proc.ib.push([input_vector2,True])
+    proc.push([input_vector1,False])
+    proc.push([input_vector2,True])
 
     # Step through it until we get the result
     proc.config(fw)
@@ -159,14 +159,13 @@ def testVectorChange():
     proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
     fw = firm.vectorChange(proc.compiler)
 
-    # Feed one value to input buffer
+    # Feed value to input buffer
     np.random.seed(0)
     input_vector1=np.random.rand(N)*8-4
     input_vector2=np.random.rand(N)*8-4
 
-    proc.ib.push([input_vector1,False])
-    proc.ib.push([input_vector2,True])
-
+    proc.push([input_vector1,False])
+    proc.push([input_vector2,True])
 
     # Step through it until we get the result
     proc.config(fw)
@@ -183,7 +182,18 @@ def testNakedRtl():
     # Instantiate processor
     DATA_WIDTH=32
     proc = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH)
-    tb = proc.run()
+
+    # Feed values to input buffer
+    np.random.seed(0)
+    input_vector1=np.random.randint(100, size=N)
+    input_vector2=np.random.randint(100, size=N)
+    proc.push([input_vector1,False])
+    proc.push([input_vector2,True])
+
+    # Run testbench
+    tb = proc.run(steps=10)
+
+    # Check results
     assert True
     print("Passed test #7")
 
