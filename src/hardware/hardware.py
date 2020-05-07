@@ -170,7 +170,7 @@ class rtlHw():
                     
                     # Declare outputs
                     apdi('')
-                    apdi('\n'.join(f'output {value.type} [{value.bits}-1:0] {value.name} [{value.elements}-1:0];'.replace("[1-1:0]","") for key, value in inst.instance_output.items()))
+                    apdi('\n'.join(f'{value.type} [{value.bits}-1:0] {value.name} [{value.elements}-1:0];'.replace("[1-1:0]","") for key, value in inst.instance_output.items()))
 
                     # Print module class name
                     apdi(inst.module_class.name)
@@ -277,27 +277,27 @@ class rtlHw():
         testbench=[textwrap.dedent(f"""
         `timescale 1 ns/10 ps  // time-unit = 1 ns, precision = 10 ps
         module testbench;
-
+        
             // Compile-time parameters
             parameter N={self.N};
             parameter DATA_WIDTH={self.DATA_WIDTH};
             parameter IB_DEPTH={self.IB_DEPTH};
-
+            
             // Declare inputs
             reg clk=1'b0;
             reg valid,eof;
             reg [DATA_WIDTH-1:0] vector [N-1:0];
-
+            
             // Declare outputs
             reg [DATA_WIDTH-1:0] vector_out [N-1:0];
             reg valid_out;
-
+            
             // duration for each bit = 10 * timescale = 10 * 1 ns  = 10ns
             localparam period = 10; 
             localparam half_period = 5; 
-
+            
             always #half_period clk=~clk; 
-
+            
             // Instantiate debugger
             {rtl.name} #(
               .N(N),
@@ -314,6 +314,7 @@ class rtlHw():
             );
             
             //Task to print all content to file
+            integer write_data,i,j;
             task toFile;
                 begin
                     $fwrite(write_data, "%b %b %b", clk, valid, eof);
@@ -328,21 +329,25 @@ class rtlHw():
                 
                 end
             endtask
-
+            
             // Test
-            integer write_data,i;
-            initial
-                begin
-                    write_data = $fopen("simulation_results.txt");
-                    
-                    $display("Test Started");
-                    {tb_inputs}
-
-                    {tb_steps}
-
-                    $fclose(write_data);
-                    $finish;
+            initial begin
+                $dumpfile("testbench.vcd");
+                $dumpvars(0,testbench);
+                for (j = 0; j < {self.N}; j = j + 1) begin
+                    $dumpvars(0,dbg.vector_in[j]);
+                    $dumpvars(0,dbg.vector_out[j]);
                 end
+                write_data = $fopen("simulation_results.txt");
+                
+                $display("Test Started");
+                {tb_inputs}
+                
+                {tb_steps}
+                
+                $fclose(write_data);
+                $finish;
+            end
         endmodule
         """)]
         return rtl.dump()+testbench
@@ -372,7 +377,46 @@ class rtlHw():
         rtl_folder=current_folder+"/rtl/"
         os.chdir(rtl_folder)
         run(['iverilog','-g2012', '-stestbench','-odebugProcessor','debugProcessor.sv'])
-        run(['vvp','debugProcessor'])
+        run(['vvp','debugProcessor','-lxt2'])
+
+        # Get results from file back to python
+        f = open("simulation_results.txt", "r")
+        clk=[]
+        eof=[]
+        valid=[]
+        vector_in=[]
+        valid_out=[]
+        vector_out=[]
+        for line in f:
+            l= line.replace("\n","").split(" ")
+            clk.append(l[0])
+            eof.append(l[1])
+            valid.append(l[2])
+            vector_in.append(l[3:3+self.N])
+            valid_out.append(l[3+self.N])
+            vector_out.append(l[4+self.N:])
+        f.close()
+        results=[clk,eof,valid,vector_in,valid_out,vector_out]
+
+        # Print results to file in a readable way
+        def fmt(a,size):
+            return (size-len(a))*" "+a
+        f = open("simulation_results_readable.txt", "w")
+        numCol=len(clk)
+        f.write("|clk|eof|valid_in|valid_out|vector_in                    |vector_out                   |\n")
+        f.write("-"*88+"\n")
+        for i in range(len(clk)):
+            f.write('|')
+            f.write(fmt(clk[i]+"|",4))
+            f.write(fmt(valid[i]+"|",4))
+            f.write(fmt(eof[i]+"|",9))
+            f.write(fmt(valid_out[i]+"|",10))
+            f.write(fmt(" ".join(vector_in[i])+"|",30))
+            f.write(fmt(" ".join(vector_out[i])+"|",30))
+            f.write('\n')
+        f.close()
+
+        # Go back to main directory
         os.chdir(current_folder)
 
     def push(self,pushed_values):

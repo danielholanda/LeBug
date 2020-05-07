@@ -1,6 +1,6 @@
  //-----------------------------------------------------
  // Design Name : Input Buffer
- // Function    : Buffers vectors for up to D cycles
+ // Function    : Buffers vectors for up to IB_DEPTH cycles
  //-----------------------------------------------------
  module  inputBuffer #(
   parameter N=8,
@@ -19,7 +19,7 @@
  //-------------Code Start-----------------
 
     assign valid_out = valid_in;
-    assign eof_out=eof_in;
-    assign vector_out=vector_in;
+    assign eof_out = eof_in;
+    assign vector_out = vector_in;
  
  endmodule 
