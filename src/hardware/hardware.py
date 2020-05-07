@@ -93,6 +93,14 @@ class rtlHw():
                 elements = 1 if len(o)==3 else o[3]
                 self.output.append(struct(name=o[0],type=o[1],bits=o[2],elements=elements))
 
+        # Assign module outputs to the outputs of a given submodule
+        def assignOutputs(self,submodule_outputs):
+            for i in self.output:
+                for _,j in submodule_outputs.items():
+                    if i.bits==j.bits and i.name.split("_")[0]==j.name.split("_")[0]:
+                        self.output_assignment[i.name]=j.name
+            assert len(self.output_assignment.keys())==len(self.output), "Output map failed"
+
         def addParameter(self,params):
             for p in params:
                 self.parameter.append(p)
@@ -112,7 +120,6 @@ class rtlHw():
         # Instantiate a given module
         def instantiateModule(self,module_class,instance_name):
             self.im.__dict__[instance_name]=self.parent.rtlInstance(module_class,instance_name)
-
 
         # Dump RTL class into readable RTL
         def dump(self):
@@ -147,10 +154,9 @@ class rtlHw():
 
                 # Module inputs and outputs
                 apd("(")
-                apd(',\n'.join(f'  input {i.type} [{i.bits}-1:0] {i.name} [{i.elements}-1:0]'.replace("[1-1:0]","") for i in self.input))
+                apd('\n'.join(f'  input {i.type} [{i.bits}-1:0] {i.name} [{i.elements}-1:0],'.replace("[1-1:0]","") for i in self.input))
                 apd(',\n'.join(f'  output {i.type} [{i.bits}-1:0] {i.name} [{i.elements}-1:0]'.replace("[1-1:0]","") for i in self.output))
                 apd(');')
-
 
                 # Do recursive dumps for submodules declared in this module
                 for m in self.dm.__dict__.keys():
@@ -181,6 +187,11 @@ class rtlHw():
                     apdi(',\n'.join([f'  .{key}({value.name})' for key, value in inst.instance_output.items()]))
                     apdi(");")
 
+                # Create assertions for outputs
+                apdi('')
+                apdi('\n'.join([f'assign {key}={value};' for key, value in self.output_assignment.items()]))
+
+
                 # Finish module
                 apd('endmodule')
 
@@ -204,6 +215,7 @@ class rtlHw():
             self.regs=[]                # Stores regs
             self.input=[]               # Store all inputs logic ports
             self.output=[]              # Store all outputs logic ports
+            self.output_assignment={}   # Describes how outputs are connected to internal signals
             self.parameter=[]           # Store all parameters
             self.included=False         # Is true if the module has been imported
             self.dm=struct()            # Those are the declare modules
@@ -212,7 +224,8 @@ class rtlHw():
     def rtlLogic(self):
         # Create RTL using custom RTL class
         rtl = self.rtlModule(self,"debugger")
-        rtl.addInput([['clk','logic',1],['valid','logic',1],['eof','logic',1],['vector','logic','DATA_WIDTH','N']])
+        rtl.addInput([['clk','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
+        rtl.addOutput([['valid_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
         rtl.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
 
         # Adds includes to the beginning of the file
@@ -224,10 +237,13 @@ class rtlHw():
         rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
         rtl.dm.inputBuffer.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
 
-        # Instantiate module
+        # Instantiate modules
         rtl.instantiateModule(rtl.dm.inputBuffer,"ib")
-        rtl.im.ib.connectInputs(rtl.input)
         rtl.im.ib.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH'],['IB_DEPTH','IB_DEPTH']])
+
+        # Connect modules
+        rtl.im.ib.connectInputs(rtl.input)
+        rtl.assignOutputs(rtl.im.ib.instance_output)
 
         # Declaring a Module
         #rtl.declareModule("testbench")
@@ -243,11 +259,20 @@ class rtlHw():
             parameter DATA_WIDTH={self.DATA_WIDTH};
             parameter IB_DEPTH={self.IB_DEPTH};
 
-            reg clk,valid,eof;
+            // Declare inputs
+            reg clk=1'b0;
+            reg valid,eof;
             reg [DATA_WIDTH-1:0] vector [N-1:0];
 
-            // duration for each bit = 20 * timescale = 20 * 1 ns  = 20ns
-            localparam period = 20;  
+            // Declare outputs
+            reg [DATA_WIDTH-1:0] vector_out [N-1:0];
+            reg valid_out;
+
+            // duration for each bit = 10 * timescale = 10 * 1 ns  = 10ns
+            localparam period = 10; 
+            localparam half_period = 5; 
+
+            always #half_period clk=~clk; 
 
             // Instantiate debugger
             {rtl.name} #(
@@ -257,13 +282,31 @@ class rtlHw():
             )
             dbg(
               .clk(clk),
-              .vector(vector),
-              .valid(valid),
-              .eof(eof)
+              .vector_in(vector),
+              .valid_in(valid),
+              .eof_in(eof),
+              .valid_out(valid_out),
+              .vector_out(vector_out)
             );
             
+            //Task to print all content to file
+            task toFile;
+                begin
+                    $fwrite(write_data, "%b %b %b", clk, valid, eof);
+                    for (i = 0; i < {self.N}; i = i +1) begin
+                        $fwrite(write_data, " %0d", vector[i]);
+                    end
+                    $fwrite(write_data, " %b", valid_out);
+                    for (i = 0; i < {self.N}; i = i +1) begin
+                        $fwrite(write_data, " %0d", vector_out[i]);
+                    end
+                    $fdisplay(write_data,"");
+                
+                end
+            endtask
+
             // Test
-            integer write_data;
+            integer write_data,i;
             initial
                 begin
                     write_data = $fopen("simulation_results.txt");
@@ -271,8 +314,22 @@ class rtlHw():
                     $display("Test Started");
                     valid = 1;
                     eof = 0;
-                    $fdisplay(write_data, "%b %b", valid, eof);
-                    #period;
+                    vector[0]=32'd9;
+                    vector[1]=32'd1;
+                    vector[2]=32'd1;
+                    vector[3]=32'd2;
+                    vector[4]=32'd1;
+                    vector[5]=32'd1;
+                    vector[6]=32'd1;
+                    vector[7]=32'd6;
+                    toFile();
+                    #half_period;
+
+                    toFile();
+                    #half_period;
+
+                    toFile();
+                    #half_period;
 
                     $fclose(write_data);
                     $finish;
