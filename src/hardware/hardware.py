@@ -263,12 +263,18 @@ class rtlHw():
             );
             
             // Test
+            integer write_data;
             initial
                 begin
+                    write_data = $fopen("simulation_results.txt");
+                    
                     $display("Test Started");
                     valid = 1;
                     eof = 0;
+                    $fdisplay(write_data, "%b %b", valid, eof);
                     #period;
+
+                    $fclose(write_data);
                     $finish;
                 end
         endmodule
