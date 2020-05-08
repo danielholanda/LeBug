@@ -263,7 +263,7 @@ class rtlHw():
             tb_inputs.append("toFile();")
             tb_inputs.append("#half_period;")
             tb_inputs.append("")
-        tb_inputs="\n\t\t\t\t\t\t\t\t\t\t".join(tb_inputs)
+        tb_inputs=("\n"+"    "*4).join(tb_inputs)
 
         # Prepare testbench steps
         tb_steps=[]
@@ -274,7 +274,7 @@ class rtlHw():
             tb_steps.append("toFile();")
             tb_steps.append("#half_period;")
             tb_steps.append("")
-        tb_steps="\n\t\t\t\t\t\t\t\t\t\t".join(tb_steps)
+        tb_steps=("\n"+"    "*4).join(tb_steps)
 
         # Add includes
         testbench='`include "debugProcessor.sv"\n'
@@ -282,12 +282,12 @@ class rtlHw():
         testbench=[testbench+textwrap.dedent(f"""
         `timescale 1 ns/10 ps  // time-unit = 1 ns, precision = 10 ps
         module testbench;
-        
+
             // Compile-time parameters
             parameter N={self.N};
             parameter DATA_WIDTH={self.DATA_WIDTH};
             parameter IB_DEPTH={self.IB_DEPTH};
-            
+   
             // Declare inputs
             reg clk=1'b0;
             reg valid,eof;
@@ -317,7 +317,7 @@ class rtlHw():
               .valid_out(valid_out),
               .vector_out(vector_out)
             );
-            
+
             //Task to print all content to file
             integer write_data,i,j;
             task toFile;
@@ -334,7 +334,7 @@ class rtlHw():
                 
                 end
             endtask
-            
+
             // Test
             initial begin
                 write_data = $fopen("simulation_results.txt");
