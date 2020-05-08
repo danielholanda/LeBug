@@ -2,6 +2,7 @@ import logging as log
 import sys, math, os, shutil, textwrap, subprocess
 import numpy as np
 from copy import deepcopy as copy
+from containers.modelsim.modelsimContainer import modelsimContainer
 
 # Setting Debug level (can be debug, info, warning, error and critical)
 log.basicConfig(stream=sys.stderr, level=log.INFO)
@@ -332,12 +333,6 @@ class rtlHw():
             
             // Test
             initial begin
-                $dumpfile("testbench.vcd");
-                $dumpvars(0,testbench);
-                for (j = 0; j < {self.N}; j = j + 1) begin
-                    $dumpvars(0,dbg.vector_in[j]);
-                    $dumpvars(0,dbg.vector_out[j]);
-                end
                 write_data = $fopen("simulation_results.txt");
                 
                 $display("Test Started");
@@ -376,8 +371,18 @@ class rtlHw():
         current_folder=os.getcwd()
         rtl_folder=current_folder+"/rtl/"
         os.chdir(rtl_folder)
-        run(['iverilog','-g2012', '-stestbench','-odebugProcessor','debugProcessor.sv'])
-        run(['vvp','debugProcessor','-lxt2'])
+
+        modelsim = modelsimContainer(log=True)
+        modelsim.start()
+        modelsim.copy('debugProcessor.sv','modelsim:/debugProcessor.sv')
+        modelsim.copy('inputBuffer.sv','modelsim:/inputBuffer.sv')
+        modelsim.exec('vlib work')
+        modelsim.exec('vlog debugProcessor.sv')
+        modelsim.exec('vsim -c -do "run -all" testbench')
+        modelsim.copy('modelsim:/simulation_results.txt','simulation_results.txt')
+        modelsim.stop()
+        #run(['iverilog','-g2012', '-stestbench','-odebugProcessor','debugProcessor.sv'])
+        #run(['vvp','debugProcessor','-lxt2'])
 
         # Get results from file back to python
         f = open("simulation_results.txt", "r")

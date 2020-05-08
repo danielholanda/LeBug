@@ -54,12 +54,3 @@ class modelsimContainer():
             self.container = dockerClient.containers.get('modelsim')
             print("Download complete")
 
-modelsim = modelsimContainer(log=True)
-modelsim.start()
-modelsim.copy('debugProcessor.sv','modelsim:/debugProcessor.sv')
-modelsim.copy('inputBuffer.sv','modelsim:/inputBuffer.sv')
-modelsim.exec('vlib work')
-modelsim.exec('vlog debugProcessor.sv')
-modelsim.exec('vsim -c -do "run -all" testbench')
-modelsim.copy('modelsim:/simulation_results.txt','simulation_results.txt')
-modelsim.stop()
