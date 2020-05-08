@@ -246,10 +246,11 @@ class rtlHw():
         rtl.im.ib.connectInputs(rtl.input)
         rtl.assignOutputs(rtl.im.ib.instance_output)
 
-        # Declaring a Module
-        #rtl.declareModule("testbench")
-        #rtl.dm.testbench.addInput([['clk','logic',1],['vector','logic',self.N]])
+        self.rtl=rtl
 
+        return rtl.dump()
+
+    def testbench(self):
         # Prepare testbench inputs
         tb_inputs=[]
         for i in self.testbench_inputs:
@@ -275,7 +276,10 @@ class rtlHw():
             tb_steps.append("")
         tb_steps="\n\t\t\t\t\t\t\t\t\t\t".join(tb_steps)
 
-        testbench=[textwrap.dedent(f"""
+        # Add includes
+        testbench='`include "debugProcessor.sv"\n'
+
+        testbench=[testbench+textwrap.dedent(f"""
         `timescale 1 ns/10 ps  // time-unit = 1 ns, precision = 10 ps
         module testbench;
         
@@ -300,7 +304,7 @@ class rtlHw():
             always #half_period clk=~clk; 
             
             // Instantiate debugger
-            {rtl.name} #(
+            {self.rtl.name} #(
               .N(N),
               .DATA_WIDTH(DATA_WIDTH),
               .IB_DEPTH(IB_DEPTH)
@@ -345,7 +349,7 @@ class rtlHw():
             end
         endmodule
         """)]
-        return rtl.dump()+testbench
+        return testbench
 
     def generateRtl(self):
 
@@ -355,9 +359,15 @@ class rtlHw():
             shutil.rmtree(rtl_folder)
         shutil.copytree(self.hwFolder+"/buildingBlocks", rtl_folder)
 
-        # Writes to file
+        # Writes debugProcessor to file
         f = open(rtl_folder+"/debugProcessor.sv", "w")
         for l in self.rtlLogic():
+            f.write(l+"\n")
+        f.close()
+
+        # Writes testbench to file
+        f = open(rtl_folder+"/testbench.sv", "w")
+        for l in self.testbench():
             f.write(l+"\n")
         f.close()
 
@@ -376,13 +386,17 @@ class rtlHw():
         modelsim.start()
         modelsim.copy('debugProcessor.sv','modelsim:/debugProcessor.sv')
         modelsim.copy('inputBuffer.sv','modelsim:/inputBuffer.sv')
+        modelsim.copy('testbench.sv','modelsim:/testbench.sv')
         modelsim.exec('vlib work')
-        modelsim.exec('vlog debugProcessor.sv')
+        modelsim.exec('vlog testbench.sv')
         modelsim.exec('vsim -c -do "run -all" testbench')
         modelsim.copy('modelsim:/simulation_results.txt','simulation_results.txt')
+        modelsim.exec('rm debugProcessor.sv')
+        modelsim.exec('rm inputBuffer.sv')
+        modelsim.exec('rm testbench.sv')
+        modelsim.exec('rm simulation_results.txt')
+        modelsim.exec('rm -r work')
         modelsim.stop()
-        #run(['iverilog','-g2012', '-stestbench','-odebugProcessor','debugProcessor.sv'])
-        #run(['vvp','debugProcessor','-lxt2'])
 
         # Get results from file back to python
         f = open("simulation_results.txt", "r")
@@ -440,4 +454,5 @@ class rtlHw():
         self.hwFolder = os.path.dirname(os.path.realpath(__file__))
         self.testbench_inputs=[]    # Stores inputs to testbench
         self.steps=0 # Number of steps for testbench
+        self.rtl=None # used to store all rtl info later on
         
