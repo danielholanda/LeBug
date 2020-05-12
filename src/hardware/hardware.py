@@ -359,7 +359,8 @@ class rtlHw():
         if os.path.isdir(rtl_folder):
             shutil.rmtree(rtl_folder)
         copy_tree(self.hwFolder+"/buildingBlocks", rtl_folder)
-        copy_tree(self.hwFolder+"/ip", rtl_folder)
+        #copy_tree(self.hwFolder+"/ip", rtl_folder)
+        copy_tree(self.hwFolder+"/simulationBlocks", rtl_folder)
 
         # Writes debugProcessor to file
         f = open(rtl_folder+"/debugProcessor.sv", "w")
@@ -389,7 +390,7 @@ class rtlHw():
         modelsim.exec('mkdir rtl')
         modelsim.copy(rtl_folder,'modelsim:.')
         modelsim.exec('vlib work',working_directory='/rtl')
-        modelsim.exec('vlog testbench.sv',working_directory='/rtl')
+        modelsim.exec('vlog altera_mf.v testbench.sv',working_directory='/rtl')
         modelsim.exec('vsim -c -do "run -all" testbench',working_directory='/rtl')
         modelsim.copy('modelsim:/rtl/simulation_results.txt','simulation_results.txt')
         modelsim.exec('rm -r rtl')

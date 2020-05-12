@@ -1,7 +1,8 @@
- //-----------------------------------------------------
- // Design Name : Ram Dual Port
- // Function    : Dual port ram for Intel FPGAs
- //-----------------------------------------------------
+//-----------------------------------------------------
+// Design Name : Ram Dual Port
+// Function    : Dual port ram for Intel FPGAs
+//-----------------------------------------------------
+
 module ram_dual_port
 (
   clk,
