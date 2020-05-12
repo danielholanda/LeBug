@@ -73,6 +73,7 @@ class rtlHw():
             self.instance_input={}
             self.instance_output={}
             self.parameter={}
+            self.mem=module_class.mem
 
             # Map outputs using the name of the instance
             for o in module_class.output:
@@ -107,6 +108,11 @@ class rtlHw():
             for p in params:
                 self.parameter.append(p)
 
+        def addMemory(self,name,depth,width):
+            self.mem[name]={}
+            self.mem[name]['depth']=depth
+            self.mem[name]['width']=width
+
         # Recursively adds Modules to module
         def declareModule(self,dm_name):
             if self.included==False:
@@ -137,7 +143,20 @@ class rtlHw():
                 lines=text.split("\n")
                 for l in lines:
                     rtlCode.append(ident+"    "+l)
-            
+
+            def dumpMifFile(mem):
+                for mem_name in mem.keys():
+                    f = open(f"rtl/{mem_name}.mif", "w")
+                    f.write(f"Depth = {mem[mem_name]['depth']};\n")
+                    f.write(f"Width = {mem[mem_name]['width']};\n")
+                    f.write("Address_radix = dec;\n")
+                    f.write("Data_radix = hex;\n")
+                    f.write("Content\n")
+                    f.write("Begin\n")
+                    f.write(f"[0..{mem[mem_name]['depth']-1}] : 0;\n")
+                    f.write("End;")
+                    f.close()
+
             # Add includes
             if self.includes!=[]:
                 for i in self.includes:
@@ -165,10 +184,13 @@ class rtlHw():
                     mod=self.dm.__dict__[m]
                     if mod.included==False:
                         rtlCode=rtlCode+mod.dump()
-                
+
                 # Instantiated modules
                 for i in self.im.__dict__.keys():
                     inst=self.im.__dict__[i]
+
+                    # Add mif file 
+                    dumpMifFile(inst.mem)
                     
                     # Declare outputs
                     apdi('')
@@ -222,6 +244,7 @@ class rtlHw():
             self.included=False         # Is true if the module has been imported
             self.dm=struct()            # Those are the declare modules
             self.im=struct()            # Those are the instantiated modules
+            self.mem={}                 # Array of mems that need the mif files initialized
 
     def rtlLogic(self):
         # Create RTL using custom RTL class
@@ -238,6 +261,7 @@ class rtlHw():
         rtl.dm.inputBuffer.addInput([['clk','logic',1],['enqueue','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
         rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
         rtl.dm.inputBuffer.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
+        rtl.dm.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
 
         # Instantiate modules
         rtl.instantiateModule(rtl.dm.inputBuffer,"ib")

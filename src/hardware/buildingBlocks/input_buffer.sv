@@ -26,20 +26,21 @@
     reg [7:0] tail = 8'b0;
     reg dequeue=1'b1; // THIS SHOULD BECOME AN INPUT LATER
 
-    parameter latency = 2;
-    parameter ram_latency = latency-1;
+    parameter LATENCY = 2;
+    parameter RAM_LATENCY = LATENCY-1;
+    parameter MEM_WIDTH = N*DATA_WIDTH;
 
     //-------------Code Start-----------------
 
     // Instantiate memory to implement queue
-    reg [$clog2(IB_DEPTH)-1:0] mem_address_a;
-    reg [$clog2(IB_DEPTH)-1:0] mem_address_b;
-    reg mem_write_enable_a;
-    reg mem_write_enable_b;
-    reg [DATA_WIDTH-1:0] mem_in_a;
-    reg [DATA_WIDTH-1:0] mem_in_b;
-    wire [DATA_WIDTH-1:0] mem_out_a;
-    wire [DATA_WIDTH-1:0] mem_out_b;
+    reg [$clog2(IB_DEPTH)-1:0] mem_address_a=2;
+    reg [$clog2(IB_DEPTH)-1:0] mem_address_b=0;
+    reg mem_write_enable_a=1;
+    reg mem_write_enable_b=0;
+    reg [MEM_WIDTH-1:0] mem_in_a=0;
+    reg [MEM_WIDTH-1:0] mem_in_b=0;
+    wire [MEM_WIDTH-1:0] mem_out_a=0;
+    wire [MEM_WIDTH-1:0] mem_out_b=0;
     ram_dual_port mem (
       .clk( clk ),
       .clken( !memory_controller_waitrequest ),
@@ -54,17 +55,31 @@
       .q_a( mem_out_a ),
       .q_b( mem_out_b)
     );
-    defparam mem.width_a = DATA_WIDTH;
-    defparam mem.width_b = DATA_WIDTH;
+    defparam mem.width_a = MEM_WIDTH;
+    defparam mem.width_b = MEM_WIDTH;
     defparam mem.widthad_a = $clog2(IB_DEPTH);
     defparam mem.widthad_b = $clog2(IB_DEPTH);
     defparam mem.width_be_a = 1;
     defparam mem.width_be_b = 1;
     defparam mem.numwords_a = IB_DEPTH;
     defparam mem.numwords_b = IB_DEPTH;
-    defparam mem.latency = ram_latency;
+    defparam mem.latency = RAM_LATENCY;
     defparam mem.init_file = "inputBuffer.mif";
 
+    always @(posedge clk) begin
+
+        // Logic for enqueuing values
+        mem_in_a <= { << { vector_in }};
+        mem_address_a <= enqueue ? mem_address_a+1'b1 : mem_address_a;
+        mem_write_enable_a <= enqueue;
+
+        //Logic for dequeuing
+        mem_address_b <= dequeue ? mem_address_b+1'b1 : mem_address_b;
+
+    end
+
+    /*
+    // OLD ONE FOR REFERENCE
     always @(posedge clk) begin
     // Store valid inputs in buffer 
         if (enqueue==1'b1) begin
@@ -78,10 +93,10 @@
             valid_out <= { >> { mem_array_valid[tail] }};
             tail <= tail+1;
         end
-    end
+    end*/
 
     assign eof_out = eof_in;
-    assign vector_out = vector_in;
+    assign vector_out = { >> { mem_out_b }};
 
  
  endmodule 
