@@ -1,4 +1,4 @@
-import docker, subprocess, sys
+import docker, subprocess, sys, shlex
 
 class modelsimContainer():
 
@@ -20,11 +20,10 @@ class modelsimContainer():
             self.runSubprocess(['bash','-c',"docker run -it --rm --privileged --pid=host alpine:latest nsenter -t 1 -m -u -n -i -- truncate -s0 "+log_path])
 
     # Execute a command on a running container
-    def exec(self,cmd):
-      exec_log=self.apiClient.exec_start(self.apiClient.exec_create(self.container.name, cmd))
-      if self.log:
-          print(exec_log.decode("utf-8"))
-
+    def exec(self,cmd,working_directory="/"):
+      self.runSubprocess(['docker','exec','-w'+working_directory,self.container.name]+shlex.split(cmd))
+      #exec_log=self.apiClient.exec_start(self.apiClient.exec_create(self.container.name, cmd))
+    
     # Copy files to/from container
     def copy(self,src,dst):
       self.runSubprocess(['docker','cp',src,dst])
