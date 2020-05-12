@@ -31,9 +31,42 @@
 
     //-------------Code Start-----------------
 
+    // Instantiate memory to implement queue
+    reg [$clog2(IB_DEPTH)-1:0] mem_address_a;
+    reg [$clog2(IB_DEPTH)-1:0] mem_address_b;
+    reg mem_write_enable_a;
+    reg mem_write_enable_b;
+    reg [DATA_WIDTH-1:0] mem_in_a;
+    reg [DATA_WIDTH-1:0] mem_in_b;
+    wire [DATA_WIDTH-1:0] mem_out_a;
+    wire [DATA_WIDTH-1:0] mem_out_b;
+    ram_dual_port mem (
+      .clk( clk ),
+      .clken( !memory_controller_waitrequest ),
+      .address_a( mem_address_a ),
+      .address_b( mem_address_b ),
+      .wren_a( mem_write_enable_a ),
+      .wren_b( mem_write_enable_b ),
+      .data_a( mem_in_a ),
+      .data_b( mem_in_b ),
+      .byteena_a( 1'b1 ),
+      .byteena_b( 1'b1 ),
+      .q_a( mem_out_a ),
+      .q_b( mem_out_b)
+    );
+    defparam mem.width_a = DATA_WIDTH;
+    defparam mem.width_b = DATA_WIDTH;
+    defparam mem.widthad_a = $clog2(IB_DEPTH);
+    defparam mem.widthad_b = $clog2(IB_DEPTH);
+    defparam mem.width_be_a = 1;
+    defparam mem.width_be_b = 1;
+    defparam mem.numwords_a = IB_DEPTH;
+    defparam mem.numwords_b = IB_DEPTH;
+    defparam mem.latency = ram_latency;
+    defparam mem.init_file = "inputBuffer.mif";
 
     always @(posedge clk) begin
-      // Store valid inputs in buffer 
+    // Store valid inputs in buffer 
         if (enqueue==1'b1) begin
             mem_array[head]<= { << { vector_in }};
             mem_array_valid[head] <= enqueue;
@@ -49,42 +82,6 @@
 
     assign eof_out = eof_in;
     assign vector_out = vector_in;
-
-
-    reg [3:0] temp0_address_a;
-    reg [3:0] temp0_address_b;
-    reg temp0_write_enable_a;
-    reg temp0_write_enable_b;
-    reg [31:0] temp0_in_a;
-    reg [31:0] temp0_in_b;
-    wire [31:0] temp0_out_a;
-    wire [31:0] temp0_out_b;
-
-    // @temp0 = internal unnamed_addr global [1 x [10 x float]] zeroinitializer, align 8
-    ram_dual_port temp0 (
-      .clk( clk ),
-      .clken( !memory_controller_waitrequest ),
-      .address_a( temp0_address_a ),
-      .address_b( temp0_address_b ),
-      .wren_a( temp0_write_enable_a ),
-      .wren_b( temp0_write_enable_b ),
-      .data_a( temp0_in_a ),
-      .data_b( temp0_in_b ),
-      .byteena_a( 1'b1 ),
-      .byteena_b( 1'b1 ),
-      .q_a( temp0_out_a ),
-      .q_b( temp0_out_b)
-    );
-    defparam temp0.width_a = 32;
-    defparam temp0.width_b = 32;
-    defparam temp0.widthad_a = 4;
-    defparam temp0.widthad_b = 4;
-    defparam temp0.width_be_a = 1;
-    defparam temp0.width_be_b = 1;
-    defparam temp0.numwords_a = 10;
-    defparam temp0.numwords_b = 10;
-    defparam temp0.latency = ram_latency;
-    defparam temp0.init_file = "temp0.mif";
 
  
  endmodule 
