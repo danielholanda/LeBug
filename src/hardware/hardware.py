@@ -234,7 +234,7 @@ class rtlHw():
 
         # Tells the class about the included modules
         rtl.includeModule("inputBuffer")
-        rtl.dm.inputBuffer.addInput([['clk_in','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
+        rtl.dm.inputBuffer.addInput([['clk','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
         rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
         rtl.dm.inputBuffer.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
 
@@ -415,7 +415,13 @@ class rtlHw():
             valid_out.append(l[3+self.N])
             vector_out.append(l[4+self.N:])
         f.close()
-        results=[clk,eof,valid,vector_in,valid_out,vector_out]
+        results={}
+        results['clk']=clk
+        results['eof']=eof
+        results['valid']=valid
+        results['vector_in']=vector_in
+        results['valid_out']=valid_out
+        results['vector_out']=vector_out
 
         # Print results to file in a readable way
         def fmt(a,size):
@@ -437,6 +443,8 @@ class rtlHw():
 
         # Go back to main directory
         os.chdir(current_folder)
+
+        return results
 
     def push(self,pushed_values):
         self.testbench_inputs.append(pushed_values)
