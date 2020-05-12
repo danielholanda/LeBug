@@ -1,6 +1,6 @@
  //-----------------------------------------------------
  // Design Name : Input Buffer
- // Function    : Buffers vectors for up to IB_DEPTH cycles
+ // Function    : Circular queue of vectors for up to IB_DEPTH cycles
  //-----------------------------------------------------
  module  inputBuffer #(
   parameter N=8,
@@ -9,7 +9,7 @@
   )
   (
   input logic clk,
-  input logic valid_in,
+  input logic enqueue,
   input logic eof_in,
   input logic [DATA_WIDTH-1:0] vector_in [N-1:0],
   output reg valid_out,
@@ -21,18 +21,21 @@
     reg mem_array_valid [IB_DEPTH-1 : 0];
     reg [7:0] head = 8'b0;
     reg [7:0] tail = 8'b0;
-    reg next=1'b1; // THIS SHOULD BECOME AN INPUT LATER
+    reg dequeue=1'b1; // THIS SHOULD BECOME AN INPUT LATER
 
     //-------------Code Start-----------------
 
+
     always @(posedge clk) begin
-        if (valid_in==1'b1) begin
+      // Store valid inputs in buffer 
+        if (enqueue==1'b1) begin
             mem_array[head]<= { << { vector_in }};
-            mem_array_valid[head] <= valid_in;
+            mem_array_valid[head] <= enqueue;
             head <= head+1;
         end
 
-        if (next==1'b1) begin
+        // Output values when "dequeue" is high
+        if (dequeue==1'b1) begin
             valid_out <= { >> { mem_array_valid[tail] }};
             tail <= tail+1;
         end

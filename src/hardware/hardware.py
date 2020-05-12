@@ -225,7 +225,7 @@ class rtlHw():
     def rtlLogic(self):
         # Create RTL using custom RTL class
         rtl = self.rtlModule(self,"debugger")
-        rtl.addInput([['clk','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
+        rtl.addInput([['clk','logic',1],['enqueue','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
         rtl.addOutput([['valid_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
         rtl.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
 
@@ -234,7 +234,7 @@ class rtlHw():
 
         # Tells the class about the included modules
         rtl.includeModule("inputBuffer")
-        rtl.dm.inputBuffer.addInput([['clk','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
+        rtl.dm.inputBuffer.addInput([['clk','logic',1],['enqueue','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
         rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
         rtl.dm.inputBuffer.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
 
@@ -312,7 +312,7 @@ class rtlHw():
             dbg(
               .clk(clk),
               .vector_in(vector),
-              .valid_in(valid),
+              .enqueue(valid),
               .eof_in(eof),
               .valid_out(valid_out),
               .vector_out(vector_out)
@@ -428,13 +428,13 @@ class rtlHw():
             return (size-len(a))*" "+a
         f = open("simulation_results_readable.txt", "w")
         numCol=len(clk)
-        f.write("|clk|eof|valid_in|valid_out|vector_in                    |vector_out                   |\n")
+        f.write("|clk|eof|enqueue|valid_out|vector_in                    |vector_out                   |\n")
         f.write("-"*88+"\n")
         for i in range(len(clk)):
             f.write('|')
             f.write(fmt(clk[i]+"|",4))
             f.write(fmt(valid[i]+"|",4))
-            f.write(fmt(eof[i]+"|",9))
+            f.write(fmt(eof[i]+"|",8))
             f.write(fmt(valid_out[i]+"|",10))
             f.write(fmt(" ".join(vector_in[i])+"|",30))
             f.write(fmt(" ".join(vector_out[i])+"|",30))
