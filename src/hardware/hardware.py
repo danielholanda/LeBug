@@ -230,7 +230,7 @@ class rtlHw():
         rtl.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
 
         # Adds includes to the beginning of the file
-        rtl.include("inputBuffer.sv")
+        rtl.include("input_buffer.sv")
 
         # Tells the class about the included modules
         rtl.includeModule("inputBuffer")
@@ -385,14 +385,14 @@ class rtlHw():
         modelsim = modelsimContainer(log=True)
         modelsim.start()
         modelsim.copy('debugProcessor.sv','modelsim:/debugProcessor.sv')
-        modelsim.copy('inputBuffer.sv','modelsim:/inputBuffer.sv')
+        modelsim.copy('input_buffer.sv','modelsim:/input_buffer.sv')
         modelsim.copy('testbench.sv','modelsim:/testbench.sv')
         modelsim.exec('vlib work')
         modelsim.exec('vlog testbench.sv')
         modelsim.exec('vsim -c -do "run -all" testbench')
         modelsim.copy('modelsim:/simulation_results.txt','simulation_results.txt')
         modelsim.exec('rm debugProcessor.sv')
-        modelsim.exec('rm inputBuffer.sv')
+        modelsim.exec('rm input_buffer.sv')
         modelsim.exec('rm testbench.sv')
         modelsim.exec('rm simulation_results.txt')
         modelsim.exec('rm -r work')
