@@ -191,7 +191,7 @@ def testNakedRtl():
     proc.push([input_vector2,True])
 
     # Run testbench
-    tb = proc.run(steps=1)
+    tb = proc.run(steps=1,gui=False)
 
     print(tb)
 

@@ -37,6 +37,10 @@ class modelsimContainer():
         self.container.stop(timeout=0)
         self.cleanLog()
 
+    # Open Gui
+    def gui(self):
+        self.exec('vsim -gui')
+
     def __init__(self,log):
         # Start docker dockerClient
         self.dockerClient = docker.from_env()

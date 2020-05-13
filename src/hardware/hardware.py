@@ -1,9 +1,10 @@
 import logging as log
-import sys, math, os, shutil, textwrap, subprocess
+import sys, math, os, shutil, textwrap, subprocess,shlex
 from distutils.dir_util import copy_tree
 import numpy as np
 from copy import deepcopy as copy
 from containers.modelsim.modelsimContainer import modelsimContainer
+import time
 
 # Setting Debug level (can be debug, info, warning, error and critical)
 log.basicConfig(stream=sys.stderr, level=log.INFO)
@@ -19,9 +20,10 @@ class struct:
         return str(self.__dict__)
 
 # Run a given command using subprocess
-def run(cmd):
+def run(cmd,wait=True):
     proc = subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-    proc.wait()
+    if wait:
+        proc.wait()
 
     # Print results
     result = proc.stdout.readlines()+proc.stderr.readlines()
@@ -399,7 +401,7 @@ class rtlHw():
         f.close()
 
     # This will run the testbench of the generated hardware and return its results
-    def run(self,steps=50):
+    def run(self,steps=50,gui=False):
         # First, generate the RTL
         self.steps=steps
         self.generateRtl()
@@ -415,7 +417,11 @@ class rtlHw():
         modelsim.copy(rtl_folder,'modelsim:.')
         modelsim.exec('vlib work',working_directory='/rtl')
         modelsim.exec('vlog altera_mf.v testbench.sv',working_directory='/rtl')
-        modelsim.exec('vsim -c -do "run -all" testbench',working_directory='/rtl')
+        if gui:
+            print("Opening GUI\n\tMake sure to open socket using this command on your mac:\n\tsocat TCP-LISTEN:6000,reuseaddr,fork UNIX-CLIENT:\"$DISPLAY\"")
+            modelsim.exec('vsim -gui -do "run -all" testbench',working_directory='/rtl')
+        else:
+            modelsim.exec('vsim -c -do "run -all" testbench',working_directory='/rtl')
         modelsim.copy('modelsim:/rtl/simulation_results.txt','simulation_results.txt')
         modelsim.exec('rm -r rtl')
         modelsim.stop()
