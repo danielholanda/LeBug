@@ -150,10 +150,10 @@ class rtlHw():
                     f.write(f"Depth = {mem[mem_name]['depth']};\n")
                     f.write(f"Width = {mem[mem_name]['width']};\n")
                     f.write("Address_radix = dec;\n")
-                    f.write("Data_radix = hex;\n")
+                    f.write("Data_radix = dec;\n")
                     f.write("Content\n")
                     f.write("Begin\n")
-                    f.write(f"[0..{mem[mem_name]['depth']-1}] : 0;\n")
+                    f.write(f"[0..{mem[mem_name]['depth']-1}] : 42;\n")
                     f.write("End;")
                     f.close()
 

@@ -56,7 +56,14 @@ You can find details on the container at this website:
 - Start/Stop a container
 
   - ```docker start CONTAINER_NAME_OR_ID``` 
-    - To make it iterative: ```docker start -a CONTAINER_NAME_OR_ID```
+    - To make it iterative: ```docker start -a CONTAINER_NAME_OR_ID``` OR
+    - start a container normally and then run ```docker attach CONTAINER_NAME_OR_ID```
   - ```docker stop -t0 CONTAINER_NAME_OR_ID```
+
+- Execute a single command on a container
+
+  - ```docker exec CONTAINER_NAME_OR_ID YOUR_COMMAND```
+
+    
 
   
