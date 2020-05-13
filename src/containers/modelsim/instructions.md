@@ -66,4 +66,16 @@ You can find details on the container at this website:
 
     
 
-  
+
+### Running a GUI on a container 
+
+- Step 1 - Open socat in your MacOS
+  - ```socat TCP-LISTEN:6000,reuseaddr,fork UNIX-CLIENT:\"$DISPLAY\"```
+- Step 2 - Start the container and attach to it
+  - ```docker start modelsim```
+  - ```docker attach modelsim```
+- Step 3 - Export the right env variable inside the container
+  - ```export DISPLAY=docker.for.mac.host.internal:0```
+- Step 4 - Open the application
+
+Note: Make sure to have xquarz installed and open in your mac. Also go to Settings -> security ->  Allow connections from network clients.

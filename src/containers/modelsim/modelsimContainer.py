@@ -49,7 +49,8 @@ class modelsimContainer():
         # If we don't, download it
         except: 
             print("Downloading modelsim image - This might take 5-10min")
-            dockerClient.containers.run('goldensniper/modelsim-docker',stdin_open = True, tty = True,detach=True,name='modelsim')
-            self.container = dockerClient.containers.get('modelsim')
+            env = ["DISPLAY=docker.for.mac.host.internal:0"] if sys.platform=='darwin' else []
+            self.dockerClient.containers.run('goldensniper/modelsim-docker',stdin_open = True, tty = True,detach=True,environment=env,name='modelsim')
+            self.container = self.dockerClient.containers.get('modelsim')
             print("Download complete")
 
