@@ -45,8 +45,16 @@ class rtlHw():
                     assert False, f'{parameter_name} is not a parameter from {self.module_class.name}'
 
         # Connect inputs of instance
-        def connectInputs(self,signals_to_connect):
+        def connectInputs(self,top_module_or_instance):
             
+            # Check if we are connecting to the top module inputs or to an intance inside top
+            if type(top_module_or_instance).__name__ == 'rtlInstance':
+                signals_to_connect = [top_module_or_instance.instance_output[k] for k in top_module_or_instance.instance_output.keys()]
+            elif type(top_module_or_instance).__name__ == 'rtlModule':
+                signals_to_connect = top_module_or_instance.input
+            else:
+                assert False
+
             # Add clock to signals to connect if not there
             clock_found=False
             for i in signals_to_connect:
@@ -100,6 +108,7 @@ class rtlHw():
 
         # Assign module outputs to the outputs of a given submodule
         def assignOutputs(self,submodule_outputs):
+            submodule_outputs=submodule_outputs.instance_output
             for i in self.output:
                 for _,j in submodule_outputs.items():
                     if i.bits==j.bits and i.name.split("_")[0]==j.name.split("_")[0]:
@@ -257,21 +266,32 @@ class rtlHw():
 
         # Adds includes to the beginning of the file
         rtl.include("input_buffer.sv")
+        rtl.include("vector_scalar_reduce_unit.sv")
 
-        # Tells the class about the included modules
+        # Input buffer
         rtl.includeModule("inputBuffer")
         rtl.dm.inputBuffer.addInput([['clk','logic',1],['enqueue','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
         rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
         rtl.dm.inputBuffer.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
         rtl.dm.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
 
+        # Vector Scalar Reduce unit
+        rtl.includeModule("vectorScalarReduceUnit")
+        rtl.dm.vectorScalarReduceUnit.addInput([['clk','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
+        rtl.dm.vectorScalarReduceUnit.addOutput([['valid_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
+        rtl.dm.vectorScalarReduceUnit.addParameter([['N',8],['DATA_WIDTH',32]])
+
         # Instantiate modules
         rtl.instantiateModule(rtl.dm.inputBuffer,"ib")
         rtl.im.ib.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH'],['IB_DEPTH','IB_DEPTH']])
 
+        rtl.instantiateModule(rtl.dm.vectorScalarReduceUnit,"vsru")
+        rtl.im.vsru.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH']])
+
         # Connect modules
-        rtl.im.ib.connectInputs(rtl.input)
-        rtl.assignOutputs(rtl.im.ib.instance_output)
+        rtl.im.ib.connectInputs(rtl) # maybe I should name rtl "top"
+        rtl.im.vsru.connectInputs(rtl.im.ib)
+        rtl.assignOutputs(rtl.im.vsru)
 
         self.rtl=rtl
 

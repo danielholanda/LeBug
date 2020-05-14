@@ -5,7 +5,7 @@
 
  module  vectorScalarReduceUnit #(
   parameter N=8,
-  parameter DATA_WIDTH=32,
+  parameter DATA_WIDTH=32
   )
   (
   input logic clk,
@@ -22,9 +22,10 @@
     //-------------Code Start-----------------
 
     always @(posedge clk) begin
-      
+
         // Assign outputs
         valid_out<=valid_in;
+        vector_out<=vector_in;
     end
 
  
