@@ -258,44 +258,44 @@ class rtlHw():
             self.mem={}                 # Array of mems that need the mif files initialized
 
     def rtlLogic(self):
-        # Create RTL using custom RTL class
-        rtl = self.rtlModule(self,"debugger")
-        rtl.addInput([['clk','logic',1],['enqueue','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
-        rtl.addOutput([['valid_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
-        rtl.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
+        # Create TOP level module using custom RTL class
+        top = self.rtlModule(self,"debugger")
+        top.addInput([['clk','logic',1],['enqueue','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
+        top.addOutput([['valid_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
+        top.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
 
         # Adds includes to the beginning of the file
-        rtl.include("input_buffer.sv")
-        rtl.include("vector_scalar_reduce_unit.sv")
+        top.include("input_buffer.sv")
+        top.include("vector_scalar_reduce_unit.sv")
 
         # Input buffer
-        rtl.includeModule("inputBuffer")
-        rtl.dm.inputBuffer.addInput([['clk','logic',1],['enqueue','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
-        rtl.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
-        rtl.dm.inputBuffer.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
-        rtl.dm.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
+        top.includeModule("inputBuffer")
+        top.dm.inputBuffer.addInput([['clk','logic',1],['enqueue','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
+        top.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
+        top.dm.inputBuffer.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
+        top.dm.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
 
         # Vector Scalar Reduce unit
-        rtl.includeModule("vectorScalarReduceUnit")
-        rtl.dm.vectorScalarReduceUnit.addInput([['clk','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
-        rtl.dm.vectorScalarReduceUnit.addOutput([['valid_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
-        rtl.dm.vectorScalarReduceUnit.addParameter([['N',8],['DATA_WIDTH',32]])
+        top.includeModule("vectorScalarReduceUnit")
+        top.dm.vectorScalarReduceUnit.addInput([['clk','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
+        top.dm.vectorScalarReduceUnit.addOutput([['valid_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
+        top.dm.vectorScalarReduceUnit.addParameter([['N',8],['DATA_WIDTH',32]])
 
         # Instantiate modules
-        rtl.instantiateModule(rtl.dm.inputBuffer,"ib")
-        rtl.im.ib.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH'],['IB_DEPTH','IB_DEPTH']])
+        top.instantiateModule(top.dm.inputBuffer,"ib")
+        top.im.ib.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH'],['IB_DEPTH','IB_DEPTH']])
 
-        rtl.instantiateModule(rtl.dm.vectorScalarReduceUnit,"vsru")
-        rtl.im.vsru.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH']])
+        top.instantiateModule(top.dm.vectorScalarReduceUnit,"vsru")
+        top.im.vsru.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH']])
 
         # Connect modules
-        rtl.im.ib.connectInputs(rtl) # maybe I should name rtl "top"
-        rtl.im.vsru.connectInputs(rtl.im.ib)
-        rtl.assignOutputs(rtl.im.vsru)
+        top.im.ib.connectInputs(top) 
+        top.im.vsru.connectInputs(top.im.ib)
+        top.assignOutputs(top.im.vsru)
 
-        self.rtl=rtl
+        self.top=top
 
-        return rtl.dump()
+        return top.dump()
 
     def testbench(self):
         # Prepare testbench inputs
@@ -351,7 +351,7 @@ class rtlHw():
             always #half_period clk=~clk; 
             
             // Instantiate debugger
-            {self.rtl.name} #(
+            {self.top.name} #(
               .N(N),
               .DATA_WIDTH(DATA_WIDTH),
               .IB_DEPTH(IB_DEPTH)
@@ -510,5 +510,5 @@ class rtlHw():
         self.hwFolder = os.path.dirname(os.path.realpath(__file__))
         self.testbench_inputs=[]    # Stores inputs to testbench
         self.steps=0 # Number of steps for testbench
-        self.rtl=None # used to store all rtl info later on
+        self.top=None # used to store all rtl info later on
         
