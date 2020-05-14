@@ -207,7 +207,7 @@ def testNakedRtl():
     emu_results = emu_proc.run(steps=steps)
 
     print("Hardware Results:")
-    for t in hw_results['vector_out'][2:]:
+    for t in hw_results['vector_out']:
         print([int(j) for j in t])
     print("\n\n")
 

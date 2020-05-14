@@ -285,7 +285,7 @@ class rtlHw():
             tb_inputs.append(f"eof = {int(i[1])};")
             for idx,ele in enumerate(i[0]):
                 tb_inputs.append(f"vector[{idx}]=32'd{ele};")
-            tb_inputs.append("toFile();")
+            #tb_inputs.append("toFile();")
             tb_inputs.append("#half_period;")
             #tb_inputs.append("toFile();")
             tb_inputs.append("#half_period;")
