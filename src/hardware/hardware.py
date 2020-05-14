@@ -125,20 +125,20 @@ class rtlHw():
             self.mem[name]['width']=width
 
         # Recursively adds Modules to module
-        def declareModule(self,dm_name):
+        def declareModule(self,mod_name):
             if self.included==False:
-                self.dm.__dict__[dm_name]=self.parent.rtlModule(self,dm_name)
+                self.mod.__dict__[mod_name]=self.parent.rtlModule(self,mod_name)
             else:
                 print("Can't declare Modules on imported modules")
 
         # Lets us know about Modules that have been imported 
-        def includeModule(self,dm_name):
-            self.declareModule(dm_name)
-            self.dm.__dict__[dm_name].included=True
+        def includeModule(self,mod_name):
+            self.declareModule(mod_name)
+            self.mod.__dict__[mod_name].included=True
 
         # Instantiate a given module
         def instantiateModule(self,module_class,instance_name):
-            self.im.__dict__[instance_name]=self.parent.rtlInstance(module_class,instance_name)
+            self.inst.__dict__[instance_name]=self.parent.rtlInstance(module_class,instance_name)
 
         # Dump RTL class into readable RTL
         def dump(self):
@@ -191,14 +191,14 @@ class rtlHw():
                 apd(');')
 
                 # Do recursive dumps for submodules declared in this module
-                for m in self.dm.__dict__.keys():
-                    mod=self.dm.__dict__[m]
+                for m in self.mod.__dict__.keys():
+                    mod=self.mod.__dict__[m]
                     if mod.included==False:
                         rtlCode=rtlCode+mod.dump()
 
                 # Instantiated modules
-                for i in self.im.__dict__.keys():
-                    inst=self.im.__dict__[i]
+                for i in self.inst.__dict__.keys():
+                    inst=self.inst.__dict__[i]
 
                     # Add mif file 
                     dumpMifFile(inst.mem)
@@ -253,8 +253,8 @@ class rtlHw():
             self.output_assignment={}   # Describes how outputs are connected to internal signals
             self.parameter=[]           # Store all parameters
             self.included=False         # Is true if the module has been imported
-            self.dm=struct()            # Those are the declare modules
-            self.im=struct()            # Those are the instantiated modules
+            self.mod=struct()           # Those are the declare modules
+            self.inst=struct()          # Those are the instantiated modules
             self.mem={}                 # Array of mems that need the mif files initialized
 
     def rtlLogic(self):
@@ -270,28 +270,28 @@ class rtlHw():
 
         # Input buffer
         top.includeModule("inputBuffer")
-        top.dm.inputBuffer.addInput([['clk','logic',1],['enqueue','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
-        top.dm.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
-        top.dm.inputBuffer.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
-        top.dm.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
+        top.mod.inputBuffer.addInput([['clk','logic',1],['enqueue','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
+        top.mod.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
+        top.mod.inputBuffer.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
+        top.mod.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
 
         # Vector Scalar Reduce unit
         top.includeModule("vectorScalarReduceUnit")
-        top.dm.vectorScalarReduceUnit.addInput([['clk','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
-        top.dm.vectorScalarReduceUnit.addOutput([['valid_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
-        top.dm.vectorScalarReduceUnit.addParameter([['N',8],['DATA_WIDTH',32]])
+        top.mod.vectorScalarReduceUnit.addInput([['clk','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
+        top.mod.vectorScalarReduceUnit.addOutput([['valid_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
+        top.mod.vectorScalarReduceUnit.addParameter([['N',8],['DATA_WIDTH',32]])
 
         # Instantiate modules
-        top.instantiateModule(top.dm.inputBuffer,"ib")
-        top.im.ib.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH'],['IB_DEPTH','IB_DEPTH']])
+        top.instantiateModule(top.mod.inputBuffer,"ib")
+        top.inst.ib.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH'],['IB_DEPTH','IB_DEPTH']])
 
-        top.instantiateModule(top.dm.vectorScalarReduceUnit,"vsru")
-        top.im.vsru.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH']])
+        top.instantiateModule(top.mod.vectorScalarReduceUnit,"vsru")
+        top.inst.vsru.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH']])
 
         # Connect modules
-        top.im.ib.connectInputs(top) 
-        top.im.vsru.connectInputs(top.im.ib)
-        top.assignOutputs(top.im.vsru)
+        top.inst.ib.connectInputs(top) 
+        top.inst.vsru.connectInputs(top.inst.ib)
+        top.assignOutputs(top.inst.vsru)
 
         self.top=top
 
