@@ -21,6 +21,7 @@
 
     //----------Internal Variables------------
     reg dequeue=1'b1; // THIS SHOULD BECOME AN INPUT LATER
+    wire empty; // This should be an output later
 
     parameter LATENCY = 2;
     parameter RAM_LATENCY = LATENCY-1;
@@ -65,10 +66,14 @@
     always @(posedge clk) begin
 
         // Logic for enqueuing values
-        mem_address_a <= enqueue ? mem_address_a+1'b1 : mem_address_a;
+        if (enqueue==1'b1) begin
+            mem_address_a <= mem_address_a<IB_DEPTH-1 ? mem_address_a+1'b1 : 0;
+        end
 
         //Logic for dequeuing
-        mem_address_b <= dequeue ? mem_address_b+1'b1 : mem_address_b;
+        if (dequeue==1'b1 & empty==1'b0) begin
+            mem_address_b <= mem_address_b<IB_DEPTH-1 ? mem_address_b+1'b1 : 0;
+        end
 
     end
 
@@ -82,5 +87,7 @@
     // Module output is the output of the queue
     assign vector_out = { >> { mem_out_b }};
 
+    // Check if queue is empty
+    assign empty = (mem_address_a-mem_address_b==0) | (mem_address_a==0 & mem_address_b==IB_DEPTH-1);
  
  endmodule 
