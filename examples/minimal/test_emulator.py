@@ -11,8 +11,10 @@ def readConf():
     with open(r'config.yaml') as file:
         yaml_dict = yaml.load(file, Loader=yaml.FullLoader)
         globals().update(yaml_dict)
-
 readConf()
+
+def toInt(lst):
+    return [list(map(int, l)) for l in lst]
 
 def testSimpleDistribution():
     
@@ -206,18 +208,19 @@ def testNakedRtl():
     hw_results = hw_proc.run(steps=steps,gui=False)
     emu_results = emu_proc.run(steps=steps)
 
+    # Filter only the results we are interested in
+    # Convert HW results to int (might contain "x"s and others)
+    hw_ib_results=np.array(toInt(hw_results['vector_out']))
+    emu_ib_results=np.array([v_out for v_out, eof_out, bof_out, chainId_out in emu_results['ib']])
+
     print("Hardware Results:")
-    for t in hw_results['vector_out']:
-        print([int(j) for j in t])
-    print("\n\n")
+    print(hw_ib_results)
 
-    print("Emulator Results")
-    for v_out, eof_out, bof_out, chainId_out in emu_results['ib']:
-        print(v_out)
-
+    print("\nEmulator Results")
+    print(emu_ib_results)
 
     # Check results
-    assert True
+    assert np.allclose(hw_ib_results,emu_ib_results), "Failed to match emulator and hardware in IB test"
     print("Passed test #7")
 
 testNakedRtl()
