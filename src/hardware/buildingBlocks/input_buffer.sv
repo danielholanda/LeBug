@@ -20,10 +20,6 @@
  );
 
     //----------Internal Variables------------
-    reg [(DATA_WIDTH*N)-1:0] mem_array [IB_DEPTH-1 : 0];
-    reg mem_array_valid [IB_DEPTH-1 : 0];
-    reg [7:0] head = 8'b0;
-    reg [7:0] tail = 8'b0;
     reg dequeue=1'b1; // THIS SHOULD BECOME AN INPUT LATER
 
     parameter LATENCY = 2;
@@ -33,17 +29,17 @@
     //-------------Code Start-----------------
 
     // Instantiate memory to implement queue
-    reg [$clog2(IB_DEPTH)-1:0] mem_address_a=2;
+    reg [$clog2(IB_DEPTH)-1:0] mem_address_a=1;
     reg [$clog2(IB_DEPTH)-1:0] mem_address_b=0;
     reg mem_write_enable_a=1;
     reg mem_write_enable_b=0;
     reg [MEM_WIDTH-1:0] mem_in_a=0;
     reg [MEM_WIDTH-1:0] mem_in_b=0;
-    wire [MEM_WIDTH-1:0] mem_out_a=0;
-    wire [MEM_WIDTH-1:0] mem_out_b=0;
+    wire [MEM_WIDTH-1:0] mem_out_a;
+    wire [MEM_WIDTH-1:0] mem_out_b;
     ram_dual_port mem (
       .clk( clk ),
-      .clken( !memory_controller_waitrequest ),
+      .clken( 1'b1 ),
       .address_a( mem_address_a ),
       .address_b( mem_address_b ),
       .wren_a( mem_write_enable_a ),
@@ -69,7 +65,7 @@
     always @(posedge clk) begin
 
         // Logic for enqueuing values
-        mem_in_a <= { << { vector_in }};
+        mem_in_a <= { >> { vector_in }};
         mem_address_a <= enqueue ? mem_address_a+1'b1 : mem_address_a;
         mem_write_enable_a <= enqueue;
 
@@ -77,23 +73,6 @@
         mem_address_b <= dequeue ? mem_address_b+1'b1 : mem_address_b;
 
     end
-
-    /*
-    // OLD ONE FOR REFERENCE
-    always @(posedge clk) begin
-    // Store valid inputs in buffer 
-        if (enqueue==1'b1) begin
-            mem_array[head]<= { << { vector_in }};
-            mem_array_valid[head] <= enqueue;
-            head <= head+1;
-        end
-
-        // Output values when "dequeue" is high
-        if (dequeue==1'b1) begin
-            valid_out <= { >> { mem_array_valid[tail] }};
-            tail <= tail+1;
-        end
-    end*/
 
     assign eof_out = eof_in;
     assign vector_out = { >> { mem_out_b }};

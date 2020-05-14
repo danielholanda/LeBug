@@ -191,9 +191,11 @@ def testNakedRtl():
     proc.push([input_vector2,True])
 
     # Run testbench
-    tb = proc.run(steps=1,gui=False)
+    tb = proc.run(steps=5,gui=False)
 
-    print(tb)
+    for t in tb['vector_out']:
+        print(t)
+    #print(tb['vector_out'])
 
     # Check results
     assert True
