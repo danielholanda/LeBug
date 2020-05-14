@@ -281,12 +281,19 @@ class emulatedHw():
     def step(self):
         log.debug('New step')
         chain = self.ib.step()
+        self.log['ib'].append(chain)
         chain = self.fu.step(chain)
+        self.log['fu'].append(chain)
         chain = self.mvru.step(chain)
+        self.log['mvru'].append(chain)
         chain = self.vvalu.step(chain)
+        self.log['vvalu'].append(chain)
         chain = self.vsru.step(chain)
+        self.log['vsru'].append(chain)
         packed_data = self.dp.step(chain)
+        self.log['dp'].append(chain)
         self.tb.step(packed_data)
+        self.log['tb'].append(self.tb.mem)
 
     # Pushes values to the input of the chain
     def push(self,pushed_vals):
@@ -312,7 +319,7 @@ class emulatedHw():
         # Keep stepping through the circuit as long as we have instructions to execute
         for i in range(steps):
             self.step()
-        return self.tb.mem
+        return self.log
 
     # Hardware configurations (that can be done by VLIW instruction)
     class compiler():
@@ -387,6 +394,7 @@ class emulatedHw():
         assert math.log(M, 2).is_integer(), "N must be a power of 2" 
         assert M<=N, "M must be less or equal to N" 
 
+        # hardware building blocks   
         self.ib   = self.InputBuffer(N,IB_DEPTH)
         self.fu   = self.FilterUnit(N,M,FUVRF_SIZE)
         self.mvru = self.MatrixVectorReduce(N,M)
@@ -396,4 +404,8 @@ class emulatedHw():
         self.tb   = self.TraceBuffer(N,TB_SIZE)
         self.config()
 
+        # Firmware compiler
         self.compiler = self.compiler(M,N)
+
+        # used to simulate a trace buffer to match results with simulation
+        self.log=dict.fromkeys(['ib','fu','mvru','vsru','vvalu','dp','tb'],[])

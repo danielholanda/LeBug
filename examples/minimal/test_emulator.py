@@ -31,8 +31,8 @@ def testSimpleDistribution():
 
     # Step through it until we get the result
     proc.config(fw)
-    tb = proc.run()
-    assert np.allclose(tb[0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with distribution failed"
+    log = proc.run()
+    assert np.allclose(log['tb'][-1][0],[ 1.,2.,1.,0.,1.,1.,1.,1.]), "Test with distribution failed"
     print("Passed test #1")
 
 testSimpleDistribution()
@@ -57,8 +57,8 @@ def testDualDistribution():
 
     # Step through it until we get the result
     proc.config(fw)
-    tb = proc.run()
-    assert np.allclose(tb[0],[ 2.,5.,1.,0.,2.,2.,2.,2.]), "Test with dual distribution failed"
+    log = proc.run()
+    assert np.allclose(log['tb'][-1][0],[ 2.,5.,1.,0.,2.,2.,2.,2.]), "Test with dual distribution failed"
     print("Passed test #2")
 
 testDualDistribution()
@@ -87,7 +87,7 @@ def testSummaryStats():
 
     # Step through it until we get the result
     proc.config(fw)
-    tb = proc.run()
+    log = proc.run()
     assert np.isclose(proc.dp.v_out[0],np.sum(input_vector1)*7+np.sum(input_vector2)), "Reduce sum failed"
     assert 47==int(proc.dp.v_out[1]), "Sparsity sum failed"
     print("Passed test #3")
@@ -112,9 +112,9 @@ def testSpatialSparsity():
 
     # Step through it until we get the result
     proc.config(fw)
-    tb = proc.run()
-    assert np.isclose(tb[0],[ 1.,1.,1.,1.,0.,1.,0.,1.]).all(), "Spatial Sparsity Failed"
-    assert np.isclose(tb[1],[ 1.,0.,1.,1.,1.,1.,0.,0.]).all(), "Spatial Sparsity Failed"
+    log = proc.run()
+    assert np.isclose(log['tb'][-1][0],[ 1.,1.,1.,1.,0.,1.,0.,1.]).all(), "Spatial Sparsity Failed"
+    assert np.isclose(log['tb'][-1][1],[ 1.,0.,1.,1.,1.,1.,0.,0.]).all(), "Spatial Sparsity Failed"
     print("Passed test #4")
 
 testSpatialSparsity()
@@ -202,13 +202,14 @@ def testNakedRtl():
     emu_proc.config(fw)
 
     # Run HW simulation and emulation
-    hw_results = hw_proc.run(steps=5,gui=False)
+    #hw_results = hw_proc.run(steps=5,gui=False)
     emu_results = emu_proc.run(steps=5)
 
-    for t in hw_results['vector_out']:
-        print(t)
-    print("\n\n")
-    print(emu_results)
+    #for t in hw_results['vector_out']:
+    #    print(t)
+    #print("\n\n")
+
+    print(emu_results['ib'][-1])
 
     # Check results
     assert True
