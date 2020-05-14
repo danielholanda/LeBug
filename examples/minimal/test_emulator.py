@@ -179,23 +179,36 @@ testVectorChange()
 
 def testNakedRtl():
 
-    # Instantiate processor
-    DATA_WIDTH=32
-    proc = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH)
+    # Missing: Select how components are attached to eachother
 
-    # Feed values to input buffer
+    # Instantiate HW and Emulator Processors
+    DATA_WIDTH=32
+    hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH)
+    emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
+
+    # Create common input values
     np.random.seed(0)
     input_vector1=np.random.randint(100, size=N)
     input_vector2=np.random.randint(100, size=N)
-    proc.push([input_vector1,False])
-    proc.push([input_vector2,True])
 
-    # Run testbench
-    tb = proc.run(steps=5,gui=False)
+    # Push values to both procs
+    hw_proc.push([input_vector1,False])
+    hw_proc.push([input_vector2,True])
+    emu_proc.push([input_vector1,False])
+    emu_proc.push([input_vector2,True])
 
-    for t in tb['vector_out']:
+    # Configure firmware (missing HW firmware)
+    fw = firm.passThrough(emu_proc.compiler)
+    emu_proc.config(fw)
+
+    # Run HW simulation and emulation
+    hw_results = hw_proc.run(steps=5,gui=False)
+    emu_results = emu_proc.run(steps=5)
+
+    for t in hw_results['vector_out']:
         print(t)
-    #print(tb['vector_out'])
+    print("\n\n")
+    print(emu_results)
 
     # Check results
     assert True
