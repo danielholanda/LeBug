@@ -202,14 +202,19 @@ def testNakedRtl():
     emu_proc.config(fw)
 
     # Run HW simulation and emulation
-    #hw_results = hw_proc.run(steps=5,gui=False)
-    emu_results = emu_proc.run(steps=5)
+    steps=6
+    hw_results = hw_proc.run(steps=steps,gui=False)
+    emu_results = emu_proc.run(steps=steps)
 
-    #for t in hw_results['vector_out']:
-    #    print(t)
-    #print("\n\n")
+    print("Hardware Results:")
+    for t in hw_results['vector_out'][2:]:
+        print([int(j) for j in t])
+    print("\n\n")
 
-    print(emu_results['ib'][-1])
+    print("Emulator Results")
+    for v_out, eof_out, bof_out, chainId_out in emu_results['ib']:
+        print(v_out)
+
 
     # Check results
     assert True

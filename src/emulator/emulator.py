@@ -294,6 +294,7 @@ class emulatedHw():
         self.log['dp'].append(chain)
         self.tb.step(packed_data)
         self.log['tb'].append(self.tb.mem)
+        
 
     # Pushes values to the input of the chain
     def push(self,pushed_vals):
@@ -408,4 +409,4 @@ class emulatedHw():
         self.compiler = self.compiler(M,N)
 
         # used to simulate a trace buffer to match results with simulation
-        self.log=dict.fromkeys(['ib','fu','mvru','vsru','vvalu','dp','tb'],[])
+        self.log={k: [] for k in ['ib','fu','mvru','vsru','vvalu','dp','tb']}
