@@ -31,9 +31,9 @@
     // Instantiate memory to implement queue
     reg [$clog2(IB_DEPTH)-1:0] mem_address_a=1;
     reg [$clog2(IB_DEPTH)-1:0] mem_address_b=0;
-    reg mem_write_enable_a=1;
+    wire mem_write_enable_a;
     reg mem_write_enable_b=0;
-    reg [MEM_WIDTH-1:0] mem_in_a=0;
+    wire [MEM_WIDTH-1:0] mem_in_a;
     reg [MEM_WIDTH-1:0] mem_in_b=0;
     wire [MEM_WIDTH-1:0] mem_out_a;
     wire [MEM_WIDTH-1:0] mem_out_b;
@@ -65,16 +65,21 @@
     always @(posedge clk) begin
 
         // Logic for enqueuing values
-        mem_in_a <= { >> { vector_in }};
         mem_address_a <= enqueue ? mem_address_a+1'b1 : mem_address_a;
-        mem_write_enable_a <= enqueue;
 
         //Logic for dequeuing
         mem_address_b <= dequeue ? mem_address_b+1'b1 : mem_address_b;
 
     end
 
+    // 1-bit wide EOF signal is implemented as a bit shifter
     assign eof_out = eof_in;
+
+    // Directly assign module inputs to port A of memory
+    assign mem_in_a = { >> { vector_in }};
+    assign mem_write_enable_a = enqueue;
+
+    // Module output is the output of the queue
     assign vector_out = { >> { mem_out_b }};
 
  
