@@ -223,4 +223,6 @@ def testNakedRtl():
     assert np.allclose(hw_ib_results,emu_ib_results), "Failed to match emulator and hardware in IB test"
     print("Passed test #7")
 
+    print(np.array(toInt(hw_results['vsru']['vector_out'])))
+
 testNakedRtl()
