@@ -15,13 +15,16 @@ module  vectorScalarReduceUnit #(
   input logic valid_in,
   input logic eof_in,
   input logic chainId_in,
+  input logic tracing,
+  input logic [7:0] config_id,
+  input logic [7:0] config_data,
   input logic [DATA_WIDTH-1:0] vector_in [N-1:0],
   output reg valid_out,
   output reg [DATA_WIDTH-1:0] vector_out [N-1:0]
  );
 
     //----------Internal Variables------------
-    reg [7:0] conf_byte [MAX_CHAINS-1:0]='{MAX_CHAINS{0}};
+    reg [7:0] config_byte [MAX_CHAINS-1:0]='{MAX_CHAINS{0}};
     wire [DATA_WIDTH-1:0] sum; 
     reg [DATA_WIDTH-1:0] zeros [N-1:0]='{N{0}};
 
@@ -37,11 +40,11 @@ module  vectorScalarReduceUnit #(
         valid_out<=valid_in;
 
         // Return N bytes
-        if (conf_byte[chainId_in]==8'd0) begin
+        if (config_byte[chainId_in]==8'd0) begin
             vector_out<=vector_in;
         end
         // Return 1 element (sum of all) zero padded
-        else if (conf_byte[chainId_in]==8'd1) begin
+        else if (config_byte[chainId_in]==8'd1) begin
           vector_out<=zeros;
           vector_out[0]<= sum;
         end

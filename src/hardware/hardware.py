@@ -45,23 +45,33 @@ class rtlHw():
                     assert False, f'{parameter_name} is not a parameter from {self.module_class.name}'
 
         # Connect inputs of instance
-        def connectInputs(self,top_module_or_instance):
+        def connectInputs(self,top_module_or_instance=None):
             
             # Check if we are connecting to the top module inputs or to an intance inside top
-            if type(top_module_or_instance).__name__ == 'rtlInstance':
+            if top_module_or_instance == None:
+                signals_to_connect = []
+            elif type(top_module_or_instance).__name__ == 'rtlInstance':
                 signals_to_connect = [top_module_or_instance.instance_output[k] for k in top_module_or_instance.instance_output.keys()]
             elif type(top_module_or_instance).__name__ == 'rtlModule':
                 signals_to_connect = top_module_or_instance.input
             else:
                 assert False
 
-            # Add clock to signals to connect if not there
-            clock_found=False
+            # Add aditional signals that don't come from the module we are connecting to
+            clock_signal_found=False
+            config_signals_found=False
             for i in signals_to_connect:
                 if i.name=='clk':
-                    clock_found=True
-            if not clock_found:
+                    clock_signal_found=True
+                if i.name=='config':
+                    config_signals_found=True
+            if not clock_signal_found:
                 signals_to_connect.append(struct(name='clk',type='logic',bits=1))
+            if not config_signals_found and top_module_or_instance!=None:
+                signals_to_connect.append(struct(name='tracing',type='logic',bits=1,elements=1))
+                signals_to_connect.append(struct(name='config_data',type='logic',bits=8,elements=1))
+                signals_to_connect.append(struct(name='config_id',type='logic',bits=8,elements=1))
+
 
             # Check if number of signals is the same
             assert len(signals_to_connect)==len(self.module_input), "Not the same number of connected signals"
@@ -260,35 +270,88 @@ class rtlHw():
     def rtlLogic(self):
         # Create TOP level module using custom RTL class
         top = self.rtlModule(self,"debugger")
-        top.addInput([['clk','logic',1],['enqueue','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
-        top.addOutput([['valid_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
-        top.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4],['MAX_CHAINS',4]])
+        top.addInput([
+            ['clk','logic',1],
+            ['enqueue','logic',1],
+            ['eof_in','logic',1],
+            ['vector_in','logic','DATA_WIDTH','N']])
+        top.addOutput([
+            ['valid_out','logic',1],
+            ['vector_out','logic','DATA_WIDTH','N']])
+        top.addParameter([
+            ['N',8],
+            ['DATA_WIDTH',32],
+            ['IB_DEPTH',4],
+            ['MAX_CHAINS',4]])
 
         # Adds includes to the beginning of the file
         top.include("input_buffer.sv")
         top.include("vector_scalar_reduce_unit.sv")
+        top.include("uart.sv")
+
+        # UART module
+        top.includeModule("uart")
+        top.mod.uart.addInput([['clk','logic',1]])
+        top.mod.uart.addOutput([
+            ['tracing','logic',1],
+            ['config_id','logic',8],
+            ['config_data','logic',8]])
 
         # Input buffer
         top.includeModule("inputBuffer")
-        top.mod.inputBuffer.addInput([['clk','logic',1],['enqueue','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
-        top.mod.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','DATA_WIDTH','N'],['chainId_out','logic',1]])
-        top.mod.inputBuffer.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
+        top.mod.inputBuffer.addInput([
+            ['clk','logic',1],
+            ['enqueue','logic',1],
+            ['eof_in','logic',1],
+            ['tracing','logic',1],
+            ['config_id','logic',8],
+            ['config_data','logic',8],
+            ['vector_in','logic','DATA_WIDTH','N']])
+        top.mod.inputBuffer.addOutput([
+            ['valid_out','logic',1],
+            ['eof_out','logic',1],
+            ['vector_out','logic','DATA_WIDTH','N'],
+            ['chainId_out','logic',1]])
+        top.mod.inputBuffer.addParameter([
+            ['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
         top.mod.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
 
         # Vector Scalar Reduce unit
         top.includeModule("vectorScalarReduceUnit")
-        top.mod.vectorScalarReduceUnit.addInput([['clk','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N'],['chainId_in','logic',1]])
-        top.mod.vectorScalarReduceUnit.addOutput([['valid_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
-        top.mod.vectorScalarReduceUnit.addParameter([['N',8],['DATA_WIDTH',32],['MAX_CHAINS',4]])
+        top.mod.vectorScalarReduceUnit.addInput([
+            ['clk','logic',1],
+            ['valid_in','logic',1],
+            ['eof_in','logic',1],
+            ['chainId_in','logic',1],
+            ['tracing','logic',1],
+            ['config_id','logic',8],
+            ['config_data','logic',8],
+            ['vector_in','logic','DATA_WIDTH','N']])
+        top.mod.vectorScalarReduceUnit.addOutput([
+            ['valid_out','logic',1],
+            ['vector_out','logic','DATA_WIDTH','N']])
+        top.mod.vectorScalarReduceUnit.addParameter([
+            ['N',8],
+            ['DATA_WIDTH',32],
+            ['MAX_CHAINS',4]])
 
         # Instantiate modules
+        top.instantiateModule(top.mod.uart,"uart_io")
+
         top.instantiateModule(top.mod.inputBuffer,"ib")
-        top.inst.ib.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH'],['IB_DEPTH','IB_DEPTH']])
+        top.inst.ib.setParameters([
+            ['N','N'],
+            ['DATA_WIDTH','DATA_WIDTH'],
+            ['IB_DEPTH','IB_DEPTH']])
 
         top.instantiateModule(top.mod.vectorScalarReduceUnit,"vsru")
-        top.inst.vsru.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH'],['MAX_CHAINS','MAX_CHAINS']])
+        top.inst.vsru.setParameters([
+            ['N','N'],
+            ['DATA_WIDTH','DATA_WIDTH'],
+            ['MAX_CHAINS','MAX_CHAINS']])
 
         # Connect modules
+        top.inst.uart_io.connectInputs() 
         top.inst.ib.connectInputs(top) 
         top.inst.vsru.connectInputs(top.inst.ib)
         top.assignOutputs(top.inst.vsru)
