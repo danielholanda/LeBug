@@ -271,13 +271,13 @@ class rtlHw():
         # Input buffer
         top.includeModule("inputBuffer")
         top.mod.inputBuffer.addInput([['clk','logic',1],['enqueue','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
-        top.mod.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
+        top.mod.inputBuffer.addOutput([['valid_out','logic',1],['eof_out','logic',1],['vector_out','logic','DATA_WIDTH','N'],['chainId_out','logic',1]])
         top.mod.inputBuffer.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
         top.mod.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
 
         # Vector Scalar Reduce unit
         top.includeModule("vectorScalarReduceUnit")
-        top.mod.vectorScalarReduceUnit.addInput([['clk','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
+        top.mod.vectorScalarReduceUnit.addInput([['clk','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N'],['chainId_in','logic',1]])
         top.mod.vectorScalarReduceUnit.addOutput([['valid_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
         top.mod.vectorScalarReduceUnit.addParameter([['N',8],['DATA_WIDTH',32]])
 

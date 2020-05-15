@@ -16,12 +16,13 @@
   input logic [DATA_WIDTH-1:0] vector_in [N-1:0],
   output reg valid_out,
   output reg eof_out,
-  output reg [DATA_WIDTH-1:0] vector_out [N-1:0]
+  output reg [DATA_WIDTH-1:0] vector_out [N-1:0],
+  output reg chainId_out
  );
 
     //----------Internal Variables------------
-    reg dequeue=1'b1; // THIS SHOULD BECOME AN INPUT LATER
-    wire empty,full; // empty should be an output later
+    reg dequeue=1'b1; 
+    wire empty,full;
 
     parameter LATENCY = 2;
     parameter RAM_LATENCY = LATENCY-1;
@@ -90,5 +91,7 @@
     // Check if queue is empty/full
     assign empty = (mem_address_a-mem_address_b==0) | (mem_address_a==0 & mem_address_b==IB_DEPTH-1);
     assign full = (mem_address_a==mem_address_b);
+
+    assign chainId_out=1'b1;
  
  endmodule 
