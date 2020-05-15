@@ -305,9 +305,7 @@ class rtlHw():
             tb_inputs.append(f"eof = {int(i[1])};")
             for idx,ele in enumerate(i[0]):
                 tb_inputs.append(f"vector[{idx}]=32'd{ele};")
-            #tb_inputs.append("toFile();")
             tb_inputs.append("#half_period;")
-            #tb_inputs.append("toFile();")
             tb_inputs.append("#half_period;")
             tb_inputs.append("")
         tb_inputs=("\n"+"    "*4).join(tb_inputs)
@@ -318,10 +316,29 @@ class rtlHw():
             tb_steps.append("valid = 0;")
             tb_steps.append("toFile();")
             tb_steps.append("#half_period;")
-            #tb_steps.append("toFile();")
             tb_steps.append("#half_period;")
             tb_steps.append("")
         tb_steps=("\n"+"    "*4).join(tb_steps)
+
+        # Prepare testbench values to save to file
+        tb_store=[]
+        tb_var_names={}
+        for i in self.top.inst.__dict__.keys():
+            inst=self.top.inst.__dict__[i]
+            tb_var_names[inst.name]=[]
+            for o in inst.module_output:
+                tb_var_names[inst.name].append([o.name,o.elements])
+                if o.elements==1:
+                    tb_store.append(f'$fwrite(write_data, "%{"b" if o.bits==1 else "0d"} ",dbg.{inst.name}.{o.name});')
+                else:
+                    if not o.elements.isnumeric():
+                        tb_store.append(f"for (i=0; i<dbg.{inst.name}.{o.elements}; i=i+1) begin")
+                    else:
+                        tb_store.append(f"for (i=0; i<{o.elements}; i=i+1) begin")
+                    tb_store.append(f'\t$fwrite(write_data, "%{"b" if o.bits==1 else "0d"} ",dbg.{inst.name}.{o.name}[i]);')
+                    tb_store.append("end")
+        tb_store.append('$fdisplay(write_data,"");')
+        tb_store=("\n"+"    "*4).join(tb_store)
 
         # Add includes
         testbench='`include "debugProcessor.sv"\n'
@@ -369,16 +386,7 @@ class rtlHw():
             integer write_data,i,j;
             task toFile;
                 begin
-                    $fwrite(write_data, "%b %b %b", clk, valid, eof);
-                    for (i = 0; i < {self.N}; i = i +1) begin
-                        $fwrite(write_data, " %0d", vector[i]);
-                    end
-                    $fwrite(write_data, " %b", valid_out);
-                    for (i = 0; i < {self.N}; i = i +1) begin
-                        $fwrite(write_data, " %0d", vector_out[i]);
-                    end
-                    $fdisplay(write_data,"");
-                
+                {tb_store}
                 end
             endtask
 
@@ -396,6 +404,8 @@ class rtlHw():
             end
         endmodule
         """)]
+
+        self.tb_var_names=tb_var_names
         return testbench
 
     def generateRtl(self):
@@ -447,47 +457,21 @@ class rtlHw():
         modelsim.stop()
 
         # Get results from file back to python
-        f = open("simulation_results.txt", "r")
-        clk=[]
-        eof=[]
-        valid=[]
-        vector_in=[]
-        valid_out=[]
-        vector_out=[]
-        for line in f:
-            l= line.replace("\n","").split(" ")
-            clk.append(l[0])
-            eof.append(l[1])
-            valid.append(l[2])
-            vector_in.append(l[3:3+self.N])
-            valid_out.append(l[3+self.N])
-            vector_out.append(l[4+self.N:])
-        f.close()
         results={}
-        results['clk']=clk
-        results['eof']=eof
-        results['valid']=valid
-        results['vector_in']=vector_in
-        results['valid_out']=valid_out
-        results['vector_out']=vector_out
-
-        # Print results to file in a readable way
-        def fmt(a,size):
-            return (size-len(a))*" "+a
-        f = open("simulation_results_readable.txt", "w")
-        numCol=len(clk)
-        f.write("|clk|eof|enqueue|valid_out|vector_in                    |vector_out                   |\n")
-        f.write("-"*88+"\n")
-        for i in range(len(clk)):
-            f.write('|')
-            f.write(fmt(clk[i]+"|",4))
-            f.write(fmt(valid[i]+"|",4))
-            f.write(fmt(eof[i]+"|",8))
-            f.write(fmt(valid_out[i]+"|",10))
-            f.write(fmt(" ".join(vector_in[i])+"|",30))
-            f.write(fmt(" ".join(vector_out[i])+"|",30))
-            f.write('\n')
-        f.close()
+        for mod in self.tb_var_names.keys():
+                results[mod]={}
+                for var_name, elements in self.tb_var_names[mod]:
+                    results[mod][var_name]=[]
+        f = open("simulation_results.txt", "r")
+        for line in f:
+            count=0
+            l= line.replace("\n","").split(" ")
+            for mod in self.tb_var_names.keys():
+                for var_name, elements in self.tb_var_names[mod]:
+                    if elements=='N':
+                        elements=self.N
+                    results[mod][var_name].append(l[count:count+elements])
+                    count=count+elements
 
         # Go back to main directory
         os.chdir(current_folder)
@@ -511,4 +495,6 @@ class rtlHw():
         self.testbench_inputs=[]    # Stores inputs to testbench
         self.steps=0 # Number of steps for testbench
         self.top=None # used to store all rtl info later on
+
+        self.tb_var_names = None
         

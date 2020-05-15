@@ -210,7 +210,7 @@ def testNakedRtl():
 
     # Filter only the results we are interested in
     # Convert HW results to int (might contain "x"s and others)
-    hw_ib_results=np.array(toInt(hw_results['vector_out']))
+    hw_ib_results=np.array(toInt(hw_results['ib']['vector_out']))
     emu_ib_results=np.array([v_out for v_out, eof_out, bof_out, chainId_out in emu_results['ib']])
 
     print("Hardware Results:")
@@ -219,7 +219,6 @@ def testNakedRtl():
     print("\nEmulator Results")
     print(emu_ib_results)
 
-    exit()
     # Check results
     assert np.allclose(hw_ib_results,emu_ib_results), "Failed to match emulator and hardware in IB test"
     print("Passed test #7")
