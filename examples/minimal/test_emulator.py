@@ -185,7 +185,8 @@ def testNakedRtl():
 
     # Instantiate HW and Emulator Processors
     DATA_WIDTH=32
-    hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH)
+    MAX_CHAINS=4
+    hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS)
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE)
 
     # Create common input values

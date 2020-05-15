@@ -262,7 +262,7 @@ class rtlHw():
         top = self.rtlModule(self,"debugger")
         top.addInput([['clk','logic',1],['enqueue','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N']])
         top.addOutput([['valid_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
-        top.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
+        top.addParameter([['N',8],['DATA_WIDTH',32],['IB_DEPTH',4],['MAX_CHAINS',4]])
 
         # Adds includes to the beginning of the file
         top.include("input_buffer.sv")
@@ -279,14 +279,14 @@ class rtlHw():
         top.includeModule("vectorScalarReduceUnit")
         top.mod.vectorScalarReduceUnit.addInput([['clk','logic',1],['valid_in','logic',1],['eof_in','logic',1],['vector_in','logic','DATA_WIDTH','N'],['chainId_in','logic',1]])
         top.mod.vectorScalarReduceUnit.addOutput([['valid_out','logic',1],['vector_out','logic','DATA_WIDTH','N']])
-        top.mod.vectorScalarReduceUnit.addParameter([['N',8],['DATA_WIDTH',32]])
+        top.mod.vectorScalarReduceUnit.addParameter([['N',8],['DATA_WIDTH',32],['MAX_CHAINS',4]])
 
         # Instantiate modules
         top.instantiateModule(top.mod.inputBuffer,"ib")
         top.inst.ib.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH'],['IB_DEPTH','IB_DEPTH']])
 
         top.instantiateModule(top.mod.vectorScalarReduceUnit,"vsru")
-        top.inst.vsru.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH']])
+        top.inst.vsru.setParameters([['N','N'],['DATA_WIDTH','DATA_WIDTH'],['MAX_CHAINS','MAX_CHAINS']])
 
         # Connect modules
         top.inst.ib.connectInputs(top) 
@@ -351,6 +351,7 @@ class rtlHw():
             parameter N={self.N};
             parameter DATA_WIDTH={self.DATA_WIDTH};
             parameter IB_DEPTH={self.IB_DEPTH};
+            parameter MAX_CHAINS={self.MAX_CHAINS};
    
             // Declare inputs
             reg clk=1'b0;
@@ -371,7 +372,8 @@ class rtlHw():
             {self.top.name} #(
               .N(N),
               .DATA_WIDTH(DATA_WIDTH),
-              .IB_DEPTH(IB_DEPTH)
+              .IB_DEPTH(IB_DEPTH),
+              .MAX_CHAINS(MAX_CHAINS)
             )
             dbg(
               .clk(clk),
@@ -481,7 +483,7 @@ class rtlHw():
     def push(self,pushed_values):
         self.testbench_inputs.append(pushed_values)
 
-    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH):
+    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS):
         ''' Verifying parameters '''
         assert math.log(N, 2).is_integer(), "N must be a power of 2" 
         assert math.log(M, 2).is_integer(), "N must be a power of 2" 
@@ -491,6 +493,7 @@ class rtlHw():
         self.M=M
         self.IB_DEPTH=IB_DEPTH
         self.DATA_WIDTH=DATA_WIDTH
+        self.MAX_CHAINS=MAX_CHAINS
         self.hwFolder = os.path.dirname(os.path.realpath(__file__))
         self.testbench_inputs=[]    # Stores inputs to testbench
         self.steps=0 # Number of steps for testbench

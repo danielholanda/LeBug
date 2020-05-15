@@ -7,7 +7,8 @@
 
 module  vectorScalarReduceUnit #(
   parameter N=8,
-  parameter DATA_WIDTH=32
+  parameter DATA_WIDTH=32,
+  parameter MAX_CHAINS=4
   )
   (
   input logic clk,
