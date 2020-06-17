@@ -134,6 +134,10 @@ class rtlHw():
             self.mem[name]['depth']=depth
             self.mem[name]['width']=width
 
+        def setAsConfigurable(self,configurable_parameters):
+            self.addInput([['tracing','logic',1],['config_id','logic',8],['config_data','logic',8]])
+            self.configurable_parameters=configurable_parameters
+
         # Recursively adds Modules to module
         def declareModule(self,mod_name):
             if self.included==False:
@@ -254,18 +258,19 @@ class rtlHw():
         # Initializes the RTL file class
         def __init__(self,parent,name):
             self.name=name
-            self.parent = parent        # name of Module
-            self.includes=[]            # Stores include files
-            self.wires=[]               # Stores wires
-            self.regs=[]                # Stores regs
-            self.input=[]               # Store all inputs logic ports
-            self.output=[]              # Store all outputs logic ports
-            self.output_assignment={}   # Describes how outputs are connected to internal signals
-            self.parameter=[]           # Store all parameters
-            self.included=False         # Is true if the module has been imported
-            self.mod=struct()           # Those are the declare modules
-            self.inst=struct()          # Those are the instantiated modules
-            self.mem={}                 # Array of mems that need the mif files initialized
+            self.parent = parent            # name of Module
+            self.includes=[]                # Stores include files
+            self.wires=[]                   # Stores wires
+            self.regs=[]                    # Stores regs
+            self.input=[]                   # Store all inputs logic ports
+            self.output=[]                  # Store all outputs logic ports
+            self.output_assignment={}       # Describes how outputs are connected to internal signals
+            self.parameter=[]               # Store all parameters
+            self.included=False             # Is true if the module has been imported
+            self.mod=struct()               # Those are the declare modules
+            self.inst=struct()              # Those are the instantiated modules
+            self.mem={}                     # Array of mems that need the mif files initialized
+            self.configurable_parameters=0  # Number of configurable parameters of this module
 
     def rtlLogic(self):
         # Create TOP level module using custom RTL class
@@ -303,9 +308,6 @@ class rtlHw():
             ['clk','logic',1],
             ['enqueue','logic',1],
             ['eof_in','logic',1],
-            ['tracing','logic',1],
-            ['config_id','logic',8],
-            ['config_data','logic',8],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.mod.inputBuffer.addOutput([
             ['valid_out','logic',1],
@@ -315,6 +317,7 @@ class rtlHw():
         top.mod.inputBuffer.addParameter([
             ['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
         top.mod.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
+        top.mod.inputBuffer.setAsConfigurable(configurable_parameters=4)
 
         # Vector Scalar Reduce unit
         top.includeModule("vectorScalarReduceUnit")
@@ -323,9 +326,6 @@ class rtlHw():
             ['valid_in','logic',1],
             ['eof_in','logic',1],
             ['chainId_in','logic',1],
-            ['tracing','logic',1],
-            ['config_id','logic',8],
-            ['config_data','logic',8],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.mod.vectorScalarReduceUnit.addOutput([
             ['valid_out','logic',1],
@@ -334,6 +334,7 @@ class rtlHw():
             ['N',8],
             ['DATA_WIDTH',32],
             ['MAX_CHAINS',4]])
+        top.mod.vectorScalarReduceUnit.setAsConfigurable(configurable_parameters=4)
 
         # Instantiate modules
         top.instantiateModule(top.mod.uart,"comm")
