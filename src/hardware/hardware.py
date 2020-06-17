@@ -57,8 +57,6 @@ class rtlHw():
             else:
                 assert False
 
-
-
             # Add aditional signals that don't come from the module we are connecting to
             clock_signal_found=False
             config_signals_found=False
@@ -70,9 +68,9 @@ class rtlHw():
             if not clock_signal_found:
                 signals_to_connect.append(struct(name='clk',type='logic',bits=1))
             if not config_signals_found and top_module_or_instance!=None:
-                signals_to_connect.append(struct(name='tracing',type='logic',bits=1,elements=1))
-                signals_to_connect.append(struct(name='config_data',type='logic',bits=8,elements=1))
-                signals_to_connect.append(struct(name='config_id',type='logic',bits=8,elements=1))
+                signals_to_connect.append(struct(name='tracing_comm',type='logic',bits=1,elements=1))
+                signals_to_connect.append(struct(name='config_data_comm',type='logic',bits=8,elements=1))
+                signals_to_connect.append(struct(name='config_id_comm',type='logic',bits=8,elements=1))
 
             # Check if number of signals is the same
             assert len(signals_to_connect)==len(self.module_input), "Not the same number of connected signals"
