@@ -53,9 +53,11 @@ class rtlHw():
             elif type(top_module_or_instance).__name__ == 'rtlInstance':
                 signals_to_connect = [top_module_or_instance.instance_output[k] for k in top_module_or_instance.instance_output.keys()]
             elif type(top_module_or_instance).__name__ == 'rtlModule':
-                signals_to_connect = top_module_or_instance.input
+                signals_to_connect = top_module_or_instance.input[:]
             else:
                 assert False
+
+
 
             # Add aditional signals that don't come from the module we are connecting to
             clock_signal_found=False
@@ -72,7 +74,6 @@ class rtlHw():
                 signals_to_connect.append(struct(name='config_data',type='logic',bits=8,elements=1))
                 signals_to_connect.append(struct(name='config_id',type='logic',bits=8,elements=1))
 
-
             # Check if number of signals is the same
             assert len(signals_to_connect)==len(self.module_input), "Not the same number of connected signals"
 
@@ -84,6 +85,7 @@ class rtlHw():
                         portMap[i.name]=j.name
             assert len(portMap.keys())==len(self.module_input), "Port map failed"
             self.instance_input=portMap
+
 
         def __init__(self,module_class,instance_name):
             self.module_class = module_class
@@ -336,7 +338,7 @@ class rtlHw():
             ['MAX_CHAINS',4]])
 
         # Instantiate modules
-        top.instantiateModule(top.mod.uart,"uart_io")
+        top.instantiateModule(top.mod.uart,"comm")
 
         top.instantiateModule(top.mod.inputBuffer,"ib")
         top.inst.ib.setParameters([
@@ -351,9 +353,10 @@ class rtlHw():
             ['MAX_CHAINS','MAX_CHAINS']])
 
         # Connect modules
-        top.inst.uart_io.connectInputs() 
+        top.inst.comm.connectInputs() 
         top.inst.ib.connectInputs(top) 
         top.inst.vsru.connectInputs(top.inst.ib)
+
         top.assignOutputs(top.inst.vsru)
 
         self.top=top
