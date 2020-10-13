@@ -45,6 +45,31 @@ Every time that the we emulate the processor or create RTL for it, we have to de
 - **VVVRF_SIZE:** Number of tensors we can store in the vector-vector scratchpad of the Filter Unit
 - **TB_SIZE:** Number of tensors we can store in the trace buffer
 
+#### Firmware
+
+The firmware is used to configure the instrumentation at debug time. When creating a firmware, you need to obey the following rules:
+
+- All ISA instructions must be chained the same whay that the hardware is chained
+- All chains must start with begin_chain() and must end with end_chain()
+- All ISA instructions may also receive a condition that enables/disables this operation according to the "end of frame" signal. Those conditions may be "first", "notfirst", "last", and "notlast".
+
+**Example:**
+
+```    python
+def distribution(cp,bins,M):
+    assert bins%M==0, "Number of bins must be divisible by M"
+    for i in range(int(bins/M)):       
+        begin_chain()
+        vv_filter(i)
+        m_reduce('M')
+        vv_add(i,'notfirst')
+        v_cache(i)
+        v_commit(M,'last')
+        end_chain()
+```
+
+
+
 ## Running it for the first time
 
 ### Testing the emulator
