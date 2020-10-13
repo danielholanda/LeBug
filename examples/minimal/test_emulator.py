@@ -224,6 +224,8 @@ def testNakedRtl():
     assert np.allclose(hw_ib_results,emu_ib_results), "Failed to match emulator and hardware in IB test"
     print("Passed test #7")
 
-    print(np.array(toInt(hw_results['vsru']['vector_out'])))
+    print("Next steps: Continue adding uart support. Modules now have the variable configurable_parameters. Next, they need a parameter that will thei their personal_config_id so they can reconfigure their internal parameters properly")
+
+
 
 testNakedRtl()

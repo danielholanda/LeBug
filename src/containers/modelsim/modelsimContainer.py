@@ -47,7 +47,7 @@ class modelsimContainer():
         try:
             docker.from_env().version()
         except:
-            print("Docker isn't running on your system. Please start docker before continuing")
+            print("Docker isn't running on your system. Please start docker before continuing") 
             exit()
         self.apiClient = docker.APIClient(base_url='unix://var/run/docker.sock')
         self.log=log
