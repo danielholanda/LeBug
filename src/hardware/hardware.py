@@ -498,7 +498,7 @@ class rtlHw():
         f.close()
 
     # This will run the testbench of the generated hardware and return its results
-    def run(self,steps=50,gui=False):
+    def run(self,steps=50,gui=False,log=True):
         # First, generate the RTL
         self.steps=steps
         self.generateRtl()
@@ -508,7 +508,7 @@ class rtlHw():
         rtl_folder=current_folder+"/rtl/"
         os.chdir(rtl_folder)
 
-        modelsim = modelsimContainer(log=True)
+        modelsim = modelsimContainer(log)
         modelsim.start()
         modelsim.exec('mkdir rtl')
         modelsim.copy(rtl_folder,'modelsim:.')

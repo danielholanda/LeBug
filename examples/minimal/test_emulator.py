@@ -206,19 +206,13 @@ def testNakedRtl():
 
     # Run HW simulation and emulation
     steps=6
-    hw_results = hw_proc.run(steps=steps,gui=False)
+    hw_results = hw_proc.run(steps=steps,gui=False,log=False)
     emu_results = emu_proc.run(steps=steps)
 
     # Filter only the results we are interested in
     # Convert HW results to int (might contain "x"s and others)
     hw_ib_results=np.array(toInt(hw_results['ib']['vector_out']))
     emu_ib_results=np.array([v_out for v_out, eof_out, bof_out, chainId_out in emu_results['ib']])
-
-    print("Hardware Results:")
-    print(hw_ib_results)
-
-    print("\nEmulator Results")
-    print(emu_ib_results)
 
     # Check results
     assert np.allclose(hw_ib_results,emu_ib_results), "Failed to match emulator and hardware in IB test"
