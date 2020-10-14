@@ -36,12 +36,10 @@ module  vectorScalarReduceUnit #(
           adder_tree_inst(.vector(vector_in), .result(sum));
 
     always @(posedge clk) begin
-
         // Perform operations normally if we are tracing
-        if (tracing) begin
+        if (tracing==1'b1) begin
           // Assign outputs
           valid_out<=valid_in;
-
           // Return N bytes (pass through)
           if (config_byte[chainId_in]==8'd0) begin
               vector_out<=vector_in;
