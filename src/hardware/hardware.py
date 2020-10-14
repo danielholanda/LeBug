@@ -481,8 +481,8 @@ class rtlHw():
         rtl_folder=os.getcwd()+"/rtl"
         if os.path.isdir(rtl_folder):
             shutil.rmtree(rtl_folder)
+        os.mkdir(rtl_folder)
         copy_tree(self.hwFolder+"/buildingBlocks", rtl_folder)
-        #copy_tree(self.hwFolder+"/ip", rtl_folder)
         copy_tree(self.hwFolder+"/simulationBlocks", rtl_folder)
 
         # Writes debugProcessor to file
