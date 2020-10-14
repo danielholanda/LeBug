@@ -280,20 +280,30 @@ class emulatedHw():
 
     def step(self):
         log.debug('New step')
-        chain = self.ib.step()
-        self.log['ib'].append(chain)
-        chain = self.fu.step(chain)
-        self.log['fu'].append(chain)
-        chain = self.mvru.step(chain)
-        self.log['mvru'].append(chain)
-        chain = self.vvalu.step(chain)
-        self.log['vvalu'].append(chain)
-        chain = self.vsru.step(chain)
-        self.log['vsru'].append(chain)
-        packed_data = self.dp.step(chain)
-        self.log['dp'].append(chain)
-        self.tb.step(packed_data)
-        self.log['tb'].append(self.tb.mem)
+
+        # Perform operations according to how building blocks are connected
+        for b in self.BUILDING_BLOCKS:
+            if b=='InputBuffer':
+                chain = self.ib.step()
+                self.log['ib'].append(chain)
+            elif b=='FilterUnit':
+                chain = self.fu.step(chain)
+                self.log['fu'].append(chain)
+            elif b=='MatrixVectorReduce':
+                chain = self.mvru.step(chain)
+                self.log['mvru'].append(chain)
+            elif b=='VectorVectorALU':
+                chain = self.vvalu.step(chain)
+                self.log['vvalu'].append(chain)
+            elif b=='VectorScalarReduce':
+                chain = self.vsru.step(chain)
+                self.log['vsru'].append(chain)
+            elif b=='DataPacker':
+                packed_data = self.dp.step(chain)
+                self.log['dp'].append(chain)
+            elif b=='TraceBuffer':
+                self.tb.step(packed_data)
+                self.log['tb'].append(self.tb.mem)
         
 
     # Pushes values to the input of the chain
@@ -389,13 +399,14 @@ class emulatedHw():
             self.fu, self.mvru, self.vsru, self.vvalu, self.dp = self.pass_through[:]
 
 
-    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE):
+    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,BUILDING_BLOCKS):
         ''' Verifying parameters '''
         assert math.log(N, 2).is_integer(), "N must be a power of 2" 
         assert math.log(M, 2).is_integer(), "N must be a power of 2" 
         assert M<=N, "M must be less or equal to N" 
 
         # hardware building blocks   
+        self.BUILDING_BLOCKS=BUILDING_BLOCKS
         self.ib   = self.InputBuffer(N,IB_DEPTH)
         self.fu   = self.FilterUnit(N,M,FUVRF_SIZE)
         self.mvru = self.MatrixVectorReduce(N,M)

@@ -15,8 +15,8 @@ BUILDING_BLOCKS:
     - InputBuffer
     - FilterUnit
     - MatrixVectorReduce
-    - VectorScalarReduce
     - VectorVectorALU
+    - VectorScalarReduce
     - DataPacker
     - TraceBuffer
 
