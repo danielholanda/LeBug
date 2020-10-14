@@ -37,17 +37,27 @@ module  vectorScalarReduceUnit #(
 
     always @(posedge clk) begin
 
-        // Assign outputs
-        valid_out<=valid_in;
+        // Perform operations normally if we are tracing
+        if (tracing) begin
+          // Assign outputs
+          valid_out<=valid_in;
 
-        // Return N bytes
-        if (config_byte[chainId_in]==8'd0) begin
-            vector_out<=vector_in;
+          // Return N bytes (pass through)
+          if (config_byte[chainId_in]==8'd0) begin
+              vector_out<=vector_in;
+          end
+          // Return 1 element (sum of all) zero padded
+          else if (config_byte[chainId_in]==8'd1) begin
+            vector_out<=zeros;
+            vector_out[0]<= sum;
+          end
         end
-        // Return 1 element (sum of all) zero padded
-        else if (config_byte[chainId_in]==8'd1) begin
-          vector_out<=zeros;
-          vector_out[0]<= sum;
+
+        // If we are not tracing, we are reconfiguring the instrumentation
+        else begin
+          if (configId==PERSONAL_CONFIG_ID && configId<PERSONAL_CONFIG_ID+MAX_CHAINS)begin
+            config_byte[chainId_in]=configData;
+          end
         end
     end
 

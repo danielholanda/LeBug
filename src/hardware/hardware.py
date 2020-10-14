@@ -83,7 +83,6 @@ class rtlHw():
                         portMap[i.name]=j.name
             assert len(portMap.keys())==len(self.module_input), "Port map failed"
             self.instance_input=portMap
-            print(portMap)
 
 
         def __init__(self,module_class,instance_name):

@@ -1,0 +1,24 @@
+# This YAML file is used to configure the instrumentation
+
+---
+
+# Parameters to define the architecture
+N: 8            # Input vector width
+M: 4            # Number of range filters in filter unit
+IB_DEPTH: 8     # Input buffer depth
+FUVRF_SIZE: 4   # Size of FUVRF in M*elements
+VVVRF_SIZE: 8   # Size of VVVRF in N*elements
+TB_SIZE: 64     # Size of Trace Buffer in N*elements
+
+# Define how instruments are connected
+BUILDING_BLOCKS: 
+    - InputBuffer
+    - FilterUnit
+    - MatrixVectorReduce
+    - VectorScalarReduce
+    - VectorVectorALU
+    - DataPacker
+    - TraceBuffer
+
+# Define the initial firmware
+FIRM: distribution
