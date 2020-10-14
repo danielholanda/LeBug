@@ -8,7 +8,8 @@
 module  vectorScalarReduceUnit #(
   parameter N=8,
   parameter DATA_WIDTH=32,
-  parameter MAX_CHAINS=4
+  parameter MAX_CHAINS=4,
+  parameter PERSONAL_CONFIG_ID=0
   )
   (
   input logic clk,
@@ -16,8 +17,8 @@ module  vectorScalarReduceUnit #(
   input logic eof_in,
   input logic chainId_in,
   input logic tracing,
-  input logic [7:0] config_id,
-  input logic [7:0] config_data,
+  input logic [7:0] configId,
+  input logic [7:0] configData,
   input logic [DATA_WIDTH-1:0] vector_in [N-1:0],
   output reg valid_out,
   output reg [DATA_WIDTH-1:0] vector_out [N-1:0]

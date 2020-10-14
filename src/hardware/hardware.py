@@ -69,8 +69,8 @@ class rtlHw():
                 signals_to_connect.append(struct(name='clk',type='logic',bits=1))
             if not config_signals_found and top_module_or_instance!=None:
                 signals_to_connect.append(struct(name='tracing_comm',type='logic',bits=1,elements=1))
-                signals_to_connect.append(struct(name='config_data_comm',type='logic',bits=8,elements=1))
-                signals_to_connect.append(struct(name='config_id_comm',type='logic',bits=8,elements=1))
+                signals_to_connect.append(struct(name='configData_comm',type='logic',bits=8,elements=1))
+                signals_to_connect.append(struct(name='configId_comm',type='logic',bits=8,elements=1))
 
             # Check if number of signals is the same
             assert len(signals_to_connect)==len(self.module_input), "Not the same number of connected signals"
@@ -83,6 +83,7 @@ class rtlHw():
                         portMap[i.name]=j.name
             assert len(portMap.keys())==len(self.module_input), "Port map failed"
             self.instance_input=portMap
+            print(portMap)
 
 
         def __init__(self,module_class,instance_name):
@@ -135,7 +136,7 @@ class rtlHw():
             self.mem[name]['width']=width
 
         def setAsConfigurable(self,configurable_parameters):
-            self.addInput([['tracing','logic',1],['config_id','logic',8],['config_data','logic',8]])
+            self.addInput([['tracing','logic',1],['configId','logic',8],['configData','logic',8]])
             self.configurable_parameters=configurable_parameters
 
         # Recursively adds Modules to module
@@ -299,8 +300,8 @@ class rtlHw():
         top.mod.uart.addInput([['clk','logic',1]])
         top.mod.uart.addOutput([
             ['tracing','logic',1],
-            ['config_id','logic',8],
-            ['config_data','logic',8]])
+            ['configId','logic',8],
+            ['configData','logic',8]])
 
         # Input buffer
         top.includeModule("inputBuffer")

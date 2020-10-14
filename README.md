@@ -44,6 +44,8 @@ Every time that the we emulate the processor or create RTL for it, we have to de
 - **FUVRF_SIZE:** Number of different ranges we can have for the FIlter Unit (VRF size is FUVRF_SIZE*M)
 - **VVVRF_SIZE:** Number of tensors we can store in the vector-vector scratchpad of the Filter Unit
 - **TB_SIZE:** Number of tensors we can store in the trace buffer
+- **DATA_WIDTH**: Input/output data width
+- **MAX_CHAINS:** Maximum number of firmware chains the hardware is able to execute.
 
 #### Firmware
 
@@ -52,6 +54,15 @@ The firmware is used to configure the instrumentation at debug time. When creati
 - All ISA instructions must be chained the same whay that the hardware is chained
 - All chains must start with begin_chain() and must end with end_chain()
 - All ISA instructions may also receive a condition that enables/disables this operation according to the "end of frame" signal. Those conditions may be "first", "notfirst", "last", and "notlast".
+
+So far, we our list of firmware includes:
+
+- Distribution
+- Summary Statistics (sum)
+- Spatial Sparsity
+- Vector Change
+- Self Correlation
+- Invalid values
 
 **Example:**
 
