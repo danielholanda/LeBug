@@ -9,7 +9,8 @@ module  vectorScalarReduceUnit #(
   parameter N=8,
   parameter DATA_WIDTH=32,
   parameter MAX_CHAINS=4,
-  parameter PERSONAL_CONFIG_ID=0
+  parameter PERSONAL_CONFIG_ID=0,
+  parameter [7:0] INITIAL_FIRMWARE [MAX_CHAINS-1:0] = '{MAX_CHAINS{0}}
   )
   (
   input logic clk,
@@ -25,7 +26,7 @@ module  vectorScalarReduceUnit #(
  );
 
     //----------Internal Variables------------
-    reg [7:0] config_byte [MAX_CHAINS-1:0]='{MAX_CHAINS{0}};
+    reg [7:0] firmware [MAX_CHAINS-1:0] = INITIAL_FIRMWARE;
     wire [DATA_WIDTH-1:0] sum; 
     reg [DATA_WIDTH-1:0] zeros [N-1:0]='{N{0}};
 
@@ -41,11 +42,11 @@ module  vectorScalarReduceUnit #(
           // Assign outputs
           valid_out<=valid_in;
           // Return N bytes (pass through)
-          if (config_byte[chainId_in]==8'd0) begin
+          if (firmware[chainId_in]==8'd0) begin
               vector_out<=vector_in;
           end
           // Return 1 element (sum of all) zero padded
-          else if (config_byte[chainId_in]==8'd1) begin
+          else if (firmware[chainId_in]==8'd1) begin
             vector_out<=zeros;
             vector_out[0]<= sum;
           end
@@ -54,7 +55,7 @@ module  vectorScalarReduceUnit #(
         // If we are not tracing, we are reconfiguring the instrumentation
         else begin
           if (configId==PERSONAL_CONFIG_ID && configId<PERSONAL_CONFIG_ID+MAX_CHAINS)begin
-            config_byte[chainId_in]=configData;
+            firmware[chainId_in]=configData;
           end
         end
     end
