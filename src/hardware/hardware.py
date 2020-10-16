@@ -333,7 +333,9 @@ class rtlHw():
         top.mod.vectorScalarReduceUnit.addParameter([
             ['N',8],
             ['DATA_WIDTH',32],
-            ['MAX_CHAINS',4]])
+            ['MAX_CHAINS',4],
+            ['PERSONAL_CONFIG_ID',0],
+            ['INITIAL_FIRMWARE',"'{MAX_CHAINS{0}}"]])
         top.mod.vectorScalarReduceUnit.setAsConfigurable(configurable_parameters=4)
 
         # Instantiate modules
@@ -349,7 +351,9 @@ class rtlHw():
         top.inst.vsru.setParameters([
             ['N','N'],
             ['DATA_WIDTH','DATA_WIDTH'],
-            ['MAX_CHAINS','MAX_CHAINS']])
+            ['MAX_CHAINS','MAX_CHAINS'],
+            ['PERSONAL_CONFIG_ID','0'],
+            ['INITIAL_FIRMWARE',"'{MAX_CHAINS{0}}"]])
 
         # Connect modules
         top.inst.comm.connectInputs() 
