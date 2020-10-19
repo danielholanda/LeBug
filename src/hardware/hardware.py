@@ -443,6 +443,7 @@ class rtlHw():
             parameter DATA_WIDTH={self.DATA_WIDTH};
             parameter IB_DEPTH={self.IB_DEPTH};
             parameter MAX_CHAINS={self.MAX_CHAINS};
+            parameter TB_SIZE={self.TB_SIZE};
    
             // Declare inputs
             reg clk=1'b0;
@@ -464,7 +465,8 @@ class rtlHw():
               .N(N),
               .DATA_WIDTH(DATA_WIDTH),
               .IB_DEPTH(IB_DEPTH),
-              .MAX_CHAINS(MAX_CHAINS)
+              .MAX_CHAINS(MAX_CHAINS),
+              .TB_SIZE(TB_SIZE)
             )
             dbg(
               .clk(clk),
@@ -475,7 +477,7 @@ class rtlHw():
             );
 
             //Task to print all content to file
-            integer write_data,i,j;
+            integer write_data,write_data2,i,j;
             task toFile;
                 begin
                 {tb_store}
@@ -492,6 +494,14 @@ class rtlHw():
                 {tb_steps}
                 
                 $fclose(write_data);
+                write_data2 = $fopen("simulation_results_tb.txt");
+                for (i=0; i<dbg.tb.TB_SIZE; i=i+1) begin
+                    for (j=0; j<dbg.tb.N; j=j+1) begin
+                        $fwrite(write_data2, "%0d ",dbg.tb.mem.altsyncram_component.mem_data[i][j]);
+                    end
+                    $fwrite(write_data2, "\\n");
+                end
+                $fclose(write_data2);
                 $finish;
             end
         endmodule
@@ -544,11 +554,12 @@ class rtlHw():
         modelsim.exec('vlib work',working_directory='/rtl')
         modelsim.exec('vlog altera_mf.v testbench.sv',working_directory='/rtl')
         if gui:
-            print("Opening GUI\n\tMake sure to open socket using this command on your mac:\n\tsocat TCP-LISTEN:6000,reuseaddr,fork UNIX-CLIENT:\"$DISPLAY\"")
+            print("Opening GUI\n\tMake sure to open socket using this command on your mac:\n\tsocat TCP-LISTEN:6000,reuseaddr,fork UNIX-CLIENT:\\\"$DISPLAY\\\"")
             modelsim.exec('vsim -gui -do "run -all" testbench',working_directory='/rtl')
         else:
             modelsim.exec('vsim -c -do "run -all" testbench',working_directory='/rtl')
         modelsim.copy('modelsim:/rtl/simulation_results.txt','simulation_results.txt')
+        modelsim.copy('modelsim:/rtl/simulation_results_tb.txt','simulation_results_tb.txt')
         modelsim.exec('rm -r rtl')
         modelsim.stop()
 
@@ -568,6 +579,15 @@ class rtlHw():
                         elements=self.N
                     results[mod][var_name].append(l[count:count+elements])
                     count=count+elements
+
+        f = open("simulation_results_tb.txt", "r")
+        tb=[]
+        for line in f:
+            count=0
+            l= line.replace(" \n","").split(" ")
+            if len(l)>1:
+                tb.append(l)
+        results['tb']['mem_data']=tb
 
         # Go back to main directory
         os.chdir(current_folder)

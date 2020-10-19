@@ -145,16 +145,14 @@ def testTB():
 
     # Filter only the results we are interested in
     # Convert HW results to int (might contain "x"s and others)
-    print(hw_results.keys())
-    print(hw_results['tb']['vector_out'])
-    #hw_tb_results=np.array(toInt(hw_results['tb']))
-    #emu_vsru_results=np.array([v_out for v_out, eof_out, bof_out, chainId_out in emu_results['vsru']])
+    hw_tb_results=np.array(hw_results['tb']['mem_data'])
+    #emu_tb_results=emu_results['tb'][-1]
 
     # Check results
     #print("\n\nExpected:")
     #print(emu_vsru_results)
     print("\nHardware results:")
-    #print(hw_tb_results)
+    print(hw_tb_results)
 
     #assert np.allclose(hw_vsru_results,emu_vsru_results), "Failed to match emulator and hardware in TB test"
     print("Passed test #3")
