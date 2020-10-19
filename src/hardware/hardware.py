@@ -266,7 +266,7 @@ class rtlHw():
             self.mem={}                     # Array of mems that need the mif files initialized
             self.configurable_parameters=0  # Number of configurable parameters of this module
 
-    def rtlLogic(self,fw):
+    def rtlLogic(self):
         # Create TOP level module using custom RTL class
         top = self.rtlModule(self,"debugger")
         top.addInput([
@@ -333,10 +333,10 @@ class rtlHw():
         top.mod.vectorScalarReduceUnit.setAsConfigurable(configurable_parameters=4)
 
         # Convert FW to RTL
-        if fw is None:
+        if self.firmware is None:
             VSRU_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
         else:
-            VSRU_INITIAL_FIRMWARE=str([chain.op for chain in fw['vsru']]).replace("[", "{").replace("]", "}")
+            VSRU_INITIAL_FIRMWARE=str([chain.op for chain in self.firmware['vsru']]).replace("[", "'{").replace("]", "}")
 
         # Instantiate modules
         top.instantiateModule(top.mod.uart,"comm")
@@ -479,7 +479,7 @@ class rtlHw():
         self.tb_var_names=tb_var_names
         return testbench
 
-    def generateRtl(self,fw=None):
+    def generateRtl(self):
 
         # Create subfolder where all files will be generated
         rtl_folder=os.getcwd()+"/rtl"
@@ -491,7 +491,7 @@ class rtlHw():
 
         # Writes debugProcessor to file
         f = open(rtl_folder+"/debugProcessor.sv", "w")
-        for l in self.rtlLogic(fw):
+        for l in self.rtlLogic():
             f.write(l+"\n")
         f.close()
 
@@ -501,9 +501,9 @@ class rtlHw():
             f.write(l+"\n")
         f.close()
 
-    def config(self,fw=None):
+    def config(self,fw):
         #Configure processor
-        self.generateRtl(fw)
+        self.firmware=fw
 
     # This will run the testbench of the generated hardware and return its results
     def run(self,steps=50,gui=False,log=True):
@@ -573,4 +573,5 @@ class rtlHw():
         self.top=None # used to store all rtl info later on
         self.tb_var_names = None
         self.compiler = compiler(M,N,MAX_CHAINS)
+        self.firmware = None
         
