@@ -4,6 +4,8 @@ from misc.misc import *
 class compiler():
     # ISA
     def begin_chain(self):
+        assert self.chains_created<self.MAX_CHAINS, "Firmware has more chains than the hardware can handle"
+        self.chains_created+=1
         no_cond={'last':False,'notlast':False,'first':False,'notfirst':False}
         self.fu    = struct(filter=0,addr=0)
         self.mvru  = struct(axis=0)
@@ -65,10 +67,18 @@ class compiler():
         self.firmware['vvalu'].append(copy(self.vvalu))
         self.firmware['dp'].append(copy(self.dp))
     def compile(self):
+        # Make sure we are returning a firmware with MAX_CHAINS chains
+        self.firmware['valid_chains'] = self.chains_created
+        while self.chains_created!=self.MAX_CHAINS:
+            self.begin_chain()
+            self.end_chain()
+        # Return final firmware    
         return self.firmware
 
     def __init__(self,N,M,MAX_CHAINS):
         self.N = N
         self.M = M
+        self.MAX_CHAINS=MAX_CHAINS
         self.fu, self.mvru, self.vsru, self.vvalu, self.dp = [],[],[],[],[]
-        self.firmware ={"fu":[],"mvru":[],"vsru":[],"vvalu":[],"dp":[]}
+        self.firmware ={"fu":[],"mvru":[],"vsru":[],"vvalu":[],"dp":[],"valid_chains":0}
+        self.chains_created = 0

@@ -315,8 +315,8 @@ class emulatedHw():
         self.dp.config=[struct(commit=0,size=0,cond=cond)]
         self.ib.config=struct(num_chains=1)
         if fw is not None:
-            self.ib.config=struct(num_chains=len(fw['fu'])+1)
-            for idx in range(len(fw['fu'])):
+            self.ib.config=struct(num_chains=fw['valid_chains']+1)
+            for idx in range(fw['valid_chains']):
                 self.fu.config.append(fw['fu'][idx])
                 self.mvru.config.append(fw['mvru'][idx])
                 self.vsru.config.append(fw['vsru'][idx])

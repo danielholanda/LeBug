@@ -337,8 +337,6 @@ class rtlHw():
             VSRU_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
         else:
             VSRU_INITIAL_FIRMWARE=str([chain.op for chain in fw['vsru']]).replace("[", "{").replace("]", "}")
-            print(VSRU_INITIAL_FIRMWARE)
-            exit()
 
         # Instantiate modules
         top.instantiateModule(top.mod.uart,"comm")
