@@ -10,7 +10,7 @@ module  vectorScalarReduceUnit #(
   parameter DATA_WIDTH=32,
   parameter MAX_CHAINS=4,
   parameter PERSONAL_CONFIG_ID=0,
-  parameter [7:0] INITIAL_FIRMWARE [MAX_CHAINS-1:0] = '{MAX_CHAINS{0}}
+  parameter [7:0] INITIAL_FIRMWARE [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
   )
   (
   input logic clk,
@@ -26,7 +26,7 @@ module  vectorScalarReduceUnit #(
  );
 
     //----------Internal Variables------------
-    reg [7:0] firmware [MAX_CHAINS-1:0] = INITIAL_FIRMWARE;
+    reg [7:0] firmware [0:MAX_CHAINS-1] = INITIAL_FIRMWARE;
     wire [DATA_WIDTH-1:0] sum; 
     reg [DATA_WIDTH-1:0] zeros [N-1:0]='{N{0}};
 

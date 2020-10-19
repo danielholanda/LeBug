@@ -95,6 +95,6 @@
     assign empty = (mem_address_a-mem_address_b==0) | (mem_address_a==0 & mem_address_b==IB_DEPTH-1);
     assign full = (mem_address_a==mem_address_b);
 
-    assign chainId_out=1'b1;
+    assign chainId_out=1'b0;
  
  endmodule 

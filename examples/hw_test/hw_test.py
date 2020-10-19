@@ -60,7 +60,7 @@ def testNakedRtl():
     print("Passed test #1")
 
 
-testNakedRtl()
+#testNakedRtl()
 
 def testVSRU():
 
@@ -85,13 +85,13 @@ def testVSRU():
     emu_proc.push([input_vector2,True])
 
     # Configure firmware - Both HW and Emulator work with the same firmware
-    fw = firm.passThrough(hw_proc.compiler)
+    fw = firm.sumAll(hw_proc.compiler)
     emu_proc.config(fw)
     hw_proc.config(fw)
 
     # Run HW simulation and emulation
     steps=8
-    hw_results = hw_proc.run(steps=steps,gui=False,log=False)
+    hw_results = hw_proc.run(steps=steps,gui=False,log=True)
     emu_results = emu_proc.run(steps=steps)
 
     # Filter only the results we are interested in
@@ -106,12 +106,13 @@ def testVSRU():
     print(hw_vsru_results)
 
 
-    assert np.allclose(hw_vsru_results,emu_vsru_results), "Failed to match emulator and hardware in IB test"
+    assert np.allclose(hw_vsru_results,emu_vsru_results), "Failed to match emulator and hardware in VSRU test"
     print("Passed test #2")
 
     print("Continue with UART support")
 
 testVSRU()
+print("NEED TO ONLY ALLOW HARWARE TO GO THROUGH THE VALID FIRMWARE CHAINS")
 
 
 
