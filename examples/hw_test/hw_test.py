@@ -109,12 +109,57 @@ def testVSRU():
     assert np.allclose(hw_vsru_results,emu_vsru_results), "Failed to match emulator and hardware in VSRU test"
     print("Passed test #2")
 
-    print("Continue with UART support")
+#testVSRU()
 
-testVSRU()
-print("NEED TO ONLY ALLOW HARWARE TO GO THROUGH THE VALID FIRMWARE CHAINS")
+def testTB():
 
+    # Overwrite YAML file to define how components are attached to eachother
+    BUILDING_BLOCKS=['InputBuffer', 'VectorScalarReduce','TraceBuffer']
 
+    # Instantiate HW and Emulator Processors
+    DATA_WIDTH=32
+    MAX_CHAINS=4
+    hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS)
+    emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
+
+    # Create common input values
+    np.random.seed(0)
+    input_vector1=np.random.randint(100, size=N)
+    input_vector2=np.random.randint(100, size=N)
+
+    # Push values to both procs
+    hw_proc.push([input_vector1,False])
+    hw_proc.push([input_vector2,True])
+    emu_proc.push([input_vector1,False])
+    emu_proc.push([input_vector2,True])
+
+    # Configure firmware - Both HW and Emulator work with the same firmware
+    fw = firm.raw(hw_proc.compiler)
+    #emu_proc.config(fw)
+    hw_proc.config(fw)
+
+    # Run HW simulation and emulation
+    steps=20
+    hw_results = hw_proc.run(steps=steps,gui=False,log=True)
+    #emu_results = emu_proc.run(steps=steps)
+
+    # Filter only the results we are interested in
+    # Convert HW results to int (might contain "x"s and others)
+    print(hw_results.keys())
+    print(hw_results['tb']['vector_out'])
+    #hw_tb_results=np.array(toInt(hw_results['tb']))
+    #emu_vsru_results=np.array([v_out for v_out, eof_out, bof_out, chainId_out in emu_results['vsru']])
+
+    # Check results
+    #print("\n\nExpected:")
+    #print(emu_vsru_results)
+    print("\nHardware results:")
+    #print(hw_tb_results)
+
+    #assert np.allclose(hw_vsru_results,emu_vsru_results), "Failed to match emulator and hardware in TB test"
+    print("Passed test #3")
+
+testTB()
 
 
 

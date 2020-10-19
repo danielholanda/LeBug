@@ -61,10 +61,11 @@ class rtlHw():
                     config_signals_found=True
             if not clock_signal_found:
                 signals_to_connect.append(struct(name='clk',type='logic',bits=1))
-            if not config_signals_found and top_module_or_instance!=None:
+            if not config_signals_found and top_module_or_instance != None:
                 signals_to_connect.append(struct(name='tracing_comm',type='logic',bits=1,elements=1))
-                signals_to_connect.append(struct(name='configData_comm',type='logic',bits=8,elements=1))
-                signals_to_connect.append(struct(name='configId_comm',type='logic',bits=8,elements=1))
+                if self.module_class.configurable_parameters!=0:
+                    signals_to_connect.append(struct(name='configData_comm',type='logic',bits=8,elements=1))
+                    signals_to_connect.append(struct(name='configId_comm',type='logic',bits=8,elements=1))
 
             # Check if number of signals is the same
             assert len(signals_to_connect)==len(self.module_input), "Not the same number of connected signals"
@@ -252,7 +253,7 @@ class rtlHw():
         # Initializes the RTL file class
         def __init__(self,parent,name):
             self.name=name
-            self.parent = parent            # name of Module
+            self.parent = parent            # parent Module
             self.includes=[]                # Stores include files
             self.wires=[]                   # Stores wires
             self.regs=[]                    # Stores regs
@@ -275,16 +276,18 @@ class rtlHw():
             ['eof_in','logic',1],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.addOutput([
-            ['valid_out','logic',1],
+            #['valid_out','logic',1],
             ['vector_out','logic','DATA_WIDTH','N']])
         top.addParameter([
             ['N',8],
             ['DATA_WIDTH',32],
             ['IB_DEPTH',4],
-            ['MAX_CHAINS',4]])
+            ['MAX_CHAINS',4],
+            ['TB_SIZE',64]])
 
         # Adds includes to the beginning of the file
         top.include("input_buffer.sv")
+        top.include("trace_buffer.sv")
         top.include("vector_scalar_reduce_unit.sv")
         top.include("uart.sv")
 
@@ -332,6 +335,21 @@ class rtlHw():
             ['INITIAL_FIRMWARE',"'{MAX_CHAINS{0}}"]])
         top.mod.vectorScalarReduceUnit.setAsConfigurable(configurable_parameters=4)
 
+        # TraceBuffer
+        top.includeModule("traceBuffer")
+        top.mod.traceBuffer.addInput([
+            ['clk','logic',1],
+            ['valid_in','logic',1],
+            ['vector_in','logic','DATA_WIDTH','N'],
+            ['tracing','logic',1]])
+        top.mod.traceBuffer.addOutput([
+            ['vector_out','logic','DATA_WIDTH','N']])
+        top.mod.traceBuffer.addParameter([
+            ['N',8],
+            ['DATA_WIDTH',32],
+            ['TB_SIZE',64]])
+        top.mod.traceBuffer.addMemory("traceBuffer",self.TB_SIZE,self.DATA_WIDTH*self.N)
+
         # Convert FW to RTL
         if self.firmware is None:
             VSRU_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
@@ -355,15 +373,19 @@ class rtlHw():
             ['PERSONAL_CONFIG_ID','0'],
             ['INITIAL_FIRMWARE',VSRU_INITIAL_FIRMWARE]])
 
+        top.instantiateModule(top.mod.traceBuffer,"tb")
+        top.inst.tb.setParameters([
+            ['N','N'],
+            ['DATA_WIDTH','DATA_WIDTH'],
+            ['TB_SIZE','TB_SIZE']])
+
         # Connect modules
         top.inst.comm.connectInputs() 
         top.inst.ib.connectInputs(top) 
         top.inst.vsru.connectInputs(top.inst.ib)
-
-        top.assignOutputs(top.inst.vsru)
-
+        top.inst.tb.connectInputs(top.inst.vsru)
+        top.assignOutputs(top.inst.tb)
         self.top=top
-
         return top.dump()
 
     def testbench(self):
@@ -449,7 +471,6 @@ class rtlHw():
               .vector_in(vector),
               .enqueue(valid),
               .eof_in(eof),
-              .valid_out(valid_out),
               .vector_out(vector_out)
             );
 
@@ -567,6 +588,7 @@ class rtlHw():
         self.IB_DEPTH=IB_DEPTH
         self.DATA_WIDTH=DATA_WIDTH
         self.MAX_CHAINS=MAX_CHAINS
+        self.TB_SIZE=TB_SIZE
         self.hwFolder = os.path.dirname(os.path.realpath(__file__))
         self.testbench_inputs=[]    # Stores inputs to testbench
         self.steps=0 # Number of steps for testbench
