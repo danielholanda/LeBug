@@ -24,7 +24,7 @@ def testNakedRtl():
     DATA_WIDTH=32
     MAX_CHAINS=4
     hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS)
-    emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,BUILDING_BLOCKS)
+    emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
     # Create common input values
     np.random.seed(0)
@@ -71,7 +71,7 @@ def testVSRU():
     DATA_WIDTH=32
     MAX_CHAINS=4
     hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS)
-    emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,BUILDING_BLOCKS)
+    emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
     # Create common input values
     np.random.seed(0)
@@ -85,7 +85,7 @@ def testVSRU():
     emu_proc.push([input_vector2,True])
 
     # Configure firmware (missing HW firmware)
-    fw = firm.passThrough(emu_proc.compiler)
+    fw = firm.passThrough(hw_proc.compiler)
     emu_proc.config(fw)
 
     # Run HW simulation and emulation

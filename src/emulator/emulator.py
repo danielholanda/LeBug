@@ -1,20 +1,14 @@
 import logging as log
 import sys, math
 import numpy as np
-from copy import deepcopy as copy
+from firmware.compiler import compiler
+from misc.misc import *
 
 # Setting Debug level (can be debug, info, warning, error and critical)
 log.basicConfig(stream=sys.stderr, level=log.INFO)
 
 ''' Emulation settings '''
 DEBUG=True
-
-''' Useful functions '''
-class struct:
-    def __init__(self, **kwds):
-        self.__dict__.update(kwds)
-    def __repr__(self):
-        return str(self.__dict__)
 
 class emulatedHw():
 
@@ -332,74 +326,7 @@ class emulatedHw():
             self.step()
         return self.log
 
-    # Hardware configurations (that can be done by VLIW instruction)
-    class compiler():
-        # ISA
-        def begin_chain(self):
-            self.fu, self.mvru, self.vsru, self.vvalu, self.dp = copy(self.pass_through)
-        def vv_filter(self,addr):
-            self.fu.filter=1
-            self.fu.addr=addr
-        def m_reduce(self,axis='N'):
-            if axis=='N':
-                self.mvru.axis=1
-            elif axis=='M':
-                self.mvru.axis=2
-            else:
-                assert False, "Unknown axis for instruction m_reduce"
-        def v_reduce(self):
-            self.vsru.op=1
-        def vv_add(self,addr,condition=None):
-            self.vvalu.op=1
-            self.vvalu.addr=addr
-            if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
-                self.vvalu.cond[condition]=True
-            else:
-                assert False, "Condition not understood"
-        def vv_mul(self,addr,condition=None):
-            self.vvalu.op=2
-            self.vvalu.addr=addr
-            if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
-                self.vvalu.cond[condition]=True
-            else:
-                assert False, "Condition not understood"
-        def vv_sub(self,addr,condition=None):
-            self.vvalu.op=3
-            self.vvalu.addr=addr
-            if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
-                self.vvalu.cond[condition]=True
-            else:
-                assert False, "Condition not understood"
-        def v_cache(self,cache_addr):
-            self.vvalu.cache=1
-            self.vvalu.cache_addr=cache_addr
-        def v_commit(self,size=None,condition=None):
-            if size is None:
-                size = self.N
-            self.dp.commit=1
-            if size==self.N or size==self.M or size==1:
-                self.dp.size=size
-            else:
-                assert False, "Cannot commit "+str(size)+" elements"
-            if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
-                self.dp.cond[condition]=True
-            else:
-                assert False, "Condition not understood"
-        def end_chain(self):
-            self.firmware.append(copy([self.fu,self.mvru,self.vsru,self.vvalu,self.dp]))
-        def compile(self):
-            return self.firmware
-
-        def __init__(self,N,M):
-            self.N = N
-            self.M = M
-            self.firmware = []
-            no_cond={'last':False,'notlast':False,'first':False,'notfirst':False}
-            self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0),struct(op=0,addr=0,cond=copy(no_cond),cache=0,cache_addr=0),struct(commit=0,size=0,cond=copy(no_cond))]
-            self.fu, self.mvru, self.vsru, self.vvalu, self.dp = self.pass_through[:]
-
-
-    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,BUILDING_BLOCKS):
+    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS):
         ''' Verifying parameters '''
         assert math.log(N, 2).is_integer(), "N must be a power of 2" 
         assert math.log(M, 2).is_integer(), "N must be a power of 2" 
@@ -407,6 +334,7 @@ class emulatedHw():
 
         # hardware building blocks   
         self.BUILDING_BLOCKS=BUILDING_BLOCKS
+        self.MAX_CHAINS=MAX_CHAINS
         self.ib   = self.InputBuffer(N,IB_DEPTH)
         self.fu   = self.FilterUnit(N,M,FUVRF_SIZE)
         self.mvru = self.MatrixVectorReduce(N,M)
@@ -417,7 +345,7 @@ class emulatedHw():
         self.config()
 
         # Firmware compiler
-        self.compiler = self.compiler(M,N)
+        self.compiler = compiler(M,N,MAX_CHAINS)
 
         # used to simulate a trace buffer to match results with simulation
         self.log={k: [] for k in ['ib','fu','mvru','vsru','vvalu','dp','tb']}

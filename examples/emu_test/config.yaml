@@ -9,6 +9,7 @@ IB_DEPTH: 8     # Input buffer depth
 FUVRF_SIZE: 4   # Size of FUVRF in M*elements
 VVVRF_SIZE: 8   # Size of VVVRF in N*elements
 TB_SIZE: 64     # Size of Trace Buffer in N*elements
+MAX_CHAINS: 8   # Maximum number of chains of the firmware
 
 # Define how instruments are connected
 BUILDING_BLOCKS: 
