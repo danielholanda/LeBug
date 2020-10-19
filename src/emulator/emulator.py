@@ -304,21 +304,28 @@ class emulatedHw():
     def push(self,pushed_vals):
         self.ib.push(pushed_vals)
 
-    def config(self,fw=[]):
+    def config(self,fw=None):
+
         #Configure processor
+        print("fixme - For some reason I need to append a chain of zeros here")
         cond={'last':False,'notlast':False,'first':False,'notfirst':False}
-        self.ib.config=struct(num_chains=len(fw)+1)
         self.fu.config=[struct(filter=0,addr=0)]
         self.mvru.config=[struct(axis=0)]
         self.vsru.config=[struct(op=0)]
         self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0,cond=cond)]
         self.dp.config=[struct(commit=0,size=0,cond=cond)]
-        for idx, chain_instrs in enumerate(fw):
-            self.fu.config.append(chain_instrs[0])
-            self.mvru.config.append(chain_instrs[1])
-            self.vsru.config.append(chain_instrs[2])
-            self.vvalu.config.append(chain_instrs[3])
-            self.dp.config.append(chain_instrs[4])
+        self.ib.config=struct(num_chains=1)
+        if fw is not None:
+            fu_config,mvru_config,vsru_config,vvalu_config,dp_config = fw
+            self.ib.config=struct(num_chains=len(fu_config)+1)
+            for idx in range(len(fu_config)):
+                self.fu.config.append(fu_config[idx])
+                self.mvru.config.append(mvru_config[idx])
+                self.vsru.config.append(vsru_config[idx])
+                self.vvalu.config.append(vvalu_config[idx])
+                self.dp.config.append(dp_config[idx])
+
+        
 
     def run(self,steps=50):
         # Keep stepping through the circuit as long as we have instructions to execute

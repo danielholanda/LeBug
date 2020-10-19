@@ -4,7 +4,12 @@ from misc.misc import *
 class compiler():
     # ISA
     def begin_chain(self):
-        self.fu, self.mvru, self.vsru, self.vvalu, self.dp = copy(self.pass_through)
+        no_cond={'last':False,'notlast':False,'first':False,'notfirst':False}
+        self.fu    = struct(filter=0,addr=0)
+        self.mvru  = struct(axis=0)
+        self.vsru  = struct(op=0)
+        self.vvalu = struct(op=0,addr=0,cond=copy(no_cond),cache=0,cache_addr=0)
+        self.dp    = struct(commit=0,size=0,cond=copy(no_cond))
     def vv_filter(self,addr):
         self.fu.filter=1
         self.fu.addr=addr
@@ -54,14 +59,16 @@ class compiler():
         else:
             assert False, "Condition not understood"
     def end_chain(self):
-        self.firmware.append(copy([self.fu,self.mvru,self.vsru,self.vvalu,self.dp]))
+        self.fu_fw.append(copy(self.fu))
+        self.mvru_fw.append(copy(self.mvru))
+        self.vsru_fw.append(copy(self.vsru))
+        self.vvalu_fw.append(copy(self.vvalu))
+        self.dp_fw.append(copy(self.dp))
     def compile(self):
-        return self.firmware
+        return [self.fu_fw,self.mvru_fw,self.vsru_fw,self.vvalu_fw,self.dp_fw]
 
     def __init__(self,N,M,MAX_CHAINS):
         self.N = N
         self.M = M
-        self.firmware = []
-        no_cond={'last':False,'notlast':False,'first':False,'notfirst':False}
-        self.pass_through = [struct(filter=0,addr=0),struct(axis=0),struct(op=0),struct(op=0,addr=0,cond=copy(no_cond),cache=0,cache_addr=0),struct(commit=0,size=0,cond=copy(no_cond))]
-        self.fu, self.mvru, self.vsru, self.vvalu, self.dp = self.pass_through[:]
+        self.fu, self.mvru, self.vsru, self.vvalu, self.dp = [],[],[],[],[]
+        self.fu_fw, self.mvru_fw, self.vsru_fw, self.vvalu_fw, self.dp_fw = [],[],[],[],[]

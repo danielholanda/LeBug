@@ -266,7 +266,7 @@ class rtlHw():
             self.mem={}                     # Array of mems that need the mif files initialized
             self.configurable_parameters=0  # Number of configurable parameters of this module
 
-    def rtlLogic(self):
+    def rtlLogic(self,fw):
         # Create TOP level module using custom RTL class
         top = self.rtlModule(self,"debugger")
         top.addInput([
@@ -332,6 +332,13 @@ class rtlHw():
             ['INITIAL_FIRMWARE',"'{MAX_CHAINS{0}}"]])
         top.mod.vectorScalarReduceUnit.setAsConfigurable(configurable_parameters=4)
 
+        # Convert FW to RTL
+        if fw is None:
+            VSRU_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
+        else:
+            print("continue here")
+            VSRU_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
+
         # Instantiate modules
         top.instantiateModule(top.mod.uart,"comm")
 
@@ -347,7 +354,7 @@ class rtlHw():
             ['DATA_WIDTH','DATA_WIDTH'],
             ['MAX_CHAINS','MAX_CHAINS'],
             ['PERSONAL_CONFIG_ID','0'],
-            ['INITIAL_FIRMWARE',"'{MAX_CHAINS{0}}"]])
+            ['INITIAL_FIRMWARE',VSRU_INITIAL_FIRMWARE]])
 
         # Connect modules
         top.inst.comm.connectInputs() 
@@ -473,7 +480,7 @@ class rtlHw():
         self.tb_var_names=tb_var_names
         return testbench
 
-    def generateRtl(self):
+    def generateRtl(self,fw=None):
 
         # Create subfolder where all files will be generated
         rtl_folder=os.getcwd()+"/rtl"
@@ -485,7 +492,7 @@ class rtlHw():
 
         # Writes debugProcessor to file
         f = open(rtl_folder+"/debugProcessor.sv", "w")
-        for l in self.rtlLogic():
+        for l in self.rtlLogic(fw):
             f.write(l+"\n")
         f.close()
 
@@ -494,6 +501,10 @@ class rtlHw():
         for l in self.testbench():
             f.write(l+"\n")
         f.close()
+
+    def config(self,fw=None):
+        #Configure processor
+        self.generateRtl(fw)
 
     # This will run the testbench of the generated hardware and return its results
     def run(self,steps=50,gui=False,log=True):

@@ -17,7 +17,6 @@ def toInt(lst):
     return [list(map(int, l)) for l in lst]
 
 def testSimpleDistribution():
-    
     # Instantiate processor
     proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 

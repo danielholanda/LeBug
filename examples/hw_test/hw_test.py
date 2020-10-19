@@ -84,9 +84,10 @@ def testVSRU():
     emu_proc.push([input_vector1,False])
     emu_proc.push([input_vector2,True])
 
-    # Configure firmware (missing HW firmware)
+    # Configure firmware - Both HW and Emulator work with the same firmware
     fw = firm.passThrough(hw_proc.compiler)
     emu_proc.config(fw)
+    hw_proc.config(fw)
 
     # Run HW simulation and emulation
     steps=8
