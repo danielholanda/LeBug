@@ -337,6 +337,7 @@ class rtlHw():
             VSRU_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
         else:
             print("continue here")
+            print(str(fw['vsru']))
             VSRU_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
 
         # Instantiate modules

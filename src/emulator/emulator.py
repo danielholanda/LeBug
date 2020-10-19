@@ -305,9 +305,8 @@ class emulatedHw():
         self.ib.push(pushed_vals)
 
     def config(self,fw=None):
-
-        #Configure processor
-        print("fixme - For some reason I need to append a chain of zeros here")
+        # Configure processor
+        # Fixme - For some reason I need to append a chain of zeros here
         cond={'last':False,'notlast':False,'first':False,'notfirst':False}
         self.fu.config=[struct(filter=0,addr=0)]
         self.mvru.config=[struct(axis=0)]
@@ -316,14 +315,13 @@ class emulatedHw():
         self.dp.config=[struct(commit=0,size=0,cond=cond)]
         self.ib.config=struct(num_chains=1)
         if fw is not None:
-            fu_config,mvru_config,vsru_config,vvalu_config,dp_config = fw
-            self.ib.config=struct(num_chains=len(fu_config)+1)
-            for idx in range(len(fu_config)):
-                self.fu.config.append(fu_config[idx])
-                self.mvru.config.append(mvru_config[idx])
-                self.vsru.config.append(vsru_config[idx])
-                self.vvalu.config.append(vvalu_config[idx])
-                self.dp.config.append(dp_config[idx])
+            self.ib.config=struct(num_chains=len(fw['fu'])+1)
+            for idx in range(len(fw['fu'])):
+                self.fu.config.append(fw['fu'][idx])
+                self.mvru.config.append(fw['mvru'][idx])
+                self.vsru.config.append(fw['vsru'][idx])
+                self.vvalu.config.append(fw['vvalu'][idx])
+                self.dp.config.append(fw['dp'][idx])
 
         
 

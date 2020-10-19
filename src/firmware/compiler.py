@@ -59,16 +59,16 @@ class compiler():
         else:
             assert False, "Condition not understood"
     def end_chain(self):
-        self.fu_fw.append(copy(self.fu))
-        self.mvru_fw.append(copy(self.mvru))
-        self.vsru_fw.append(copy(self.vsru))
-        self.vvalu_fw.append(copy(self.vvalu))
-        self.dp_fw.append(copy(self.dp))
+        self.firmware['fu'].append(copy(self.fu))
+        self.firmware['mvru'].append(copy(self.mvru))
+        self.firmware['vsru'].append(copy(self.vsru))
+        self.firmware['vvalu'].append(copy(self.vvalu))
+        self.firmware['dp'].append(copy(self.dp))
     def compile(self):
-        return [self.fu_fw,self.mvru_fw,self.vsru_fw,self.vvalu_fw,self.dp_fw]
+        return self.firmware
 
     def __init__(self,N,M,MAX_CHAINS):
         self.N = N
         self.M = M
         self.fu, self.mvru, self.vsru, self.vvalu, self.dp = [],[],[],[],[]
-        self.fu_fw, self.mvru_fw, self.vsru_fw, self.vvalu_fw, self.dp_fw = [],[],[],[],[]
+        self.firmware ={"fu":[],"mvru":[],"vsru":[],"vvalu":[],"dp":[]}
