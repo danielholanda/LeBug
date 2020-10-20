@@ -77,6 +77,10 @@
         //Logic for dequeuing
         if (dequeue==1'b1 & empty==1'b0) begin
             mem_address_b <= mem_address_b<IB_DEPTH-1 ? mem_address_b+1'b1 : 0;
+            valid_out <= 1'b1;
+        end
+        else begin
+            valid_out <= 1'b0;
         end
 
     end
