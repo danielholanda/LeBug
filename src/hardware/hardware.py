@@ -280,6 +280,7 @@ class rtlHw():
             ['vector_out','logic','DATA_WIDTH','N']])
         top.addParameter([
             ['N',8],
+            ['M',4],
             ['DATA_WIDTH',32],
             ['IB_DEPTH',4],
             ['MAX_CHAINS',4],
@@ -288,6 +289,7 @@ class rtlHw():
         # Adds includes to the beginning of the file
         top.include("input_buffer.sv")
         top.include("trace_buffer.sv")
+        top.include("data_packer.sv")
         top.include("vector_scalar_reduce_unit.sv")
         top.include("uart.sv")
 
@@ -326,6 +328,8 @@ class rtlHw():
             ['vector_in','logic','DATA_WIDTH','N']])
         top.mod.vectorScalarReduceUnit.addOutput([
             ['valid_out','logic',1],
+            ['eof_out','logic',1],
+            ['chainId_out','logic',1],
             ['vector_out','logic','DATA_WIDTH','N']])
         top.mod.vectorScalarReduceUnit.addParameter([
             ['N',8],
@@ -334,6 +338,26 @@ class rtlHw():
             ['PERSONAL_CONFIG_ID',0],
             ['INITIAL_FIRMWARE',"'{MAX_CHAINS{0}}"]])
         top.mod.vectorScalarReduceUnit.setAsConfigurable(configurable_parameters=4)
+
+        # Data Packer
+        top.includeModule("dataPacker")
+        top.mod.dataPacker.addInput([
+            ['clk','logic',1],
+            ['valid_in','logic',1],
+            ['eof_in','logic',1],
+            ['chainId_in','logic',1],
+            ['vector_in','logic','DATA_WIDTH','N']])
+        top.mod.dataPacker.addOutput([
+            ['valid_out','logic',1],
+            ['vector_out','logic','DATA_WIDTH','N']])
+        top.mod.dataPacker.addParameter([
+            ['N',8],
+            ['M',4],
+            ['DATA_WIDTH',32],
+            ['MAX_CHAINS',4],
+            ['PERSONAL_CONFIG_ID',0],
+            ['INITIAL_FIRMWARE',"'{MAX_CHAINS{0}}"]])
+        top.mod.dataPacker.setAsConfigurable(configurable_parameters=1)
 
         # TraceBuffer
         top.includeModule("traceBuffer")
@@ -355,6 +379,7 @@ class rtlHw():
             VSRU_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
         else:
             VSRU_INITIAL_FIRMWARE=str([chain.op for chain in self.firmware['vsru']]).replace("[", "'{").replace("]", "}")
+        DP_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
 
         # Instantiate modules
         top.instantiateModule(top.mod.uart,"comm")
@@ -373,6 +398,15 @@ class rtlHw():
             ['PERSONAL_CONFIG_ID','0'],
             ['INITIAL_FIRMWARE',VSRU_INITIAL_FIRMWARE]])
 
+        top.instantiateModule(top.mod.dataPacker,"dp")
+        top.inst.dp.setParameters([
+            ['N','N'],
+            ['M','M'],
+            ['DATA_WIDTH','DATA_WIDTH'],
+            ['MAX_CHAINS','MAX_CHAINS'],
+            ['PERSONAL_CONFIG_ID','0'],
+            ['INITIAL_FIRMWARE',DP_INITIAL_FIRMWARE]])
+
         top.instantiateModule(top.mod.traceBuffer,"tb")
         top.inst.tb.setParameters([
             ['N','N'],
@@ -383,7 +417,8 @@ class rtlHw():
         top.inst.comm.connectInputs() 
         top.inst.ib.connectInputs(top) 
         top.inst.vsru.connectInputs(top.inst.ib)
-        top.inst.tb.connectInputs(top.inst.vsru)
+        top.inst.dp.connectInputs(top.inst.vsru)
+        top.inst.tb.connectInputs(top.inst.dp)
         top.assignOutputs(top.inst.tb)
         self.top=top
         return top.dump()

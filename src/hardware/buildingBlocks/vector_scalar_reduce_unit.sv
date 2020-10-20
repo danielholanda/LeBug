@@ -22,7 +22,9 @@ module  vectorScalarReduceUnit #(
   input logic [7:0] configData,
   input logic [DATA_WIDTH-1:0] vector_in [N-1:0],
   output reg valid_out,
-  output reg [DATA_WIDTH-1:0] vector_out [N-1:0]
+  output reg [DATA_WIDTH-1:0] vector_out [N-1:0],
+  output reg eof_out,
+  output reg chainId_out
  );
 
     //----------Internal Variables------------
@@ -58,6 +60,9 @@ module  vectorScalarReduceUnit #(
             firmware[chainId_in]=configData;
           end
         end
+
+        eof_out<=eof_in;
+        chainId_out<=chainId_in;
     end
 
  

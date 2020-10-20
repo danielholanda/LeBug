@@ -83,10 +83,10 @@
             valid_out <= 1'b0;
         end
 
+        // 1-bit wide EOF signal is implemented as a bit shifter
+        // FIXME - This is wrong -> We also need to create a memory/buffer for this
+        eof_out <= eof_in;
     end
-
-    // 1-bit wide EOF signal is implemented as a bit shifter
-    assign eof_out = eof_in;
 
     // Directly assign module inputs to port A of memory
     assign mem_in_a = { >> { vector_in }};

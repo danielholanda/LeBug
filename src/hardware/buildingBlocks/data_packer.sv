@@ -3,11 +3,12 @@
  // Function    : Packs data into N values by receiving blocks of N, M or 1 values
  //-----------------------------------------------------
 
- module  DataPacker #(
+ module  dataPacker #(
   parameter N=8,
   parameter M=2,
   parameter DATA_WIDTH=32,
   parameter MAX_CHAINS=4,
+  parameter PERSONAL_CONFIG_ID=0,
   parameter [7:0] INITIAL_FIRMWARE [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
   )
   (
@@ -67,9 +68,9 @@
 
     always @(*) begin
       case (firmware [chainId_in])
-        8'd0:    vector_length = 1;
+        8'd0:    vector_length = N;
         8'd1:    vector_length = M;
-        default: vector_length = N;
+        default: vector_length = 1;
       endcase
       total_length = packed_counter+vector_length;
     end
