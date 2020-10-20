@@ -30,13 +30,14 @@
     reg [7:0] firmware [0:MAX_CHAINS-1] = INITIAL_FIRMWARE;
     reg [31:0] total_length;
     reg [31:0] vector_length;
+    reg commit;
 
     //-------------Code Start-----------------
 
     always @(posedge clk) begin
       //Packing is not perfect, otherwise it would be too expensive
       // If we overflow, we just submit things as they are (This may happen if we are mixing precisions)
-      if (valid_in==1'b1 && tracing==1'b1) begin
+      if (valid_in==1'b1 && tracing==1'b1 && commit==1'b1) begin
         $display("vector_length %d",vector_length);
         $display("total_length %d",total_length);
         $display("packed_counter %d",packed_counter);
@@ -71,9 +72,10 @@
 
     always @(*) begin
       case (firmware [chainId_in])
-        8'd0:    vector_length = N;
-        8'd1:    vector_length = M;
-        default: vector_length = 1;
+        8'd0:    begin vector_length = N; commit=1; end
+        8'd1:    begin vector_length = M; commit=1; end
+        8'd2:    begin vector_length = 1; commit=1; end
+        default: begin vector_length = 0; commit=0; end
       endcase
     end
 

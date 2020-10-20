@@ -377,10 +377,23 @@ class rtlHw():
         # Convert FW to RTL
         if self.firmware is None:
             VSRU_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
+            DP_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
         else:
             VSRU_INITIAL_FIRMWARE=str([chain.op for chain in self.firmware['vsru']]).replace("[", "'{").replace("]", "}")
-        print(self.firmware['dp'])
-        DP_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
+            print(self.firmware['dp'])
+            def encodeDpFirmware(commit,size):
+                print("CONTINUE HERE TO PROPERLY INITIALIZE THE FIRMWARE!")
+                if commit==1:
+                    return 3
+                elif size==1:
+                    return 2
+                elif size==M:
+                    return 1
+                elif size==N:
+                    return 0
+                else:
+                    assert True
+            DP_INITIAL_FIRMWARE = str([encodeDpFirmware(chain.commit,chain.size) for chain in self.firmware['dp']]).replace("[", "'{").replace("]", "}")
 
         # Instantiate modules
         top.instantiateModule(top.mod.uart,"comm")
