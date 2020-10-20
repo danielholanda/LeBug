@@ -294,7 +294,7 @@ class emulatedHw():
                 self.log['vsru'].append(chain)
             elif b=='DataPacker':
                 packed_data = self.dp.step(chain)
-                self.log['dp'].append(chain)
+                self.log['dp'].append(packed_data)
             elif b=='TraceBuffer':
                 self.tb.step(packed_data)
                 self.log['tb'].append(self.tb.mem)

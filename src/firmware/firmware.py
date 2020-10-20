@@ -97,6 +97,7 @@ def passThrough(cp):
 def sumAll(cp):
     cp.begin_chain()
     cp.v_reduce()
+    cp.v_commit(1)
     cp.end_chain()
     return cp.compile()
 

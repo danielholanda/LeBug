@@ -167,29 +167,28 @@ def testDataPacker():
     # Instantiate HW and Emulator Processors
     DATA_WIDTH=32
     MAX_CHAINS=4
+    IB_DEPTH=32
     hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS)
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
     # Create common input values
     np.random.seed(0)
-    input_vector1=np.random.randint(100, size=N)
-    input_vector2=np.random.randint(100, size=N)
-
-    # Push values to both procs
-    hw_proc.push([input_vector1,False])
-    hw_proc.push([input_vector2,True])
-    emu_proc.push([input_vector1,False])
-    emu_proc.push([input_vector2,True])
+    input_vectors=[]
+    num_input_vectors=16
+    for i in range(num_input_vectors):
+        input_vectors.append(np.random.randint(100, size=N))
+        hw_proc.push([input_vectors[i],False])
+        emu_proc.push([input_vectors[i],False])
 
     # Configure firmware - Both HW and Emulator work with the same firmware
-    fw = firm.raw(hw_proc.compiler)
-    #emu_proc.config(fw)
+    fw = firm.sumAll(hw_proc.compiler)
+    emu_proc.config(fw)
     hw_proc.config(fw)
 
     # Run HW simulation and emulation
     steps=20
     hw_results = hw_proc.run(steps=steps,gui=False,log=True)
-    #emu_results = emu_proc.run(steps=steps)
+    emu_results = emu_proc.run(steps=steps)
 
     # Filter only the results we are interested in
     # Convert HW results to int (might contain "x"s and others)
@@ -201,11 +200,12 @@ def testDataPacker():
     print(np.array(hw_results['dp']['vector_out']))
     print("TRACE BUFFER")
     print(np.array(hw_results['tb']['mem_data']))
-    #emu_tb_results=emu_results['dp']
+    emu_dp_results=[[list(x[0]),x[1]] for x in emu_results['dp']]
 
     # Check results
-    #print("\n\nExpected:")
-    #print(emu_vsru_results)
+    print("\n\nExpected:")
+    for i in emu_dp_results:
+        print(i)
     #print("\nHardware results:")
     #print(hw_tb_results)
 
