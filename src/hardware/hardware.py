@@ -453,6 +453,11 @@ class rtlHw():
             // Declare outputs
             reg [DATA_WIDTH-1:0] vector_out [N-1:0];
             reg valid_out;
+
+            reg [DATA_WIDTH*N-1:0] tmp;
+            integer count_1=0;
+            integer count_2=0;
+
             
             // duration for each bit = 10 * timescale = 10 * 1 ns  = 10ns
             localparam period = 10; 
@@ -496,8 +501,11 @@ class rtlHw():
                 $fclose(write_data);
                 write_data2 = $fopen("simulation_results_tb.txt");
                 for (i=0; i<dbg.tb.TB_SIZE; i=i+1) begin
-                    for (j=0; j<dbg.tb.N; j=j+1) begin
-                        $fwrite(write_data2, "%0d ",dbg.tb.mem.altsyncram_component.mem_data[i][j]);
+                    tmp = dbg.tb.mem.altsyncram_component.mem_data[i];
+                    for (j=0; j<N; j=j+1) begin
+                        // Verilog you can't have two variable expressions in a range, even if they evaluate to a constant difference.  
+                        // Specifically: [j*DATA_WIDTH+DATA_WIDTH-1:j*DATA_WIDTH] should be:[j*DATA_WIDTH +: DATA_WIDTH]
+                        $fwrite(write_data2, "%0d ",tmp[DATA_WIDTH*j+:DATA_WIDTH]);
                     end
                     $fwrite(write_data2, "\\n");
                 end
