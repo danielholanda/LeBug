@@ -7,6 +7,7 @@
   parameter N=8,
   parameter M=2,
   parameter DATA_WIDTH=32,
+  parameter MAX_CHAINS=4,
   parameter [7:0] INITIAL_FIRMWARE [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
   )
   (
@@ -18,16 +19,16 @@
   input logic [7:0] configId,
   input logic [7:0] configData,
   input logic [DATA_WIDTH-1:0] vector_in [N-1:0],
-  output logic [DATA_WIDTH-1:0] vector_out [N-1:0],
+  output reg [DATA_WIDTH-1:0] vector_out [N-1:0],
   output reg valid_out
  );
 
     //----------Internal Variables------------
     reg [DATA_WIDTH-1:0] packed_data [N*2-1:0];
     reg [31:0] packed_counter = 0;
-    wire total_length;
     reg [7:0] firmware [0:MAX_CHAINS-1] = INITIAL_FIRMWARE;
-    wire [31:0] vector_length;
+    reg total_length;
+    reg [31:0] vector_length;
 
     //-------------Code Start-----------------
 
@@ -44,17 +45,17 @@
         else if (total_length==N) begin 
             valid_out<=1;
             vector_out<=vector_in;
-            packed_data<='{default:DATA_WIDTH'd0};
+            packed_data<='{default:'{N{0}}};
             packed_counter<=0;
         end
         else begin //no vector overflow
           valid_out<=0;
           if (vector_length==1) begin
-            packed_data<={vector_in[[0],packed_data[N-1:1]};
+            packed_data<={vector_in[0],packed_data[N-1:1]};
             packed_counter<=total_length;
           end
           else if (vector_length==M) begin
-            packed_data<={vector_in[[M-1:0],packed_data[N-1:M]};
+            packed_data<={vector_in[M-1:0],packed_data[N-1:M]};
             packed_counter<=total_length;
           end
         end
@@ -64,12 +65,12 @@
       end
     end
 
-    always @(chainId_in) begin
-      case (firmware [chainId_in]) begin
+    always @(*) begin
+      case (firmware [chainId_in])
         8'd0:    vector_length = 1;
         8'd1:    vector_length = M;
-        default: vector_length=N
-      end
+        default: vector_length = N;
+      endcase
       total_length = packed_counter+vector_length;
     end
 
