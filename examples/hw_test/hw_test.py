@@ -192,12 +192,22 @@ def testDataPacker():
 
     # Filter only the results we are interested in
     # Convert HW results to int (might contain "x"s and others)
-    print("VSRU OUT")
-    print(np.array(hw_results['vsru']['valid_out']))
-    print(np.array(hw_results['vsru']['vector_out']))
-    print("DP OUT")
-    print(np.array(hw_results['dp']['valid_out']))
-    print(np.array(hw_results['dp']['vector_out']))
+    #print("VSRU OUT")
+    #print(np.array(hw_results['vsru']['valid_out']))
+    #print(np.array(hw_results['vsru']['vector_out']))
+    #print("VSRU OUT EMULATOR")
+    #print(np.array(emu_results['vsru']))
+    #for i in emu_results['vsru']:
+    #    print(i[0])
+    #for i in emu_results['vsru']:
+    #    print(i[3])
+    #print(np.array(emu_results['vsru']['valid_out']))
+    #print(np.array(emu_results['vsru']['vector_out']))
+    #print("\n\n")
+
+    #print("DP OUT")
+    #print(np.array(hw_results['dp']['valid_out']))
+    #print(np.array(hw_results['dp']['vector_out']))
     print("TRACE BUFFER")
     print(np.array(hw_results['tb']['mem_data']))
     emu_dp_results=[[list(x[0]),x[1]] for x in emu_results['dp']]

@@ -25,12 +25,14 @@
  );
 
     //----------Internal Variables------------
-    reg [DATA_WIDTH-1:0] packed_data [N*2-1:0];
+    reg [DATA_WIDTH-1:0] packed_data [N-1:0];
     reg [31:0] packed_counter = 0;
     reg [7:0] firmware [0:MAX_CHAINS-1] = INITIAL_FIRMWARE;
     reg [31:0] total_length;
     reg [31:0] vector_length;
     reg commit;
+    wire [DATA_WIDTH-1:0] pack_1 [N-1:0];
+    wire [DATA_WIDTH-1:0] pack_M [N-1:0];
 
     //-------------Code Start-----------------
 
@@ -38,9 +40,6 @@
       //Packing is not perfect, otherwise it would be too expensive
       // If we overflow, we just submit things as they are (This may happen if we are mixing precisions)
       if (valid_in==1'b1 && tracing==1'b1 && commit==1'b1) begin
-        $display("vector_length %d",vector_length);
-        $display("total_length %d",total_length);
-        $display("packed_counter %d",packed_counter);
         if (total_length>N) begin 
             vector_out<=packed_data;
             packed_data<=vector_in;
@@ -48,19 +47,27 @@
             packed_counter<=vector_length;
         end
         else if (total_length==N) begin 
-            valid_out<=1;
-            vector_out<=vector_in;
+            if (vector_length==1) begin
+              vector_out<=pack_1;
+            end
+            else if (vector_length==M) begin
+              vector_out<=pack_M;
+            end
+            else begin
+              vector_out<=vector_in;
+            end
             packed_data<='{default:'{DATA_WIDTH{0}}};
             packed_counter<=0;
+            valid_out<=1;
         end
         else begin //no vector overflow
           valid_out<=0;
           if (vector_length==1) begin
-            packed_data<={vector_in[0],packed_data[N-1:1]};
+            packed_data<=pack_1;
             packed_counter<=total_length;
           end
           else if (vector_length==M) begin
-            packed_data<={vector_in[M-1:0],packed_data[N-1:M]};
+            packed_data<=pack_M;
             packed_counter<=total_length;
           end
         end
@@ -68,6 +75,9 @@
       else begin
         valid_out<=0;
       end
+        //$display("New Cycle:");
+        //$display("\tpacked_data: %0d %0d %0d %0d %0d %0d %0d %0d",packed_data[0],packed_data[1],packed_data[2],packed_data[3],packed_data[4],packed_data[5],packed_data[6],packed_data[7]);
+        //$display("\tvector_out: %0d %0d %0d %0d %0d %0d %0d %0d",vector_out[0],vector_out[1],vector_out[2],vector_out[3],vector_out[4],vector_out[5],vector_out[6],vector_out[7]);
     end
 
     always @(*) begin
@@ -80,5 +90,7 @@
     end
 
     assign total_length = packed_counter+vector_length;
+    assign pack_1 = {vector_in[0],packed_data[N-1:1]};
+    assign pack_M = {vector_in[M-1:0],packed_data[N-1:M]};
  
  endmodule 
