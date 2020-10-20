@@ -49,7 +49,7 @@
         else if (total_length==N) begin 
             valid_out<=1;
             vector_out<=vector_in;
-            packed_data<='{default:'{N{0}}};
+            packed_data<='{default:'{DATA_WIDTH{0}}};
             packed_counter<=0;
         end
         else begin //no vector overflow

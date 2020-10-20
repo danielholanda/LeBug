@@ -199,6 +199,8 @@ def testDataPacker():
     print("DP OUT")
     print(np.array(hw_results['dp']['valid_out']))
     print(np.array(hw_results['dp']['vector_out']))
+    print("TRACE BUFFER")
+    print(np.array(hw_results['tb']['mem_data']))
     #emu_tb_results=emu_results['dp']
 
     # Check results
