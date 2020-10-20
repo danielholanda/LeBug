@@ -28,7 +28,7 @@
     reg [DATA_WIDTH-1:0] packed_data [N*2-1:0];
     reg [31:0] packed_counter = 0;
     reg [7:0] firmware [0:MAX_CHAINS-1] = INITIAL_FIRMWARE;
-    reg total_length;
+    reg [31:0] total_length;
     reg [31:0] vector_length;
 
     //-------------Code Start-----------------
@@ -37,6 +37,9 @@
       //Packing is not perfect, otherwise it would be too expensive
       // If we overflow, we just submit things as they are (This may happen if we are mixing precisions)
       if (valid_in==1'b1 && tracing==1'b1) begin
+        $display("vector_length %d",vector_length);
+        $display("total_length %d",total_length);
+        $display("packed_counter %d",packed_counter);
         if (total_length>N) begin 
             vector_out<=packed_data;
             packed_data<=vector_in;
@@ -72,8 +75,8 @@
         8'd1:    vector_length = M;
         default: vector_length = 1;
       endcase
-      total_length = packed_counter+vector_length;
     end
 
+    assign total_length = packed_counter+vector_length;
  
  endmodule 
