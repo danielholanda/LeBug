@@ -380,19 +380,17 @@ class rtlHw():
             DP_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
         else:
             VSRU_INITIAL_FIRMWARE=str([chain.op for chain in self.firmware['vsru']]).replace("[", "'{").replace("]", "}")
-            print(self.firmware['dp'])
             def encodeDpFirmware(commit,size):
-                print("CONTINUE HERE TO PROPERLY INITIALIZE THE FIRMWARE!")
-                if commit==1:
+                if commit==0:
                     return 3
                 elif size==1:
                     return 2
-                elif size==M:
+                elif size==self.M:
                     return 1
-                elif size==N:
+                elif size==self.N:
                     return 0
                 else:
-                    assert True
+                    assert False
             DP_INITIAL_FIRMWARE = str([encodeDpFirmware(chain.commit,chain.size) for chain in self.firmware['dp']]).replace("[", "'{").replace("]", "}")
 
         # Instantiate modules
