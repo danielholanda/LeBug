@@ -192,8 +192,8 @@ def testDataPacker():
     emu_results = emu_proc.run(steps=steps)
 
     # Check when the wrong valid starts
-    #print(np.array(hw_results['ib']['valid_out']))
-    #print(np.array(hw_results['ib']['vector_out']))
+    print(np.array(hw_results['ib']['valid_out']))
+    print(np.array(hw_results['ib']['vector_out']))
     print("Trace Buffer is right, but apparently I'm not storing/reading things correctly for some reason...")
     print("Problem might be related with size of trace buffer.... not sure")
     print("\nExpected vsru:")

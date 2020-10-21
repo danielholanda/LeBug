@@ -26,6 +26,7 @@
     //----------Internal Variables------------
     reg dequeue=1'b1; 
     wire empty,full;
+    reg valid_out_delay=1'b0;
 
     parameter LATENCY = 2;
     parameter RAM_LATENCY = LATENCY-1;
@@ -77,11 +78,12 @@
         //Logic for dequeuing
         if (dequeue==1'b1 & empty==1'b0) begin
             mem_address_b <= mem_address_b<IB_DEPTH-1 ? mem_address_b+1'b1 : 0;
-            valid_out <= 1'b1;
+            valid_out_delay <= 1'b1;
         end
         else begin
-            valid_out <= 1'b0;
+            valid_out_delay <= 1'b0;
         end
+        valid_out <= valid_out_delay;
 
         // 1-bit wide EOF signal is implemented as a bit shifter
         // FIXME - This is wrong -> We also need to create a memory/buffer for this
