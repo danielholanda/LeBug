@@ -494,7 +494,8 @@ class rtlHw():
    
             // Declare inputs
             reg clk=1'b0;
-            reg valid,eof;
+            reg valid=1'b0;
+            reg eof=1'b0;
             reg [DATA_WIDTH-1:0] vector [N-1:0];
             
             // Declare outputs
