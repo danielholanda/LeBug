@@ -60,7 +60,7 @@ def testNakedRtl():
     print("Passed test #1")
 
 
-testNakedRtl()
+#testNakedRtl()
 
 def testVSRU():
 
@@ -109,7 +109,7 @@ def testVSRU():
     assert np.allclose(hw_vsru_results,emu_vsru_results), "Failed to match emulator and hardware in VSRU test"
     print("Passed test #2")
 
-testVSRU()
+#testVSRU()
 
 def testTB():
 
@@ -157,7 +157,17 @@ def testTB():
     #assert np.allclose(hw_vsru_results,emu_vsru_results), "Failed to match emulator and hardware in TB test"
     print("Passed test #3")
 
-testTB()
+#testTB()
+
+
+
+
+
+
+
+
+
+
 
 def testDataPacker():
 
@@ -176,10 +186,12 @@ def testDataPacker():
     np.random.seed(0)
     input_vectors=[]
     num_input_vectors=16
+    print("********** Input vectors **********")
     for i in range(num_input_vectors):
         input_vectors.append(np.random.randint(100, size=N))
         hw_proc.push([input_vectors[i],False])
         emu_proc.push([input_vectors[i],False])
+        print(f'Cycle {i}:\t{input_vectors[i]}')
 
     # Configure firmware - Both HW and Emulator work with the same firmware
     fw = firm.sumAll(hw_proc.compiler)
@@ -188,29 +200,25 @@ def testDataPacker():
 
     # Run HW simulation and emulation
     steps=20
-    hw_results = hw_proc.run(steps=steps,gui=False,log=True)
+    hw_results = hw_proc.run(steps=steps,gui=False,log=False)
     emu_results = emu_proc.run(steps=steps)
 
-    # Check when the wrong valid starts
-    print(np.array(hw_results['ib']['valid_out']))
-    print(np.array(hw_results['ib']['vector_out']))
-    print("Trace Buffer is right, but apparently I'm not storing/reading things correctly for some reason...")
-    print("Problem might be related with size of trace buffer.... not sure")
-    print("\nExpected vsru:")
-    
-    emu_vsru_results=np.array([v_out for v_out, eof_out, bof_out, chainId_out in emu_results['vsru']])
-    print(emu_vsru_results)
-    print("\nHW vsru:")
-    print(np.array(hw_results['vsru']['vector_out']))
-    #exit()
+    # Filter Results
+    emu_trace_buffer = emu_results['tb'][-1];
+    hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
 
-    # Check results
-    print("\n\nExpected:")
-    print(emu_results['tb'][-1])
-    print("\nHardware results:")
-    print(np.array(toInt(hw_results['tb']['mem_data'])))
+    # Print intermediate results
+    #print("\n\n********** Intermediate Data Packer Results **********")
+    #intermediate_results=np.array([print(f'{list(v_out)} valid:{valid}') for v_out, valid in emu_results['dp']])
 
-    #assert np.allclose(hw_vsru_results,emu_vsru_results), "Failed to match emulator and hardware in DP test"
+    # Print Results
+    print("\n\n********** Emulation results **********")
+    print(emu_trace_buffer)
+    print("\n********** Hardware results **********")
+    print(hw_trace_buffer)
+
+    # Verify that results are equal
+    assert np.allclose(emu_trace_buffer,hw_trace_buffer), "Failed to match emulator and hardware in DP test"
     print("Passed test #4")
 
 testDataPacker()
