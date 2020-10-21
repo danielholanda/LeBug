@@ -27,7 +27,7 @@
     //-------------Code Start-----------------
 
     // Instantiate memory to implement queue
-    reg [$clog2(TB_SIZE)-1:0] mem_address_a=1;
+    reg [$clog2(TB_SIZE)-1:0] mem_address_a=0;
     reg [$clog2(TB_SIZE)-1:0] mem_address_b=0;
     wire mem_write_enable_a;
     reg mem_write_enable_b=0;
