@@ -438,23 +438,25 @@ class rtlHw():
     def testbench(self):
         # Prepare testbench inputs
         tb_inputs=[]
-        for i in self.testbench_inputs:
+        for i, inp in enumerate(self.testbench_inputs):
             tb_inputs.append("valid = 1;")
-            tb_inputs.append(f"eof = {int(i[1])};")
-            for idx,ele in enumerate(i[0]):
+            tb_inputs.append(f"eof = {int(inp[1])};")
+            for idx,ele in enumerate(inp[0]):
                 tb_inputs.append(f"vector[{idx}]=32'd{ele};")
             tb_inputs.append("#half_period;")
             tb_inputs.append("#half_period;")
+            if i!=0:
+                tb_inputs.append("toFile();")  
             tb_inputs.append("")
         tb_inputs=("\n"+"    "*4).join(tb_inputs)
 
         # Prepare testbench steps
         tb_steps=[]
-        for i in range(self.steps):
+        for i in range(self.steps-len(self.testbench_inputs)+1):
             tb_steps.append("valid = 0;")
+            tb_steps.append("#half_period;")
+            tb_steps.append("#half_period;")
             tb_steps.append("toFile();")
-            tb_steps.append("#half_period;")
-            tb_steps.append("#half_period;")
             tb_steps.append("")
         tb_steps=("\n"+"    "*4).join(tb_steps)
 

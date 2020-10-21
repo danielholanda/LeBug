@@ -42,7 +42,7 @@ def testNakedRtl():
     emu_proc.config(fw)
 
     # Run HW simulation and emulation
-    steps=2
+    steps=3
     hw_results = hw_proc.run(steps=steps,gui=False,log=False)
     emu_results = emu_proc.run(steps=steps)
 
@@ -60,7 +60,7 @@ def testNakedRtl():
     print("Passed test #1")
 
 
-#testNakedRtl()
+testNakedRtl()
 
 def testVSRU():
 
@@ -109,7 +109,7 @@ def testVSRU():
     assert np.allclose(hw_vsru_results,emu_vsru_results), "Failed to match emulator and hardware in VSRU test"
     print("Passed test #2")
 
-#testVSRU()
+testVSRU()
 
 def testTB():
 
@@ -157,7 +157,7 @@ def testTB():
     #assert np.allclose(hw_vsru_results,emu_vsru_results), "Failed to match emulator and hardware in TB test"
     print("Passed test #3")
 
-#testTB()
+testTB()
 
 def testDataPacker():
 
@@ -188,8 +188,21 @@ def testDataPacker():
 
     # Run HW simulation and emulation
     steps=20
-    hw_results = hw_proc.run(steps=steps,gui=False,log=False)
+    hw_results = hw_proc.run(steps=steps,gui=False,log=True)
     emu_results = emu_proc.run(steps=steps)
+
+    # Check when the wrong valid starts
+    #print(np.array(hw_results['ib']['valid_out']))
+    #print(np.array(hw_results['ib']['vector_out']))
+    print("Trace Buffer is right, but apparently I'm not storing/reading things correctly for some reason...")
+    print("Problem might be related with size of trace buffer.... not sure")
+    print("\nExpected vsru:")
+    
+    emu_vsru_results=np.array([v_out for v_out, eof_out, bof_out, chainId_out in emu_results['vsru']])
+    print(emu_vsru_results)
+    print("\nHW vsru:")
+    print(np.array(hw_results['vsru']['vector_out']))
+    #exit()
 
     # Check results
     print("\n\nExpected:")
