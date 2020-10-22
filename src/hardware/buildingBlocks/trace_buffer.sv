@@ -64,7 +64,7 @@
 
         // Logic for enqueuing values
         if (tracing==1'b1 & valid_in==1'b1) begin
-            mem_address_a <= mem_address_a<TB_SIZE-1 ? mem_address_a+1'b1 : 0;
+            mem_address_a <= mem_address_a<TB_SIZE ? mem_address_a+1'b1 : 0;
         end
     end
 
