@@ -672,6 +672,6 @@ class rtlHw():
         self.steps=0 # Number of steps for testbench
         self.top=None # used to store all rtl info later on
         self.tb_var_names = None
-        self.compiler = compiler(M,N,MAX_CHAINS)
+        self.compiler = compiler(N,M,MAX_CHAINS)
         self.firmware = None
         

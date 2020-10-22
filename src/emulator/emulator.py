@@ -350,7 +350,7 @@ class emulatedHw():
         self.config()
 
         # Firmware compiler
-        self.compiler = compiler(M,N,MAX_CHAINS)
+        self.compiler = compiler(N,M,MAX_CHAINS)
 
         # used to simulate a trace buffer to match results with simulation
         self.log={k: [] for k in ['ib','fu','mvru','vsru','vvalu','dp','tb']}
