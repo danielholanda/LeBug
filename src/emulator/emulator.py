@@ -266,7 +266,7 @@ class emulatedHw():
         def step(self,packed_data):
             output, output_valid = packed_data
             if output_valid:
-                if self.size==self.TB_SIZE-1:
+                if self.size==self.TB_SIZE:
                     self.size=0
                 self.mem[self.size]=output
                 self.size=self.size+1
