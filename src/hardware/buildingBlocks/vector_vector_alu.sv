@@ -43,10 +43,14 @@
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay;
     reg [7:0] firmware_cache_delay = 0;
     reg [7:0] firmware_cache_addr_delay = 0;
-    wire [DATA_WIDTH-1:0] alu_result [N-1:0];
-    wire [DATA_WIDTH-1:0] alu_add [N-1:0];
-    wire [DATA_WIDTH-1:0] alu_mul [N-1:0];
-    wire [DATA_WIDTH-1:0] alu_sub [N-1:0];
+    reg [DATA_WIDTH-1:0] alu_result [N-1:0];
+    reg [DATA_WIDTH-1:0] alu_add [N-1:0];
+    reg [DATA_WIDTH-1:0] alu_mul [N-1:0];
+    reg [DATA_WIDTH-1:0] alu_sub [N-1:0];
+
+    parameter LATENCY = 2;
+    parameter RAM_LATENCY = LATENCY-1;
+    parameter MEM_WIDTH = N*DATA_WIDTH;
 
     //-------------Code Start-----------------
 
@@ -56,7 +60,7 @@
     wire mem_write_enable_a;
     reg mem_write_enable_b;
     wire [MEM_WIDTH-1:0] mem_in_a;
-    wire [MEM_WIDTH-1:0] mem_in_b;
+    reg [MEM_WIDTH-1:0] mem_in_b;
     wire [MEM_WIDTH-1:0] mem_out_a;
     wire [MEM_WIDTH-1:0] mem_out_b;
     ram_dual_port vvrf (
@@ -88,13 +92,13 @@
 
       if (valid_in==1'b1 && tracing==1'b1) begin
         // Logic for output
-        mem_address_a = firmware_addr_rd [chainId_in];
+        mem_address_a = firmware_addr_rd[chainId_in];
         vector_out <= alu_result;
         valid_out <= valid_in_delay;
         eof_out <= eof_in_delay;
 
         //Logic for caching
-        mem_in_b <= alu_result;
+        mem_in_b <= {>>{alu_result}};
         mem_write_enable_b <= firmware_cache_delay;
         mem_address_b <= firmware_cache_addr_delay;
       end
@@ -113,9 +117,9 @@
 
     // Perform ALU ops
     always @(*) begin
-      alu_add = mem_out_a + vector_in_delay;
-      alu_mul = mem_out_a * vector_in_delay;
-      alu_sub = mem_out_a - vector_in_delay;
+      alu_add = {>>{mem_out_a}} + vector_in_delay;
+      alu_mul = {>>{mem_out_a}} * vector_in_delay;
+      alu_sub = {>>{mem_out_a}} - vector_in_delay;
       case (firmware_op[chainId_in_delay])
         0 : alu_result = vector_in_delay;
         1 : alu_result = alu_add;
