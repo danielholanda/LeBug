@@ -315,7 +315,9 @@ class rtlHw():
             ['vector_out','logic','DATA_WIDTH','N'],
             ['chainId_out','logic',1]])
         top.mod.inputBuffer.addParameter([
-            ['N',8],['DATA_WIDTH',32],['IB_DEPTH',4]])
+            ['N'],
+            ['DATA_WIDTH'],
+            ['IB_DEPTH']])
         top.mod.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
         top.mod.inputBuffer.setAsConfigurable(configurable_parameters=4)
 
@@ -333,12 +335,35 @@ class rtlHw():
             ['chainId_out','logic',1],
             ['vector_out','logic','DATA_WIDTH','N']])
         top.mod.vectorScalarReduceUnit.addParameter([
+            ['N'],
+            ['DATA_WIDTH'],
+            ['MAX_CHAINS'],
+            ['PERSONAL_CONFIG_ID'],
+            ['INITIAL_FIRMWARE']])
+        top.mod.vectorScalarReduceUnit.setAsConfigurable(configurable_parameters=4)
+
+        # Vector Vector ALU
+        '''
+        top.includeModule("vectorVectorALU")
+        top.mod.vectorVectorALU.addInput([
+            ['clk','logic',1],
+            ['valid_in','logic',1],
+            ['eof_in','logic',1],
+            ['chainId_in','logic',1],
+            ['vector_in','logic','DATA_WIDTH','N']])
+        top.mod.vectorVectorALU.addOutput([
+            ['valid_out','logic',1],
+            ['eof_out','logic',1],
+            ['chainId_out','logic',1],
+            ['vector_out','logic','DATA_WIDTH','N']])
+        top.mod.vectorVectorALU.addParameter([
             ['N',8],
             ['DATA_WIDTH',32],
             ['MAX_CHAINS',4],
             ['PERSONAL_CONFIG_ID',0],
             ['INITIAL_FIRMWARE',"'{MAX_CHAINS{0}}"]])
-        top.mod.vectorScalarReduceUnit.setAsConfigurable(configurable_parameters=4)
+        top.mod.vectorVectorALU.setAsConfigurable(configurable_parameters=4)
+        '''
 
         # Data Packer
         top.includeModule("dataPacker")
@@ -352,12 +377,12 @@ class rtlHw():
             ['valid_out','logic',1],
             ['vector_out','logic','DATA_WIDTH','N']])
         top.mod.dataPacker.addParameter([
-            ['N',8],
-            ['M',4],
-            ['DATA_WIDTH',32],
-            ['MAX_CHAINS',4],
-            ['PERSONAL_CONFIG_ID',0],
-            ['INITIAL_FIRMWARE',"'{MAX_CHAINS{0}}"]])
+            ['N'],
+            ['M'],
+            ['DATA_WIDTH'],
+            ['MAX_CHAINS'],
+            ['PERSONAL_CONFIG_ID'],
+            ['INITIAL_FIRMWARE']])
         top.mod.dataPacker.setAsConfigurable(configurable_parameters=1)
 
         # TraceBuffer
@@ -370,9 +395,9 @@ class rtlHw():
         top.mod.traceBuffer.addOutput([
             ['vector_out','logic','DATA_WIDTH','N']])
         top.mod.traceBuffer.addParameter([
-            ['N',8],
-            ['DATA_WIDTH',32],
-            ['TB_SIZE',64]])
+            ['N'],
+            ['DATA_WIDTH'],
+            ['TB_SIZE']])
         top.mod.traceBuffer.addMemory("traceBuffer",self.TB_SIZE,self.DATA_WIDTH*self.N)
 
         # Convert FW to RTL
