@@ -40,9 +40,10 @@
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
     reg valid_in_delay = 1'b0;
     reg eof_in_delay = 1'b0;
-    reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay;
+    reg [7:0] firmware_op_delay = 0;
     reg [7:0] firmware_cache_delay = 0;
     reg [7:0] firmware_cache_addr_delay = 0;
+    reg [DATA_WIDTH-1:0] mem_out [N-1:0];
     reg [DATA_WIDTH-1:0] alu_result [N-1:0];
     reg [DATA_WIDTH-1:0] alu_add [N-1:0];
     reg [DATA_WIDTH-1:0] alu_mul [N-1:0];
@@ -51,6 +52,8 @@
     parameter LATENCY = 2;
     parameter RAM_LATENCY = LATENCY-1;
     parameter MEM_WIDTH = N*DATA_WIDTH;
+
+    integer i;
 
     //-------------Code Start-----------------
 
@@ -109,18 +112,21 @@
       // Delay values until we can read the value to perform the op
       valid_in_delay <= valid_in;
       vector_in_delay <= vector_in; 
-      chainId_in_delay <= chainId_in;
-      firmware_cache_delay <= firmware_cache;
-      firmware_cache_addr_delay <= firmware_cache_addr;
+      firmware_op_delay <= firmware_op[chainId_in];
+      firmware_cache_delay <= firmware_cache[chainId_in];
+      firmware_cache_addr_delay <= firmware_cache_addr[chainId_in];
       eof_in_delay <= eof_in;
     end
 
     // Perform ALU ops
     always @(*) begin
-      alu_add = {>>{mem_out_a}} + vector_in_delay;
-      alu_mul = {>>{mem_out_a}} * vector_in_delay;
-      alu_sub = {>>{mem_out_a}} - vector_in_delay;
-      case (firmware_op[chainId_in_delay])
+      mem_out = {>>{mem_out_a}};
+      for(i=0; i<N; i=i+1) begin
+        alu_add[i] = mem_out[i] + vector_in_delay[i];
+        alu_mul[i] = mem_out[i] * vector_in_delay[i];
+        alu_sub[i] = mem_out[i] - vector_in_delay[i];
+      end
+      case (firmware_op_delay)
         0 : alu_result = vector_in_delay;
         1 : alu_result = alu_add;
         2 : alu_result = alu_mul;

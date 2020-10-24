@@ -75,10 +75,10 @@
       else begin
         valid_out<=0;
       end
-        $display("New Cycle:");
-        $display("\tvector_in: %0d %0d %0d %0d %0d %0d %0d %0d (valid = %d)",vector_in[0],vector_in[1],vector_in[2],vector_in[3],vector_in[4],vector_in[5],vector_in[6],vector_in[7],valid_in);
-        $display("\tpacked_data: %0d %0d %0d %0d %0d %0d %0d %0d",packed_data[0],packed_data[1],packed_data[2],packed_data[3],packed_data[4],packed_data[5],packed_data[6],packed_data[7]);
-        $display("\tvector_out: %0d %0d %0d %0d %0d %0d %0d %0d",vector_out[0],vector_out[1],vector_out[2],vector_out[3],vector_out[4],vector_out[5],vector_out[6],vector_out[7]);
+        //$display("New Cycle:");
+        //$display("\tvector_in: %0d %0d %0d %0d %0d %0d %0d %0d (valid = %d)",vector_in[0],vector_in[1],vector_in[2],vector_in[3],vector_in[4],vector_in[5],vector_in[6],vector_in[7],valid_in);
+        //$display("\tpacked_data: %0d %0d %0d %0d %0d %0d %0d %0d",packed_data[0],packed_data[1],packed_data[2],packed_data[3],packed_data[4],packed_data[5],packed_data[6],packed_data[7]);
+        //$display("\tvector_out: %0d %0d %0d %0d %0d %0d %0d %0d (valid = %d)",vector_out[0],vector_out[1],vector_out[2],vector_out[3],vector_out[4],vector_out[5],vector_out[6],vector_out[7],valid_out);
     end
 
     always @(*) begin

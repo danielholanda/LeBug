@@ -291,6 +291,7 @@ class rtlHw():
         top.include("trace_buffer.sv")
         top.include("data_packer.sv")
         top.include("vector_scalar_reduce_unit.sv")
+        top.include("vector_vector_alu.sv")
         top.include("uart.sv")
 
         # UART module
