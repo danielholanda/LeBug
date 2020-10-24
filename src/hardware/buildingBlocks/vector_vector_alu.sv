@@ -26,6 +26,7 @@
   input logic [7:0] configData,
   input logic [DATA_WIDTH-1:0] vector_in [N-1:0],
   output reg [DATA_WIDTH-1:0] vector_out [N-1:0],
+  output reg [$clog2(MAX_CHAINS)-1:0] chainId_out,
   output reg valid_out,
   output reg eof_out
  );
@@ -38,6 +39,7 @@
     reg [7:0] firmware_cache_addr [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_CACHE_ADDR;
     reg [7:0] firmware_cache_cond [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_CACHE_COND;
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
+    reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
     reg valid_in_delay = 1'b0;
     reg eof_in_delay = 1'b0;
     reg [7:0] firmware_op_delay = 0;
@@ -99,6 +101,7 @@
         vector_out <= alu_result;
         valid_out <= valid_in_delay;
         eof_out <= eof_in_delay;
+        chainId_out <= chainId_in_delay;
 
         //Logic for caching
         mem_in_b <= {>>{alu_result}};
@@ -116,6 +119,7 @@
       firmware_cache_delay <= firmware_cache[chainId_in];
       firmware_cache_addr_delay <= firmware_cache_addr[chainId_in];
       eof_in_delay <= eof_in;
+      chainId_in_delay <= chainId_in;
     end
 
     // Perform ALU ops
