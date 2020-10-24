@@ -313,11 +313,12 @@ class rtlHw():
             ['valid_out','logic',1],
             ['eof_out','logic',1],
             ['vector_out','logic','DATA_WIDTH','N'],
-            ['chainId_out','logic',1]])
+            ['chainId_out','logic','$clog2(MAX_CHAINS)']])
         top.mod.inputBuffer.addParameter([
             ['N'],
             ['DATA_WIDTH'],
-            ['IB_DEPTH']])
+            ['IB_DEPTH'],
+            ['MAX_CHAINS']])
         top.mod.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
         top.mod.inputBuffer.setAsConfigurable(configurable_parameters=4)
 
@@ -327,12 +328,12 @@ class rtlHw():
             ['clk','logic',1],
             ['valid_in','logic',1],
             ['eof_in','logic',1],
-            ['chainId_in','logic',1],
+            ['chainId_in','logic','$clog2(MAX_CHAINS)'],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.mod.vectorScalarReduceUnit.addOutput([
             ['valid_out','logic',1],
             ['eof_out','logic',1],
-            ['chainId_out','logic',1],
+            ['chainId_out','logic','$clog2(MAX_CHAINS)'],
             ['vector_out','logic','DATA_WIDTH','N']])
         top.mod.vectorScalarReduceUnit.addParameter([
             ['N'],
@@ -371,7 +372,7 @@ class rtlHw():
             ['clk','logic',1],
             ['valid_in','logic',1],
             ['eof_in','logic',1],
-            ['chainId_in','logic',1],
+            ['chainId_in','logic','$clog2(MAX_CHAINS)'],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.mod.dataPacker.addOutput([
             ['valid_out','logic',1],

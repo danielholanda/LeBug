@@ -7,7 +7,8 @@
  module  inputBuffer #(
   parameter N=8,
   parameter DATA_WIDTH=32,
-  parameter IB_DEPTH=4
+  parameter IB_DEPTH=4,
+  parameter MAX_CHAINS=4
   )
   (
   input logic clk,
@@ -20,7 +21,7 @@
   output reg valid_out,
   output reg eof_out,
   output reg [DATA_WIDTH-1:0] vector_out [N-1:0],
-  output reg chainId_out
+  output reg [$clog2(MAX_CHAINS)-1:0] chainId_out 
  );
 
     //----------Internal Variables------------
@@ -102,6 +103,6 @@
     assign empty = (mem_address_a-mem_address_b==1) | (mem_address_a==0 & mem_address_b==IB_DEPTH-1);
     assign full = (mem_address_a==mem_address_b);
 
-    assign chainId_out=1'b0;
+    assign chainId_out=0;
  
  endmodule 
