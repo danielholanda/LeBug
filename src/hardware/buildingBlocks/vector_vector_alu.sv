@@ -95,7 +95,7 @@
 
     always @(posedge clk) begin
 
-      if (valid_in==1'b1 && tracing==1'b1) begin
+      if (tracing==1'b1) begin
         // Logic for output
         mem_address_a = firmware_addr_rd[chainId_in];
         vector_out <= alu_result;

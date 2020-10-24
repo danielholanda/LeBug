@@ -213,7 +213,61 @@ def testDataPacker():
     assert np.allclose(emu_trace_buffer,hw_trace_buffer), "Failed to match emulator and hardware in DP test"
     print("Passed test #4")
 
-testDataPacker()
+#testDataPacker()
+
+def testVVALU():
+
+    # Overwrite YAML file to define how components are attached to eachother
+    BUILDING_BLOCKS=['InputBuffer', 'VectorScalarReduce','DataPacker','TraceBuffer']
+
+    # Instantiate HW and Emulator Processors
+    DATA_WIDTH=32
+    MAX_CHAINS=4
+    IB_DEPTH=32
+    TB_SIZE=5
+    hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS)
+    emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
+
+    # Create common input values
+    np.random.seed(0)
+    input_vectors=[]
+    num_input_vectors=4
+    print("********** Input vectors **********")
+    for i in range(num_input_vectors):
+        input_vectors.append(np.random.randint(100, size=N))
+        hw_proc.push([input_vectors[i],False])
+        emu_proc.push([input_vectors[i],False])
+        print(f'Cycle {i}:\t{input_vectors[i]}')
+
+    # Configure firmware - Both HW and Emulator work with the same firmware
+    fw = firm.raw(hw_proc.compiler)
+    emu_proc.config(fw)
+    hw_proc.config(fw)
+
+    # Run HW simulation and emulation
+    steps=35
+    hw_results = hw_proc.run(steps=steps,gui=False,log=False)
+    emu_results = emu_proc.run(steps=steps)
+
+    # Filter Results
+    emu_trace_buffer = emu_results['tb'][-1];
+    hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
+
+    # Print intermediate results
+    #print("\n\n********** Intermediate Data Packer Results **********")
+    #intermediate_results=np.array([print(f'{list(v_out)} valid:{valid}') for v_out, valid in emu_results['dp']])
+
+    # Print Results
+    print("\n\n********** Emulation results **********")
+    print(emu_trace_buffer)
+    print("\n********** Hardware results **********")
+    print(hw_trace_buffer)
+
+    # Verify that results are equal
+    assert np.allclose(emu_trace_buffer,hw_trace_buffer), "Failed to match emulator and hardware in DP test"
+    print("Passed test #4")
+
+testVVALU()
 
 
 

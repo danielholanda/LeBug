@@ -108,6 +108,14 @@ def raw(cp):
     cp.end_chain()
     return cp.compile()
 
+# Simple test for vvalu
+def vvalu_simple(cp):
+    cp.begin_chain()
+    cp.vv_add(0)
+    cp.v_commit()
+    cp.end_chain()
+    return cp.compile()
+
 # Ideas for new instruments:
 # 1- Check elements that are between -inf and min_range OR NaN OR between max_range and Inf (given a specific activation)
 #   In the previous instrumentation, I would need one instrument for each of them (3x more memory)
