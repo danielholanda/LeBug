@@ -279,13 +279,13 @@ class rtlHw():
             #['valid_out','logic',1],
             ['vector_out','logic','DATA_WIDTH','N']])
         top.addParameter([
-            ['N',8],
-            ['M',4],
-            ['DATA_WIDTH',32],
-            ['IB_DEPTH',4],
-            ['VVVRF_SIZE',8],
-            ['MAX_CHAINS',4],
-            ['TB_SIZE',64]])
+            ['N',self.N],
+            ['M',self.M],
+            ['DATA_WIDTH',self.DATA_WIDTH],
+            ['IB_DEPTH',self.IB_DEPTH],
+            ['VVVRF_SIZE',self.VVVRF_SIZE],
+            ['MAX_CHAINS',self.MAX_CHAINS],
+            ['TB_SIZE',self.TB_SIZE]])
 
         # Adds includes to the beginning of the file
         top.include("input_buffer.sv")
