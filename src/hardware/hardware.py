@@ -283,6 +283,7 @@ class rtlHw():
             ['M',4],
             ['DATA_WIDTH',32],
             ['IB_DEPTH',4],
+            ['VVVRF_SIZE',8],
             ['MAX_CHAINS',4],
             ['TB_SIZE',64]])
 
@@ -322,6 +323,34 @@ class rtlHw():
         top.mod.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
         top.mod.inputBuffer.setAsConfigurable(configurable_parameters=4)
 
+        # Vector Vector ALU
+        top.includeModule("vectorVectorALU")
+        top.mod.vectorVectorALU.addInput([
+            ['clk','logic',1],
+            ['valid_in','logic',1],
+            ['eof_in','logic',1],
+            ['chainId_in','logic','$clog2(MAX_CHAINS)'],
+            ['vector_in','logic','DATA_WIDTH','N']])
+        top.mod.vectorVectorALU.addOutput([
+            ['valid_out','logic',1],
+            ['eof_out','logic',1],
+            ['chainId_out','logic','$clog2(MAX_CHAINS)'],
+            ['vector_out','logic','DATA_WIDTH','N']])
+        top.mod.vectorVectorALU.addParameter([
+            ['N'],
+            ['DATA_WIDTH'],
+            ['MAX_CHAINS'],
+            ['VVVRF_SIZE'],
+            ['PERSONAL_CONFIG_ID'],
+            ['INITIAL_FIRMWARE_OP'],
+            ['INITIAL_FIRMWARE_ADDR_RD'],
+            ['INITIAL_FIRMWARE_COND'],
+            ['INITIAL_FIRMWARE_CACHE'],
+            ['INITIAL_FIRMWARE_CACHE_ADDR'],
+            ['INITIAL_FIRMWARE_CACHE_COND']])
+        top.mod.vectorVectorALU.setAsConfigurable(configurable_parameters=6)
+        top.mod.inputBuffer.addMemory("vvrf",self.VVVRF_SIZE,self.DATA_WIDTH*self.N)
+
         # Vector Scalar Reduce unit
         top.includeModule("vectorScalarReduceUnit")
         top.mod.vectorScalarReduceUnit.addInput([
@@ -342,29 +371,6 @@ class rtlHw():
             ['PERSONAL_CONFIG_ID'],
             ['INITIAL_FIRMWARE']])
         top.mod.vectorScalarReduceUnit.setAsConfigurable(configurable_parameters=4)
-
-        # Vector Vector ALU
-        '''
-        top.includeModule("vectorVectorALU")
-        top.mod.vectorVectorALU.addInput([
-            ['clk','logic',1],
-            ['valid_in','logic',1],
-            ['eof_in','logic',1],
-            ['chainId_in','logic',1],
-            ['vector_in','logic','DATA_WIDTH','N']])
-        top.mod.vectorVectorALU.addOutput([
-            ['valid_out','logic',1],
-            ['eof_out','logic',1],
-            ['chainId_out','logic',1],
-            ['vector_out','logic','DATA_WIDTH','N']])
-        top.mod.vectorVectorALU.addParameter([
-            ['N',8],
-            ['DATA_WIDTH',32],
-            ['MAX_CHAINS',4],
-            ['PERSONAL_CONFIG_ID',0],
-            ['INITIAL_FIRMWARE',"'{MAX_CHAINS{0}}"]])
-        top.mod.vectorVectorALU.setAsConfigurable(configurable_parameters=4)
-        '''
 
         # Data Packer
         top.includeModule("dataPacker")
@@ -402,9 +408,11 @@ class rtlHw():
         top.mod.traceBuffer.addMemory("traceBuffer",self.TB_SIZE,self.DATA_WIDTH*self.N)
 
         # Convert FW to RTL
+        EMPTY_FIRMWARE= "'{MAX_CHAINS{0}}"
         if self.firmware is None:
-            VSRU_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
-            DP_INITIAL_FIRMWARE = "'{MAX_CHAINS{0}}"
+            VSRU_INITIAL_FIRMWARE = EMPTY_FIRMWARE
+            DP_INITIAL_FIRMWARE = EMPTY_FIRMWARE
+            VVALU_INITIAL_FIRMWARE = EMPTY_FIRMWARE
         else:
             VSRU_INITIAL_FIRMWARE=str([chain.op for chain in self.firmware['vsru']]).replace("[", "'{").replace("]", "}")
             def encodeDpFirmware(commit,size):
@@ -419,6 +427,7 @@ class rtlHw():
                 else:
                     assert False
             DP_INITIAL_FIRMWARE = str([encodeDpFirmware(chain.commit,chain.size) for chain in self.firmware['dp']]).replace("[", "'{").replace("]", "}")
+            VVALU_INITIAL_FIRMWARE = EMPTY_FIRMWARE
 
         # Instantiate modules
         top.instantiateModule(top.mod.uart,"comm")
@@ -428,6 +437,20 @@ class rtlHw():
             ['N','N'],
             ['DATA_WIDTH','DATA_WIDTH'],
             ['IB_DEPTH','IB_DEPTH']])
+
+        top.instantiateModule(top.mod.vectorVectorALU,"vvalu")
+        top.inst.vvalu.setParameters([
+            ['N','N'],
+            ['DATA_WIDTH','DATA_WIDTH'],
+            ['MAX_CHAINS','MAX_CHAINS'],
+            ['PERSONAL_CONFIG_ID','0'],
+            ['VVVRF_SIZE','VVVRF_SIZE'],
+            ['INITIAL_FIRMWARE_OP',VVALU_INITIAL_FIRMWARE],
+            ['INITIAL_FIRMWARE_ADDR_RD',VVALU_INITIAL_FIRMWARE],
+            ['INITIAL_FIRMWARE_COND',VVALU_INITIAL_FIRMWARE],
+            ['INITIAL_FIRMWARE_CACHE',VVALU_INITIAL_FIRMWARE],
+            ['INITIAL_FIRMWARE_CACHE_ADDR',VVALU_INITIAL_FIRMWARE],
+            ['INITIAL_FIRMWARE_CACHE_COND',VVALU_INITIAL_FIRMWARE]])
 
         top.instantiateModule(top.mod.vectorScalarReduceUnit,"vsru")
         top.inst.vsru.setParameters([
@@ -455,7 +478,8 @@ class rtlHw():
         # Connect modules
         top.inst.comm.connectInputs() 
         top.inst.ib.connectInputs(top) 
-        top.inst.vsru.connectInputs(top.inst.ib)
+        top.inst.vvalu.connectInputs(top.inst.ib)
+        top.inst.vsru.connectInputs(top.inst.vvalu)
         top.inst.dp.connectInputs(top.inst.vsru)
         top.inst.tb.connectInputs(top.inst.dp)
         top.assignOutputs(top.inst.tb)
@@ -694,6 +718,7 @@ class rtlHw():
         self.DATA_WIDTH=DATA_WIDTH
         self.MAX_CHAINS=MAX_CHAINS
         self.TB_SIZE=TB_SIZE
+        self.VVVRF_SIZE=VVVRF_SIZE
         self.hwFolder = os.path.dirname(os.path.realpath(__file__))
         self.testbench_inputs=[]    # Stores inputs to testbench
         self.steps=0 # Number of steps for testbench
