@@ -117,6 +117,13 @@ def vvalu_simple(cp):
     cp.end_chain()
     return cp.compile()
 
+# Simple test for fru
+def fru_simple(cp):
+    cp.begin_chain()
+    cp.v_commit()
+    cp.end_chain()
+    return cp.compile()
+
 # Ideas for new instruments:
 # 1- Check elements that are between -inf and min_range OR NaN OR between max_range and Inf (given a specific activation)
 #   In the previous instrumentation, I would need one instrument for each of them (3x more memory)

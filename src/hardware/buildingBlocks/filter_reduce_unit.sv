@@ -37,7 +37,7 @@
     reg valid_in_delay = 1'b0;
     reg eof_in_delay = 1'b0;
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
-    reg [DATA_WIDTH-1:0] filter_result [N-1:0] [M-1:0];
+    reg [DATA_WIDTH-1:0] filter_result [M-1:0] [N-1:0];
     reg [DATA_WIDTH-1:0] reduce_result [N-1:0];
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
     reg [7:0] firmware_filter_op_delay;
@@ -91,7 +91,7 @@
       if (tracing==1'b1) begin
         // Logic for output
         mem_address_a = firmware_filter_addr[chainId_in];
-        vector_out <= reduce_result;
+        vector_out <= firmware_filter_op_delay==8'b1 ? reduce_result : vector_in_delay;
         valid_out <= valid_in_delay;
         eof_out <= eof_in_delay;
         chainId_out <= chainId_in_delay;
@@ -115,11 +115,11 @@
       // Logic for filter unit
       //operand = {>>{mem_out_a}};
       for(i=0; i<M; i=i+1) begin
-        filter_result[i] =  {>>{vector_in_delay[i]}};
+        filter_result[i] =  vector_in_delay;
       end
     end
 
-    // Logic for reduce unit (MUST REUSE THIS FOR REDUCING ALONG N AXIS - NOW IS ONLY REDUCING ALONG M AXIS)
+    // Logic for reduce unit (MUST REUSE THIS FOR REDUCING ALONG M AXIS - NOW IS ONLY REDUCING ALONG N AXIS)
     generate 
       for (g=0;g<N;g++) begin
         adderTree #(.N(N), .DATA_WIDTH(DATA_WIDTH))adder_tree_inst(.vector(filter_result[g]), .result(reduce_result[g]));
