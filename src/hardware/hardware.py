@@ -124,11 +124,13 @@ class rtlHw():
             for p in params:
                 self.parameter.append(p)
 
-        def addMemory(self,name,depth,width):
+        def addMemory(self,name,depth,width,packed_elements=False,init_values=False):
+            # Packed elements is used when we are packing multiple values into a single memory address
             self.mem[name]={}
             self.mem[name]['depth']=depth
             self.mem[name]['width']=width
-            self.mem[name]['init_values']=False
+            self.mem[name]['init_values']=init_values
+            self.mem[name]['packed_elements']=packed_elements
 
         def setAsConfigurable(self,configurable_parameters):
             self.addInput([['tracing','logic',1],['configId','logic',8],['configData','logic',8]])
@@ -177,7 +179,16 @@ class rtlHw():
                     f.write("Begin\n")
                     if m['init_values']!=False:
                         for i in range(m['depth']):
-                            f.write(f"{i} : {m['init_values'][i]};\n")
+                            # Transform array into a packed value if we are using wide memories to represent arrays
+                            if m['packed_elements']!=False:
+                                packed_elements= m['packed_elements']
+                                element_width = int(m['width']/packed_elements)
+                                packed_bits = int(0)
+                                for idx, val in enumerate(m['init_values'][i]):
+                                    packed_bits=packed_bits | int(val)<<(element_width*idx)
+                                f.write(f"{i} : {packed_bits};\n")
+                            else:
+                                f.write(f"{i} : {m['init_values'][i]};\n")
                     else:
                         f.write(f"[0..{m['depth']-1}] : 0;\n")
                     f.write("End;")
@@ -354,8 +365,8 @@ class rtlHw():
             ['INITIAL_FIRMWARE_CACHE'],
             ['INITIAL_FIRMWARE_CACHE_ADDR']])
         top.mod.vectorVectorALU.setAsConfigurable(configurable_parameters=5)
-        top.mod.vectorVectorALU.addMemory("vvrf",self.VVVRF_SIZE,self.DATA_WIDTH*self.N)
-        top.mod.vectorVectorALU.mem['vvrf']['init_values']=[2]*self.VVVRF_SIZE
+        top.mod.vectorVectorALU.addMemory("vvrf",self.VVVRF_SIZE,self.DATA_WIDTH*self.N,packed_elements=self.N)
+        top.mod.vectorVectorALU.mem['vvrf']['init_values']=[[1,2,3,4,5,6,7,8]]*self.VVVRF_SIZE
         #exit()
 
         # Vector Scalar Reduce unit

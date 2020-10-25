@@ -124,9 +124,9 @@
     always @(*) begin
       mem_out = {>>{mem_out_a}};
       for(i=0; i<N; i=i+1) begin
-        alu_add[i] = mem_out[i] + vector_in_delay[i];
-        alu_mul[i] = mem_out[i] * vector_in_delay[i];
-        alu_sub[i] = mem_out[i] - vector_in_delay[i];
+        alu_add[i] =  vector_in_delay[i] + mem_out[i];
+        alu_mul[i] =  vector_in_delay[i] * mem_out[i];
+        alu_sub[i] =  vector_in_delay[i] - mem_out[i];
       end
       case (firmware_op_delay)
         0 : alu_result = vector_in_delay;
