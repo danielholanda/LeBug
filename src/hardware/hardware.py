@@ -128,6 +128,7 @@ class rtlHw():
             self.mem[name]={}
             self.mem[name]['depth']=depth
             self.mem[name]['width']=width
+            self.mem[name]['init_values']=False
 
         def setAsConfigurable(self,configurable_parameters):
             self.addInput([['tracing','logic',1],['configId','logic',8],['configData','logic',8]])
@@ -166,14 +167,19 @@ class rtlHw():
 
             def dumpMifFile(mem):
                 for mem_name in mem.keys():
+                    m=mem[mem_name]
                     f = open(f"rtl/{mem_name}.mif", "w")
-                    f.write(f"Depth = {mem[mem_name]['depth']};\n")
-                    f.write(f"Width = {mem[mem_name]['width']};\n")
+                    f.write(f"Depth = {m['depth']};\n")
+                    f.write(f"Width = {m['width']};\n")
                     f.write("Address_radix = dec;\n")
                     f.write("Data_radix = dec;\n")
                     f.write("Content\n")
                     f.write("Begin\n")
-                    f.write(f"[0..{mem[mem_name]['depth']-1}] : 0;\n")
+                    if m['init_values']!=False:
+                        for i in range(m['depth']):
+                            f.write(f"{i} : {m['init_values'][i]};\n")
+                    else:
+                        f.write(f"[0..{m['depth']-1}] : 0;\n")
                     f.write("End;")
                     f.close()
 
@@ -348,7 +354,9 @@ class rtlHw():
             ['INITIAL_FIRMWARE_CACHE'],
             ['INITIAL_FIRMWARE_CACHE_ADDR']])
         top.mod.vectorVectorALU.setAsConfigurable(configurable_parameters=5)
-        top.mod.inputBuffer.addMemory("vvrf",self.VVVRF_SIZE,self.DATA_WIDTH*self.N)
+        top.mod.vectorVectorALU.addMemory("vvrf",self.VVVRF_SIZE,self.DATA_WIDTH*self.N)
+        top.mod.vectorVectorALU.mem['vvrf']['init_values']=[2]*self.VVVRF_SIZE
+        #exit()
 
         # Vector Scalar Reduce unit
         top.includeModule("vectorScalarReduceUnit")
