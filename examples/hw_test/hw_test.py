@@ -218,7 +218,7 @@ def testDataPacker():
 def testVVALU():
 
     # Overwrite YAML file to define how components are attached to eachother
-    BUILDING_BLOCKS=['InputBuffer', 'VectorScalarReduce','DataPacker','TraceBuffer']
+    BUILDING_BLOCKS=['InputBuffer', 'VectorVectorALU','VectorScalarReduce','DataPacker','TraceBuffer']
 
     # Instantiate HW and Emulator Processors
     DATA_WIDTH=32
@@ -239,8 +239,11 @@ def testVVALU():
         emu_proc.push([input_vectors[i],False])
         print(f'Cycle {i}:\t{input_vectors[i]}')
 
+    # Initialize the memories the same way
+    emu_proc.vvalu.vrf = [1,2,3,4,5,6,7,8]*N 
+
     # Configure firmware - Both HW and Emulator work with the same firmware
-    fw = firm.raw(hw_proc.compiler)
+    fw = firm.vvalu_simple(hw_proc.compiler)
     emu_proc.config(fw)
     hw_proc.config(fw)
 

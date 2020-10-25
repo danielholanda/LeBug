@@ -298,6 +298,8 @@ class emulatedHw():
             elif b=='TraceBuffer':
                 self.tb.step(packed_data)
                 self.log['tb'].append(self.tb.mem)
+            else:
+                assert False, "Unknown building block "+b
         
 
     # Pushes values to the input of the chain
