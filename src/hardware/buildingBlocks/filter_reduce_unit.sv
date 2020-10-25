@@ -9,6 +9,7 @@
   parameter DATA_WIDTH=32,
   parameter MAX_CHAINS=4,
   parameter PERSONAL_CONFIG_ID=0,
+  parameter FUVRF_SIZE=4,
   parameter [7:0] INITIAL_FIRMWARE_FILTER_OP    [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_FILTER_ADDR  [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_REDUCE_OP    [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
@@ -44,7 +45,7 @@
 
     parameter LATENCY = 2;
     parameter RAM_LATENCY = LATENCY-1;
-    parameter MEM_WIDTH = N*DATA_WIDTH;
+    parameter MEM_WIDTH = M*DATA_WIDTH;
 
     integer i;
     genvar g;
@@ -52,8 +53,8 @@
     //-------------Code Start-----------------
 
     // Instantiate memory to implement queue
-    reg [$clog2(VVVRF_SIZE)-1:0] mem_address_a=0;
-    reg [$clog2(VVVRF_SIZE)-1:0] mem_address_b=0;
+    reg [$clog2(FUVRF_SIZE)-1:0] mem_address_a=0;
+    reg [$clog2(FUVRF_SIZE)-1:0] mem_address_b=0;
     wire mem_write_enable_a;
     reg mem_write_enable_b=0;
     wire [MEM_WIDTH-1:0] mem_in_a;
@@ -76,12 +77,12 @@
     );
     defparam furf.width_a = MEM_WIDTH;
     defparam furf.width_b = MEM_WIDTH;
-    defparam furf.widthad_a = $clog2(VVVRF_SIZE);
-    defparam furf.widthad_b = $clog2(VVVRF_SIZE);
+    defparam furf.widthad_a = $clog2(FUVRF_SIZE);
+    defparam furf.widthad_b = $clog2(FUVRF_SIZE);
     defparam furf.width_be_a = 1;
     defparam furf.width_be_b = 1;
-    defparam furf.numwords_a = VVVRF_SIZE;
-    defparam furf.numwords_b = VVVRF_SIZE;
+    defparam furf.numwords_a = FUVRF_SIZE;
+    defparam furf.numwords_b = FUVRF_SIZE;
     defparam furf.latency = RAM_LATENCY;
     defparam furf.init_file = "furf.mif";
 
@@ -112,9 +113,9 @@
     // FOR NOW, THE FILTER IS SIMPLY REPLICATING THE INPUT! THIS IS TO FACILITATE THE TESTING OF THE REDUCE UNIT
     always @(*) begin
       // Logic for filter unit
-      operand = {>>{mem_out_a}};
+      //operand = {>>{mem_out_a}};
       for(i=0; i<M; i=i+1) begin
-        filter_result[i] =  vector_in_delay[i];
+        filter_result[i] =  {>>{vector_in_delay[i]}};
       end
     end
 

@@ -310,6 +310,7 @@ class rtlHw():
         top.include("data_packer.sv")
         top.include("vector_scalar_reduce_unit.sv")
         top.include("vector_vector_alu.sv")
+        top.include("filter_reduce_unit.sv")
         top.include("uart.sv")
 
         # UART module
