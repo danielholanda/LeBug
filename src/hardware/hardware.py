@@ -300,6 +300,7 @@ class rtlHw():
             ['M',self.M],
             ['DATA_WIDTH',self.DATA_WIDTH],
             ['IB_DEPTH',self.IB_DEPTH],
+            ['FUVRF_SIZE',self.FUVRF_SIZE],
             ['VVVRF_SIZE',self.VVVRF_SIZE],
             ['MAX_CHAINS',self.MAX_CHAINS],
             ['TB_SIZE',self.TB_SIZE]])
@@ -340,6 +341,33 @@ class rtlHw():
             ['MAX_CHAINS']])
         top.mod.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
         top.mod.inputBuffer.setAsConfigurable(configurable_parameters=4)
+
+
+        # Filter Reduce Unit
+        top.includeModule("filterReduceUnit")
+        top.mod.filterReduceUnit.addInput([
+            ['clk','logic',1],
+            ['valid_in','logic',1],
+            ['eof_in','logic',1],
+            ['chainId_in','logic','$clog2(MAX_CHAINS)'],
+            ['vector_in','logic','DATA_WIDTH','N']])
+        top.mod.filterReduceUnit.addOutput([
+            ['valid_out','logic',1],
+            ['eof_out','logic',1],
+            ['chainId_out','logic','$clog2(MAX_CHAINS)'],
+            ['vector_out','logic','DATA_WIDTH','N']])
+        top.mod.filterReduceUnit.addParameter([
+            ['N'],
+            ['M'],
+            ['DATA_WIDTH'],
+            ['MAX_CHAINS'],
+            ['FUVRF_SIZE'],
+            ['PERSONAL_CONFIG_ID'],
+            ['INITIAL_FIRMWARE_FILTER_OP'],
+            ['INITIAL_FIRMWARE_FILTER_ADDR'],
+            ['INITIAL_FIRMWARE_REDUCE_OP']])
+        top.mod.filterReduceUnit.setAsConfigurable(configurable_parameters=3)
+        top.mod.filterReduceUnit.addMemory("furf",self.FUVRF_SIZE,self.DATA_WIDTH*self.M,packed_elements=self.M)
 
         # Vector Vector ALU
         top.includeModule("vectorVectorALU")
@@ -584,6 +612,8 @@ class rtlHw():
             parameter IB_DEPTH={self.IB_DEPTH};
             parameter MAX_CHAINS={self.MAX_CHAINS};
             parameter TB_SIZE={self.TB_SIZE};
+            parameter FUVRF_SIZE={self.FUVRF_SIZE};
+            parameter VVVRF_SIZE={self.VVVRF_SIZE};
    
             // Declare inputs
             reg clk=1'b0;
@@ -612,7 +642,9 @@ class rtlHw():
               .DATA_WIDTH(DATA_WIDTH),
               .IB_DEPTH(IB_DEPTH),
               .MAX_CHAINS(MAX_CHAINS),
-              .TB_SIZE(TB_SIZE)
+              .TB_SIZE(TB_SIZE),
+              .FUVRF_SIZE(FUVRF_SIZE),
+              .VVVRF_SIZE(VVVRF_SIZE)
             )
             dbg(
               .clk(clk),
@@ -760,6 +792,7 @@ class rtlHw():
         self.MAX_CHAINS=MAX_CHAINS
         self.TB_SIZE=TB_SIZE
         self.VVVRF_SIZE=VVVRF_SIZE
+        self.FUVRF_SIZE=FUVRF_SIZE
         self.hwFolder = os.path.dirname(os.path.realpath(__file__))
         self.testbench_inputs=[]    # Stores inputs to testbench
         self.steps=0 # Number of steps for testbench 
