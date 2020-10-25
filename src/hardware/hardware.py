@@ -498,6 +498,9 @@ class rtlHw():
             VVALU_INITIAL_FIRMWARE_COND=str([encodeCond(chain.cond) for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
             VVALU_INITIAL_FIRMWARE_CACHE=str([chain.cache for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
             VVALU_INITIAL_FIRMWARE_CACHE_ADDR=str([chain.cache_addr for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
+        FRU_INITIAL_FIRMWARE_OP=EMPTY_FIRMWARE
+        FRU_INITIAL_FIRMWARE_ADDR=EMPTY_FIRMWARE
+        FRU_INITIAL_FIRMWARE_REDUCE_OP=EMPTY_FIRMWARE
 
         # Instantiate modules
         top.instantiateModule(top.mod.uart,"comm")
@@ -507,6 +510,18 @@ class rtlHw():
             ['N','N'],
             ['DATA_WIDTH','DATA_WIDTH'],
             ['IB_DEPTH','IB_DEPTH']])
+
+        top.instantiateModule(top.mod.filterReduceUnit,"fru")
+        top.inst.fru.setParameters([
+            ['N','N'],
+            ['M','M'],
+            ['DATA_WIDTH','DATA_WIDTH'],
+            ['MAX_CHAINS','MAX_CHAINS'],
+            ['FUVRF_SIZE','FUVRF_SIZE'],
+            ['PERSONAL_CONFIG_ID','0'],
+            ['INITIAL_FIRMWARE_FILTER_OP',FRU_INITIAL_FIRMWARE_OP],
+            ['INITIAL_FIRMWARE_FILTER_ADDR',FRU_INITIAL_FIRMWARE_ADDR],
+            ['INITIAL_FIRMWARE_REDUCE_OP',FRU_INITIAL_FIRMWARE_REDUCE_OP]])
 
         top.instantiateModule(top.mod.vectorVectorALU,"vvalu")
         top.inst.vvalu.setParameters([
@@ -547,7 +562,8 @@ class rtlHw():
         # Connect modules
         top.inst.comm.connectInputs() 
         top.inst.ib.connectInputs(top) 
-        top.inst.vvalu.connectInputs(top.inst.ib)
+        top.inst.fru.connectInputs(top.inst.ib)
+        top.inst.vvalu.connectInputs(top.inst.fru)
         top.inst.vsru.connectInputs(top.inst.vvalu)
         top.inst.dp.connectInputs(top.inst.vsru)
         top.inst.tb.connectInputs(top.inst.dp)
