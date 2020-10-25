@@ -48,7 +48,7 @@
     parameter RAM_LATENCY = LATENCY-1;
     parameter MEM_WIDTH = M*DATA_WIDTH;
 
-    integer i;
+    integer i,j;
     genvar g;
 
     //-------------Code Start-----------------
@@ -111,27 +111,37 @@
       chainId_in_delay <= chainId_in;
     end
 
-    // FOR NOW, THE FILTER IS SIMPLY REPLICATING THE INPUT! THIS IS TO FACILITATE THE TESTING OF THE REDUCE UNIT
+    // Logic for filter unit
     always @(*) begin
-      // Logic for filter unit
       //operand = {>>{mem_out_a}};
       for(i=0; i<M; i=i+1) begin
         filter_result[i] =  vector_in_delay;
       end
+    end
 
-      // Logic for reduce unit
-      // Reduce along M axis
-      if (firmware_reduce_axis_delay==8'd0) begin
-        $display("Still need to do this here");
-      end
+    // Logic for reduce unit
+    always @(*) begin
       // Reduce along N axis
-      else begin
+      if (firmware_reduce_axis_delay==8'd1) begin
         for(i=0; i<N; i=i+1) begin
           if (i<M) begin
             reduce_input[i]=filter_result[i];
           end
           else begin
             reduce_input[i]='{N{0}};
+          end
+        end
+      end
+      // Reduce along M axis
+      else begin
+        for(i=0; i<N; i=i+1) begin
+          for(j=0; j<N; j=j+1) begin
+            if (j<M) begin
+              reduce_input[i][j]=filter_result[j][i];
+            end
+            else begin
+              reduce_input[i][j]=0;
+            end
           end
         end
       end
