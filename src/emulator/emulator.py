@@ -280,10 +280,9 @@ class emulatedHw():
             if b=='InputBuffer':
                 chain = self.ib.step()
                 self.log['ib'].append(chain)
-            elif b=='FilterUnit':
+            elif b=='FilterReduceUnit':
                 chain = self.fu.step(chain)
                 self.log['fu'].append(chain)
-            elif b=='MatrixVectorReduce':
                 chain = self.mvru.step(chain)
                 self.log['mvru'].append(chain)
             elif b=='VectorVectorALU':

@@ -14,8 +14,7 @@ MAX_CHAINS: 8   # Maximum number of chains of the firmware
 # Define how instruments are connected
 BUILDING_BLOCKS: 
     - InputBuffer
-    - FilterUnit
-    - MatrixVectorReduce
+    - FilterReduceUnit
     - VectorVectorALU
     - VectorScalarReduce
     - DataPacker
