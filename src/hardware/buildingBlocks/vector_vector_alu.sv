@@ -13,8 +13,7 @@
   parameter [7:0] INITIAL_FIRMWARE_ADDR_RD    [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_COND       [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_CACHE      [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
-  parameter [7:0] INITIAL_FIRMWARE_CACHE_ADDR [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
-  parameter [7:0] INITIAL_FIRMWARE_CACHE_COND [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
+  parameter [7:0] INITIAL_FIRMWARE_CACHE_ADDR [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
   )
   (
   input logic clk,
@@ -37,7 +36,6 @@
     reg [7:0] firmware_cond       [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_COND;
     reg [7:0] firmware_cache      [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_CACHE;
     reg [7:0] firmware_cache_addr [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_CACHE_ADDR;
-    reg [7:0] firmware_cache_cond [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_CACHE_COND;
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
     reg valid_in_delay = 1'b0;

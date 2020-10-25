@@ -346,9 +346,8 @@ class rtlHw():
             ['INITIAL_FIRMWARE_ADDR_RD'],
             ['INITIAL_FIRMWARE_COND'],
             ['INITIAL_FIRMWARE_CACHE'],
-            ['INITIAL_FIRMWARE_CACHE_ADDR'],
-            ['INITIAL_FIRMWARE_CACHE_COND']])
-        top.mod.vectorVectorALU.setAsConfigurable(configurable_parameters=6)
+            ['INITIAL_FIRMWARE_CACHE_ADDR']])
+        top.mod.vectorVectorALU.setAsConfigurable(configurable_parameters=5)
         top.mod.inputBuffer.addMemory("vvrf",self.VVVRF_SIZE,self.DATA_WIDTH*self.N)
 
         # Vector Scalar Reduce unit
@@ -412,9 +411,13 @@ class rtlHw():
         if self.firmware is None:
             VSRU_INITIAL_FIRMWARE = EMPTY_FIRMWARE
             DP_INITIAL_FIRMWARE = EMPTY_FIRMWARE
-            VVALU_INITIAL_FIRMWARE = EMPTY_FIRMWARE
+            VVALU_INITIAL_FIRMWARE_OP = EMPTY_FIRMWARE
+            VVALU_INITIAL_FIRMWARE_ADDR_RD = EMPTY_FIRMWARE
+            VVALU_INITIAL_FIRMWARE_COND = EMPTY_FIRMWARE
+            VVALU_INITIAL_FIRMWARE_CACHE = EMPTY_FIRMWARE
+            VVALU_INITIAL_FIRMWARE_CACHE_ADDR = EMPTY_FIRMWARE
         else:
-            VSRU_INITIAL_FIRMWARE=str([chain.op for chain in self.firmware['vsru']]).replace("[", "'{").replace("]", "}")
+            
             def encodeDpFirmware(commit,size):
                 if commit==0:
                     return 3
@@ -426,8 +429,24 @@ class rtlHw():
                     return 0
                 else:
                     assert False
+            def encodeCond(cond):
+                if cond['last']:
+                    return 1
+                elif cond['notlast']:
+                    return 2
+                elif cond['first']:
+                    return 3
+                elif cond['notfirst']:
+                    return 4
+                else:
+                    return 0
+            VSRU_INITIAL_FIRMWARE=str([chain.op for chain in self.firmware['vsru']]).replace("[", "'{").replace("]", "}")
             DP_INITIAL_FIRMWARE = str([encodeDpFirmware(chain.commit,chain.size) for chain in self.firmware['dp']]).replace("[", "'{").replace("]", "}")
-            VVALU_INITIAL_FIRMWARE = EMPTY_FIRMWARE
+            VVALU_INITIAL_FIRMWARE_OP=str([chain.op for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
+            VVALU_INITIAL_FIRMWARE_ADDR_RD=str([chain.addr for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
+            VVALU_INITIAL_FIRMWARE_COND=str([encodeCond(chain.cond) for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
+            VVALU_INITIAL_FIRMWARE_CACHE=str([chain.cache for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
+            VVALU_INITIAL_FIRMWARE_CACHE_ADDR=str([chain.cache_addr for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
 
         # Instantiate modules
         top.instantiateModule(top.mod.uart,"comm")
@@ -445,12 +464,11 @@ class rtlHw():
             ['MAX_CHAINS','MAX_CHAINS'],
             ['PERSONAL_CONFIG_ID','0'],
             ['VVVRF_SIZE','VVVRF_SIZE'],
-            ['INITIAL_FIRMWARE_OP',VVALU_INITIAL_FIRMWARE],
-            ['INITIAL_FIRMWARE_ADDR_RD',VVALU_INITIAL_FIRMWARE],
-            ['INITIAL_FIRMWARE_COND',VVALU_INITIAL_FIRMWARE],
-            ['INITIAL_FIRMWARE_CACHE',VVALU_INITIAL_FIRMWARE],
-            ['INITIAL_FIRMWARE_CACHE_ADDR',VVALU_INITIAL_FIRMWARE],
-            ['INITIAL_FIRMWARE_CACHE_COND',VVALU_INITIAL_FIRMWARE]])
+            ['INITIAL_FIRMWARE_OP',VVALU_INITIAL_FIRMWARE_OP],
+            ['INITIAL_FIRMWARE_ADDR_RD',VVALU_INITIAL_FIRMWARE_ADDR_RD],
+            ['INITIAL_FIRMWARE_COND',VVALU_INITIAL_FIRMWARE_COND],
+            ['INITIAL_FIRMWARE_CACHE',VVALU_INITIAL_FIRMWARE_CACHE],
+            ['INITIAL_FIRMWARE_CACHE_ADDR',VVALU_INITIAL_FIRMWARE_CACHE_ADDR]])
 
         top.instantiateModule(top.mod.vectorScalarReduceUnit,"vsru")
         top.inst.vsru.setParameters([
