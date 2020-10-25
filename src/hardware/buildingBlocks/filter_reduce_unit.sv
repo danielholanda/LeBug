@@ -12,7 +12,7 @@
   parameter FUVRF_SIZE=4,
   parameter [7:0] INITIAL_FIRMWARE_FILTER_OP    [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_FILTER_ADDR  [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
-  parameter [7:0] INITIAL_FIRMWARE_REDUCE_OP    [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
+  parameter [7:0] INITIAL_FIRMWARE_REDUCE_AXIS  [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
   )
   (
   input logic clk,
@@ -32,7 +32,7 @@
     //----------Internal Variables------------
     reg [7:0] firmware_filter_op     [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_FILTER_OP;
     reg [7:0] firmware_filter_addr   [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_FILTER_ADDR;
-    reg [7:0] firmware_reduce_op     [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_REDUCE_OP;
+    reg [7:0] firmware_reduce_op     [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_REDUCE_AXIS;
 
     reg valid_in_delay = 1'b0;
     reg eof_in_delay = 1'b0;

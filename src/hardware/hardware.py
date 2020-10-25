@@ -365,7 +365,7 @@ class rtlHw():
             ['PERSONAL_CONFIG_ID'],
             ['INITIAL_FIRMWARE_FILTER_OP'],
             ['INITIAL_FIRMWARE_FILTER_ADDR'],
-            ['INITIAL_FIRMWARE_REDUCE_OP']])
+            ['INITIAL_FIRMWARE_REDUCE_AXIS']])
         top.mod.filterReduceUnit.setAsConfigurable(configurable_parameters=3)
         top.mod.filterReduceUnit.addMemory("furf",self.FUVRF_SIZE,self.DATA_WIDTH*self.M,packed_elements=self.M)
 
@@ -467,6 +467,9 @@ class rtlHw():
             VVALU_INITIAL_FIRMWARE_COND = EMPTY_FIRMWARE
             VVALU_INITIAL_FIRMWARE_CACHE = EMPTY_FIRMWARE
             VVALU_INITIAL_FIRMWARE_CACHE_ADDR = EMPTY_FIRMWARE
+            FRU_INITIAL_FIRMWARE_OP = EMPTY_FIRMWARE
+            FRU_INITIAL_FIRMWARE_ADDR = EMPTY_FIRMWARE
+            FRU_INITIAL_FIRMWARE_REDUCE_AXIS = EMPTY_FIRMWARE
         else:
             
             def encodeDpFirmware(commit,size):
@@ -498,9 +501,9 @@ class rtlHw():
             VVALU_INITIAL_FIRMWARE_COND=str([encodeCond(chain.cond) for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
             VVALU_INITIAL_FIRMWARE_CACHE=str([chain.cache for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
             VVALU_INITIAL_FIRMWARE_CACHE_ADDR=str([chain.cache_addr for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
-        FRU_INITIAL_FIRMWARE_OP=EMPTY_FIRMWARE
-        FRU_INITIAL_FIRMWARE_ADDR=EMPTY_FIRMWARE
-        FRU_INITIAL_FIRMWARE_REDUCE_OP=EMPTY_FIRMWARE
+            FRU_INITIAL_FIRMWARE_OP=str([chain.filter for chain in self.firmware['fu']]).replace("[", "'{").replace("]", "}")
+            FRU_INITIAL_FIRMWARE_ADDR=str([chain.addr for chain in self.firmware['fu']]).replace("[", "'{").replace("]", "}")
+            FRU_INITIAL_FIRMWARE_REDUCE_AXIS=str([chain.axis for chain in self.firmware['mvru']]).replace("[", "'{").replace("]", "}")
 
         # Instantiate modules
         top.instantiateModule(top.mod.uart,"comm")
@@ -521,7 +524,7 @@ class rtlHw():
             ['PERSONAL_CONFIG_ID','0'],
             ['INITIAL_FIRMWARE_FILTER_OP',FRU_INITIAL_FIRMWARE_OP],
             ['INITIAL_FIRMWARE_FILTER_ADDR',FRU_INITIAL_FIRMWARE_ADDR],
-            ['INITIAL_FIRMWARE_REDUCE_OP',FRU_INITIAL_FIRMWARE_REDUCE_OP]])
+            ['INITIAL_FIRMWARE_REDUCE_AXIS',FRU_INITIAL_FIRMWARE_REDUCE_AXIS]])
 
         top.instantiateModule(top.mod.vectorVectorALU,"vvalu")
         top.inst.vvalu.setParameters([

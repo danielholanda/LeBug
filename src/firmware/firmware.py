@@ -120,6 +120,8 @@ def vvalu_simple(cp):
 # Simple test for fru
 def fru_simple(cp):
     cp.begin_chain()
+    cp.vv_filter(0)
+    cp.m_reduce('N')
     cp.v_commit()
     cp.end_chain()
     return cp.compile()
