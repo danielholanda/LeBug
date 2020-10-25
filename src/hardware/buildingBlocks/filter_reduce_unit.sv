@@ -109,20 +109,13 @@
       chainId_in_delay <= chainId_in;
     end
 
-    
+    // FOR NOW, THE FILTER IS SIMPLY REPLICATING THE INPUT! THIS IS TO FACILITATE THE TESTING OF THE REDUCE UNIT
     always @(*) begin
       // Logic for filter unit
       operand = {>>{mem_out_a}};
-      for(i=0; i<N; i=i+1) begin
-        filtered_input[i] =  vector_in_delay[i] + operand[i];
+      for(i=0; i<M; i=i+1) begin
+        filter_result[i] =  vector_in_delay[i];
       end
-      filter_result = filtered_input;
-
-      // Logic for reduce unit 
-      case (firmware_filter_op_delay)
-        0 : filter_result = vector_in_delay;
-        default : filter_result = filtered_input;
-      endcase
     end
 
     // Logic for reduce unit (MUST REUSE THIS FOR REDUCING ALONG N AXIS - NOW IS ONLY REDUCING ALONG M AXIS)
