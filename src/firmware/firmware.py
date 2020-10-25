@@ -112,6 +112,7 @@ def raw(cp):
 def vvalu_simple(cp):
     cp.begin_chain()
     cp.vv_add(0)
+    cp.v_cache(0)
     cp.v_commit()
     cp.end_chain()
     return cp.compile()

@@ -43,7 +43,7 @@
     reg [7:0] firmware_op_delay = 0;
     reg [7:0] firmware_cache_delay = 0;
     reg [7:0] firmware_cache_addr_delay = 0;
-    reg [DATA_WIDTH-1:0] mem_out [N-1:0];
+    reg [DATA_WIDTH-1:0] operand [N-1:0];
     reg [DATA_WIDTH-1:0] alu_result [N-1:0];
     reg [DATA_WIDTH-1:0] alu_add [N-1:0];
     reg [DATA_WIDTH-1:0] alu_mul [N-1:0];
@@ -118,11 +118,17 @@
 
     // Perform ALU ops
     always @(*) begin
-      mem_out = {>>{mem_out_a}};
+      // Select if I'm reading from memory or using value I just calculated (to avoid read after write conflicts in the cache) 
+      if (firmware_cache_delay && firmware_cache_addr_delay==firmware_cache_addr[chainId_in] && valid_in_delay) begin
+        operand = vector_out;
+      end
+      else begin
+        operand = {>>{mem_out_a}};
+      end
       for(i=0; i<N; i=i+1) begin
-        alu_add[i] =  vector_in_delay[i] + mem_out[i];
-        alu_mul[i] =  vector_in_delay[i] * mem_out[i];
-        alu_sub[i] =  vector_in_delay[i] - mem_out[i];
+        alu_add[i] =  vector_in_delay[i] + operand[i];
+        alu_mul[i] =  vector_in_delay[i] * operand[i];
+        alu_sub[i] =  vector_in_delay[i] - operand[i];
       end
       case (firmware_op_delay)
         0 : alu_result = vector_in_delay;
