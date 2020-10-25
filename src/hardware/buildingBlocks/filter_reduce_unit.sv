@@ -36,6 +36,7 @@
 
     reg valid_in_delay = 1'b0;
     reg eof_in_delay = 1'b0;
+    reg [DATA_WIDTH-1:0] operand [M-1:0];
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
     reg [DATA_WIDTH-1:0] filter_result [M-1:0] [N-1:0];
     reg [DATA_WIDTH-1:0] reduce_input [N-1:0] [N-1:0];
@@ -56,10 +57,10 @@
     // Instantiate memory to implement queue
     reg [$clog2(FUVRF_SIZE)-1:0] mem_address_a=0;
     reg [$clog2(FUVRF_SIZE)-1:0] mem_address_b=0;
-    wire mem_write_enable_a;
+    reg mem_write_enable=0;
     reg mem_write_enable_b=0;
-    wire [MEM_WIDTH-1:0] mem_in_a;
-    reg [MEM_WIDTH-1:0] mem_in_b;
+    reg [MEM_WIDTH-1:0] mem_in_a =0;
+    reg [MEM_WIDTH-1:0] mem_in_b =0;
     wire [MEM_WIDTH-1:0] mem_out_a;
     wire [MEM_WIDTH-1:0] mem_out_b;
     ram_dual_port furf (
@@ -113,9 +114,16 @@
 
     // Logic for filter unit
     always @(*) begin
-      //operand = {>>{mem_out_a}};
-      for(i=0; i<M; i=i+1) begin
-        filter_result[i] =  vector_in_delay;
+      operand = {>>{mem_out_a}};
+      for(i=0; i<N; i=i+1) begin
+        for(j=0; j<M; j=j+1) begin
+          if (j<M-1) begin
+            filter_result[j][i] = operand[j]>vector_in_delay[i] & operand[j+1]<=vector_in_delay[i];
+          end
+          else begin
+            filter_result[j][i] = operand[j]>vector_in_delay[i];
+          end
+        end
       end
     end
 

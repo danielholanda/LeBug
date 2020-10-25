@@ -276,7 +276,7 @@ def testVVALU():
 def testFRU():
 
     # Overwrite YAML file to define how components are attached to eachother
-    BUILDING_BLOCKS=['InputBuffer', 'VectorVectorALU','VectorScalarReduce','DataPacker','TraceBuffer']
+    BUILDING_BLOCKS=['InputBuffer', 'FilterReduceUnit','VectorVectorALU','VectorScalarReduce','DataPacker','TraceBuffer']
 
     # Instantiate HW and Emulator Processors
     DATA_WIDTH=32
@@ -298,8 +298,8 @@ def testFRU():
         print(f'Cycle {i}:\t{input_vectors[i]}')
 
     # Initialize the memories the same way
-    emu_proc.vvalu.vrf = [1,2,3,4,5,6,7,8]*VVVRF_SIZE
-    hw_proc.top.mod.vectorVectorALU.mem['vvrf']['init_values']=[[1,2,3,4,5,6,7,8]]*VVVRF_SIZE
+    emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
+    hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[list(range(FUVRF_SIZE))]*M
 
     # Configure firmware - Both HW and Emulator work with the same firmware
     fw = firm.fru_simple(hw_proc.compiler)
@@ -308,7 +308,7 @@ def testFRU():
 
     # Run HW simulation and emulation
     steps=35
-    hw_results = hw_proc.run(steps=steps,gui=False,log=True)
+    hw_results = hw_proc.run(steps=steps,gui=False,log=False)
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results
