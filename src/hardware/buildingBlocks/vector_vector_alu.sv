@@ -101,10 +101,6 @@
         eof_out <= eof_in_delay;
         chainId_out <= chainId_in_delay;
 
-        //Logic for caching
-        mem_in_b <= {>>{alu_result}};
-        mem_write_enable_b <= firmware_cache_delay;
-        mem_address_b <= firmware_cache_addr_delay;
       end
       else begin
         valid_out<=0;
@@ -136,6 +132,12 @@
       endcase
     end
 
+    //Logic for caching
+    always @(*) begin 
+      mem_in_b = {>>{alu_result}};
+      mem_write_enable_b = firmware_cache_delay;
+      mem_address_b = firmware_cache_addr_delay;
+    end
 
 
  
