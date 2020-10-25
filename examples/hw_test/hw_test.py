@@ -240,7 +240,8 @@ def testVVALU():
         print(f'Cycle {i}:\t{input_vectors[i]}')
 
     # Initialize the memories the same way
-    emu_proc.vvalu.vrf = [1,2,3,4,5,6,7,8]*N 
+    emu_proc.vvalu.vrf = [1,2,3,4,5,6,7,8]*VVVRF_SIZE
+    hw_proc.top.mod.vectorVectorALU.mem['vvrf']['init_values']=[[1,2,3,4,5,6,7,8]]*VVVRF_SIZE
 
     # Configure firmware - Both HW and Emulator work with the same firmware
     fw = firm.vvalu_simple(hw_proc.compiler)

@@ -284,7 +284,7 @@ class rtlHw():
             self.mem={}                     # Array of mems that need the mif files initialized
             self.configurable_parameters=0  # Number of configurable parameters of this module
 
-    def rtlLogic(self):
+    def rtlLogicInit(self):
         # Create TOP level module using custom RTL class
         top = self.rtlModule(self,"debugger")
         top.addInput([
@@ -366,8 +366,6 @@ class rtlHw():
             ['INITIAL_FIRMWARE_CACHE_ADDR']])
         top.mod.vectorVectorALU.setAsConfigurable(configurable_parameters=5)
         top.mod.vectorVectorALU.addMemory("vvrf",self.VVVRF_SIZE,self.DATA_WIDTH*self.N,packed_elements=self.N)
-        top.mod.vectorVectorALU.mem['vvrf']['init_values']=[[1,2,3,4,5,6,7,8]]*self.VVVRF_SIZE
-        #exit()
 
         # Vector Scalar Reduce unit
         top.includeModule("vectorScalarReduceUnit")
@@ -424,6 +422,11 @@ class rtlHw():
             ['DATA_WIDTH'],
             ['TB_SIZE']])
         top.mod.traceBuffer.addMemory("traceBuffer",self.TB_SIZE,self.DATA_WIDTH*self.N)
+
+        return top
+
+    def rtlLogicConfig(self):
+        top = self.top
 
         # Convert FW to RTL
         EMPTY_FIRMWARE= "'{MAX_CHAINS{0}}"
@@ -520,8 +523,7 @@ class rtlHw():
         top.inst.dp.connectInputs(top.inst.vsru)
         top.inst.tb.connectInputs(top.inst.dp)
         top.assignOutputs(top.inst.tb)
-        self.top=top
-        return top.dump()
+
 
     def testbench(self):
         # Prepare testbench inputs
@@ -668,7 +670,8 @@ class rtlHw():
 
         # Writes debugProcessor to file
         f = open(rtl_folder+"/debugProcessor.sv", "w")
-        for l in self.rtlLogic():
+        self.rtlLogicConfig()
+        for l in self.top.dump():
             f.write(l+"\n")
         f.close()
 
@@ -758,9 +761,9 @@ class rtlHw():
         self.VVVRF_SIZE=VVVRF_SIZE
         self.hwFolder = os.path.dirname(os.path.realpath(__file__))
         self.testbench_inputs=[]    # Stores inputs to testbench
-        self.steps=0 # Number of steps for testbench
-        self.top=None # used to store all rtl info later on
+        self.steps=0 # Number of steps for testbench 
         self.tb_var_names = None
         self.compiler = compiler(N,M,MAX_CHAINS)
         self.firmware = None
+        self.top=self.rtlLogicInit()
         
