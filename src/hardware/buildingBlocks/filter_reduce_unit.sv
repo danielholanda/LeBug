@@ -32,16 +32,17 @@
     //----------Internal Variables------------
     reg [7:0] firmware_filter_op     [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_FILTER_OP;
     reg [7:0] firmware_filter_addr   [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_FILTER_ADDR;
-    reg [7:0] firmware_reduce_op     [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_REDUCE_AXIS;
+    reg [7:0] firmware_reduce_axis   [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_REDUCE_AXIS;
 
     reg valid_in_delay = 1'b0;
     reg eof_in_delay = 1'b0;
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
     reg [DATA_WIDTH-1:0] filter_result [M-1:0] [N-1:0];
+    reg [DATA_WIDTH-1:0] reduce_input [N-1:0] [N-1:0];
     reg [DATA_WIDTH-1:0] reduce_result [N-1:0];
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
     reg [7:0] firmware_filter_op_delay;
-    reg [7:0] firmware_reduce_op_delay;
+    reg [7:0] firmware_reduce_axis_delay;
 
     parameter LATENCY = 2;
     parameter RAM_LATENCY = LATENCY-1;
@@ -105,7 +106,7 @@
       valid_in_delay <= valid_in;
       vector_in_delay <= vector_in; 
       firmware_filter_op_delay <= firmware_filter_op[chainId_in];
-      firmware_reduce_op_delay <= firmware_reduce_op[chainId_in];
+      firmware_reduce_axis_delay <= firmware_reduce_axis[chainId_in];
       eof_in_delay <= eof_in;
       chainId_in_delay <= chainId_in;
     end
@@ -117,12 +118,29 @@
       for(i=0; i<M; i=i+1) begin
         filter_result[i] =  vector_in_delay;
       end
+
+      // Logic for reduce unit
+      // Reduce along M axis
+      if (firmware_reduce_axis_delay==8'd0) begin
+        $display("Still need to do this here");
+      end
+      // Reduce along N axis
+      else begin
+        for(i=0; i<N; i=i+1) begin
+          if (i<M) begin
+            reduce_input[i]=filter_result[i];
+          end
+          else begin
+            reduce_input[i]='{N{0}};
+          end
+        end
+      end
     end
 
     // Logic for reduce unit (MUST REUSE THIS FOR REDUCING ALONG M AXIS - NOW IS ONLY REDUCING ALONG N AXIS)
     generate 
       for (g=0;g<N;g++) begin
-        adderTree #(.N(N), .DATA_WIDTH(DATA_WIDTH))adder_tree_inst(.vector(filter_result[g]), .result(reduce_result[g]));
+        adderTree #(.N(N), .DATA_WIDTH(DATA_WIDTH))adder_tree_inst(.vector(reduce_input[g]), .result(reduce_result[g]));
       end
     endgenerate
  

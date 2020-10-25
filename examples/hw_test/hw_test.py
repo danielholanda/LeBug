@@ -289,7 +289,7 @@ def testFRU():
     # Create common input values
     np.random.seed(0)
     input_vectors=[]
-    num_input_vectors=4
+    num_input_vectors=2
     print("********** Input vectors **********")
     for i in range(num_input_vectors):
         input_vectors.append(np.random.randint(5, size=N))
@@ -308,7 +308,7 @@ def testFRU():
 
     # Run HW simulation and emulation
     steps=35
-    hw_results = hw_proc.run(steps=steps,gui=False,log=False)
+    hw_results = hw_proc.run(steps=steps,gui=False,log=True)
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results
