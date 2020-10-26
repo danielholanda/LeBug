@@ -124,12 +124,21 @@ def fru_simple(cp):
     cp.m_reduce('M')
     cp.v_commit()
     cp.end_chain()
+    return cp.compile()
 
-    #cp.begin_chain()
-    #cp.vv_filter(0)
-    #cp.m_reduce('M')
-    #cp.v_commit()
-    #cp.end_chain()
+# Simple test for fru
+def twoChains(cp):
+    cp.begin_chain()
+    cp.vv_filter(0)
+    cp.m_reduce('M')
+    cp.v_commit()
+    cp.end_chain()
+
+    cp.begin_chain()
+    cp.vv_filter(0)
+    cp.m_reduce('N')
+    cp.v_commit()
+    cp.end_chain()
     return cp.compile()
 
 # Ideas for new instruments:

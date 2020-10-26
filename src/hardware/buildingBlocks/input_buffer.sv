@@ -26,7 +26,6 @@
  );
 
     //----------Internal Variables------------
-    reg dequeue=1'b1; 
     wire empty,full;
     reg valid_out_delay = 1'b0;
     reg [7:0] valid_chains = INITIAL_FIRMWARE;
@@ -79,11 +78,11 @@
         end
 
         //Logic for dequeuing
-        if (dequeue==1'b1 & empty==1'b0) begin
+        if (chainId_out==1'b0 & empty==1'b0) begin
             mem_address_b <= mem_address_b<IB_DEPTH-1 ? mem_address_b+1'b1 : 0;
             valid_out_delay <= 1'b1;
         end
-        else begin
+        if (chainId_out==1'b0 & empty==1'b1) begin
             valid_out_delay <= 1'b0;
         end
 
@@ -100,6 +99,7 @@
         else begin
           chainId_out<=0;
         end
+
     end
 
     // Directly assign module inputs to port A of memory
