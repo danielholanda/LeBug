@@ -32,6 +32,7 @@
     reg [7:0] valid_chains = INITIAL_FIRMWARE;
     reg [$clog2(MAX_CHAINS)-1:0] chainId=0;
     reg [$clog2(MAX_CHAINS)-1:0] chainId_delay=0;
+    reg frame_ended=1'b1;
 
     parameter LATENCY = 2;
     parameter RAM_LATENCY = LATENCY-1;
@@ -129,9 +130,20 @@
           chainId<=0;
         end
 
-        // 1-bit wide EOF signal is implemented as a bit shifter
-        // FIXME - This is wrong -> We also need to create a memory/buffer for this
-        bof_out <= 1'b1;
+        if (valid_out_delay<=1'b1) begin
+          if (frame_ended==1'b1) begin
+            bof_out <= 1'b1;
+            frame_ended<=1'b0;
+          end
+          else if (eof_out==1'b1) begin
+            bof_out <= 1'b1;
+            frame_ended<=1'b1;
+          end
+          else begin
+            bof_out <= 1'b0;
+          end
+        end
+
         valid_out <= valid_out_delay;
         chainId_delay<=chainId;
         chainId_out <=chainId_delay;
