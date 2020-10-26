@@ -73,6 +73,36 @@
     defparam mem.latency = RAM_LATENCY;
     defparam mem.init_file = "inputBuffer.mif";
 
+    // Instantiate memory to implement queue
+    wire eof_mem_in_a;
+    wire eof_mem_in_b;
+    wire eof_mem_out_a;
+    wire eof_mem_out_b;
+    ram_dual_port mem_eof (
+      .clk( clk ),
+      .clken( 1'b1 ),
+      .address_a( mem_address_a ),
+      .address_b( mem_address_b ),
+      .wren_a( mem_write_enable_a ),
+      .wren_b( mem_write_enable_b ),
+      .data_a( eof_mem_in_a ),
+      .data_b( eof_mem_in_b ),
+      .byteena_a( 1'b1 ),
+      .byteena_b( 1'b1 ),
+      .q_a( eof_mem_out_a ),
+      .q_b( eof_mem_out_b)
+    );
+    defparam mem_eof.width_a = 1;
+    defparam mem_eof.width_b = 1;
+    defparam mem_eof.widthad_a = $clog2(IB_DEPTH);
+    defparam mem_eof.widthad_b = $clog2(IB_DEPTH);
+    defparam mem_eof.width_be_a = 1;
+    defparam mem_eof.width_be_b = 1;
+    defparam mem_eof.numwords_a = IB_DEPTH;
+    defparam mem_eof.numwords_b = IB_DEPTH;
+    defparam mem_eof.latency = RAM_LATENCY;
+    defparam mem_eof.init_file = "inputBuffer_eof.mif";
+
     always @(posedge clk) begin
 
         // Logic for enqueuing values
@@ -101,7 +131,6 @@
 
         // 1-bit wide EOF signal is implemented as a bit shifter
         // FIXME - This is wrong -> We also need to create a memory/buffer for this
-        eof_out <= eof_in;
         bof_out <= 1'b1;
         valid_out <= valid_out_delay;
         chainId_delay<=chainId;
@@ -111,10 +140,12 @@
 
     // Directly assign module inputs to port A of memory
     assign mem_in_a = { >> { vector_in }};
+    assign eof_mem_in_a = eof_in;
     assign mem_write_enable_a = enqueue;
 
     // Module output is the output of the queue
     assign vector_out = { >> { mem_out_b }};
+    assign eof_out = eof_mem_out_b;
 
     // Check if queue is empty/full
     assign empty = (mem_address_a-mem_address_b==1) | (mem_address_a==0 & mem_address_b==IB_DEPTH-1);
