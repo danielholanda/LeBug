@@ -39,10 +39,13 @@
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
     reg valid_in_delay = 1'b0;
+    reg valid_in_delay_2 = 1'b0;
     reg eof_in_delay = 1'b0;
     reg [7:0] firmware_op_delay = 0;
     reg [7:0] firmware_cache_delay = 0;
+    reg [7:0] firmware_cache_delay_2 = 0;
     reg [7:0] firmware_cache_addr_delay = 0;
+    reg [7:0] firmware_cache_addr_delay_2 = 0;
     reg [DATA_WIDTH-1:0] operand [N-1:0];
     reg [DATA_WIDTH-1:0] alu_result [N-1:0];
     reg [DATA_WIDTH-1:0] alu_add [N-1:0];
@@ -108,10 +111,13 @@
 
       // Delay values until we can read the value to perform the op
       valid_in_delay <= valid_in;
+      valid_in_delay_2 <= valid_in_delay;
       vector_in_delay <= vector_in; 
       firmware_op_delay <= firmware_op[chainId_in];
       firmware_cache_delay <= firmware_cache[chainId_in];
+      firmware_cache_delay_2 <= firmware_cache_delay;
       firmware_cache_addr_delay <= firmware_cache_addr[chainId_in];
+      firmware_cache_addr_delay_2 <= firmware_cache_addr_delay;
       eof_in_delay <= eof_in;
       chainId_in_delay <= chainId_in;
     end
@@ -119,7 +125,7 @@
     // Perform ALU ops
     always @(*) begin
       // Select if I'm reading from memory or using value I just calculated (to avoid read after write conflicts in the cache) 
-      if (firmware_cache_delay && firmware_cache_addr_delay==firmware_cache_addr[chainId_in] && valid_in_delay) begin
+      if (firmware_cache_delay_2 && valid_in_delay_2 && firmware_cache_addr_delay_2==firmware_cache_addr_delay) begin
         operand = vector_out;
       end
       else begin
@@ -144,8 +150,6 @@
       mem_write_enable_b = firmware_cache_delay;
       mem_address_b = firmware_cache_addr_delay;
     end
-
-
  
  endmodule 
 
