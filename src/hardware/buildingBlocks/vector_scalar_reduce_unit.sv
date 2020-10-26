@@ -16,6 +16,7 @@ module  vectorScalarReduceUnit #(
   input logic clk,
   input logic valid_in,
   input logic eof_in,
+  input logic bof_in,
   input logic [$clog2(MAX_CHAINS)-1:0] chainId_in,
   input logic tracing,
   input logic [7:0] configId,
@@ -24,6 +25,7 @@ module  vectorScalarReduceUnit #(
   output reg valid_out,
   output reg [DATA_WIDTH-1:0] vector_out [N-1:0],
   output reg eof_out,
+  output reg bof_out,
   output reg [$clog2(MAX_CHAINS)-1:0] chainId_out
  );
 
@@ -62,6 +64,7 @@ module  vectorScalarReduceUnit #(
         end
 
         eof_out<=eof_in;
+        bof_out<=bof_in;
         chainId_out<=chainId_in;
     end
 

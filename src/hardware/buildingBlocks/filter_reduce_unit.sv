@@ -19,6 +19,7 @@
   input logic tracing,
   input logic valid_in,
   input logic eof_in,
+  input logic bof_in,
   input logic [$clog2(MAX_CHAINS)-1:0] chainId_in,
   input logic [7:0] configId,
   input logic [7:0] configData,
@@ -26,7 +27,8 @@
   output reg [DATA_WIDTH-1:0] vector_out [N-1:0],
   output reg [$clog2(MAX_CHAINS)-1:0] chainId_out,
   output reg valid_out,
-  output reg eof_out
+  output reg eof_out,
+  output reg bof_out
  );
 
     //----------Internal Variables------------
@@ -36,6 +38,7 @@
 
     reg valid_in_delay = 1'b0;
     reg eof_in_delay = 1'b0;
+    reg bof_in_delay = 1'b0;
     reg [DATA_WIDTH-1:0] operand [M-1:0];
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
     reg [DATA_WIDTH-1:0] filter_result [M-1:0] [N-1:0];
@@ -96,6 +99,7 @@
         vector_out <= firmware_filter_op_delay==8'b1 ? reduce_result : vector_in_delay;
         valid_out <= valid_in_delay;
         eof_out <= eof_in_delay;
+        bof_out <= bof_in_delay;
         chainId_out <= chainId_in_delay;
 
       end

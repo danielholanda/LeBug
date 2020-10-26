@@ -332,6 +332,7 @@ class rtlHw():
         top.mod.inputBuffer.addOutput([
             ['valid_out','logic',1],
             ['eof_out','logic',1],
+            ['bof_out','logic',1],
             ['vector_out','logic','DATA_WIDTH','N'],
             ['chainId_out','logic','$clog2(MAX_CHAINS)']])
         top.mod.inputBuffer.addParameter([
@@ -350,11 +351,13 @@ class rtlHw():
             ['clk','logic',1],
             ['valid_in','logic',1],
             ['eof_in','logic',1],
+            ['bof_in','logic',1],
             ['chainId_in','logic','$clog2(MAX_CHAINS)'],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.mod.filterReduceUnit.addOutput([
             ['valid_out','logic',1],
             ['eof_out','logic',1],
+            ['bof_out','logic',1],
             ['chainId_out','logic','$clog2(MAX_CHAINS)'],
             ['vector_out','logic','DATA_WIDTH','N']])
         top.mod.filterReduceUnit.addParameter([
@@ -376,11 +379,13 @@ class rtlHw():
             ['clk','logic',1],
             ['valid_in','logic',1],
             ['eof_in','logic',1],
+            ['bof_in','logic',1],
             ['chainId_in','logic','$clog2(MAX_CHAINS)'],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.mod.vectorVectorALU.addOutput([
             ['valid_out','logic',1],
             ['eof_out','logic',1],
+            ['bof_out','logic',1],
             ['chainId_out','logic','$clog2(MAX_CHAINS)'],
             ['vector_out','logic','DATA_WIDTH','N']])
         top.mod.vectorVectorALU.addParameter([
@@ -403,11 +408,13 @@ class rtlHw():
             ['clk','logic',1],
             ['valid_in','logic',1],
             ['eof_in','logic',1],
+            ['bof_in','logic',1],
             ['chainId_in','logic','$clog2(MAX_CHAINS)'],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.mod.vectorScalarReduceUnit.addOutput([
             ['valid_out','logic',1],
             ['eof_out','logic',1],
+            ['bof_out','logic',1],
             ['chainId_out','logic','$clog2(MAX_CHAINS)'],
             ['vector_out','logic','DATA_WIDTH','N']])
         top.mod.vectorScalarReduceUnit.addParameter([
@@ -424,6 +431,7 @@ class rtlHw():
             ['clk','logic',1],
             ['valid_in','logic',1],
             ['eof_in','logic',1],
+            ['bof_in','logic',1],
             ['chainId_in','logic','$clog2(MAX_CHAINS)'],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.mod.dataPacker.addOutput([

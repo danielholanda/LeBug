@@ -144,24 +144,10 @@ def multipleChains(cp):
     cp.end_chain()
     return cp.compile()
 
-# Self correlation with the previous sample
-def crazy(cp):
-
-    # x
+# Firmware for a distribution with multiple sets of N values
+def conditions(cp):
     cp.begin_chain()
-    cp.vv_add(0)
-    cp.v_commit()
-    cp.end_chain()
-
-    # x
-    cp.begin_chain()
-    cp.v_cache(0)
-    cp.v_commit()
-    cp.end_chain()
-
-    # x+x
-    cp.begin_chain()
-    cp.vv_add(0)
+    cp.vv_add(0,'notfirst')
     cp.v_commit()
     cp.end_chain()
     return cp.compile()

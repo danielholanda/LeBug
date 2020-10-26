@@ -16,6 +16,7 @@
   input logic tracing,
   input logic valid_in,
   input logic eof_in,
+  input logic bof_in,
   input logic [$clog2(MAX_CHAINS)-1:0] chainId_in,
   input logic [7:0] configId,
   input logic [7:0] configData,

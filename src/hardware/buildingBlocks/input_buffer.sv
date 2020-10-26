@@ -21,6 +21,7 @@
   input logic [DATA_WIDTH-1:0] vector_in [N-1:0],
   output reg valid_out,
   output reg eof_out,
+  output reg bof_out,
   output reg [DATA_WIDTH-1:0] vector_out [N-1:0],
   output reg [$clog2(MAX_CHAINS)-1:0] chainId_out
  );
@@ -101,6 +102,7 @@
         // 1-bit wide EOF signal is implemented as a bit shifter
         // FIXME - This is wrong -> We also need to create a memory/buffer for this
         eof_out <= eof_in;
+        bof_out <= 1'b1;
         valid_out <= valid_out_delay;
         chainId_delay<=chainId;
         chainId_out <=chainId_delay;

@@ -20,6 +20,7 @@
   input logic tracing,
   input logic valid_in,
   input logic eof_in,
+  input logic bof_in,
   input logic [$clog2(MAX_CHAINS)-1:0] chainId_in,
   input logic [7:0] configId,
   input logic [7:0] configData,
@@ -27,7 +28,8 @@
   output reg [DATA_WIDTH-1:0] vector_out [N-1:0],
   output reg [$clog2(MAX_CHAINS)-1:0] chainId_out,
   output reg valid_out,
-  output reg eof_out
+  output reg eof_out,
+  output reg bof_out
  );
 
     //----------Internal Variables------------
@@ -41,11 +43,14 @@
     reg valid_in_delay = 1'b0;
     reg valid_in_delay_2 = 1'b0;
     reg eof_in_delay = 1'b0;
+    reg bof_in_delay = 1'b0;
     reg [7:0] firmware_op_delay = 0;
     reg [7:0] firmware_cache_delay = 0;
     reg [7:0] firmware_cache_delay_2 = 0;
     reg [7:0] firmware_cache_addr_delay = 0;
     reg [7:0] firmware_cache_addr_delay_2 = 0;
+    reg [7:0] firmware_cond_delay =0;
+    reg cond_valid;
     reg [DATA_WIDTH-1:0] operand [N-1:0];
     reg [DATA_WIDTH-1:0] alu_result [N-1:0];
     reg [DATA_WIDTH-1:0] alu_add [N-1:0];
@@ -99,9 +104,10 @@
       if (tracing==1'b1) begin
         // Logic for output
         mem_address_a = firmware_addr_rd[chainId_in];
-        vector_out <= alu_result;
+        vector_out <= cond_valid ? alu_result : vector_in_delay;
         valid_out <= valid_in_delay;
         eof_out <= eof_in_delay;
+        bof_out <= bof_in_delay;
         chainId_out <= chainId_in_delay;
 
       end
@@ -113,12 +119,14 @@
       valid_in_delay <= valid_in;
       valid_in_delay_2 <= valid_in_delay;
       vector_in_delay <= vector_in; 
+      firmware_cond_delay <= firmware_cond[chainId_in];
       firmware_op_delay <= firmware_op[chainId_in];
       firmware_cache_delay <= firmware_cache[chainId_in];
       firmware_cache_delay_2 <= firmware_cache_delay;
       firmware_cache_addr_delay <= firmware_cache_addr[chainId_in];
       firmware_cache_addr_delay_2 <= firmware_cache_addr_delay;
       eof_in_delay <= eof_in;
+      bof_in_delay <= bof_in;
       chainId_in_delay <= chainId_in;
     end
 
@@ -142,6 +150,15 @@
         2 : alu_result = alu_mul;
         default : alu_result = alu_sub;
       endcase
+
+      // Only perform operation if condition is valid
+      // none=0, last=1, notlast=2, first=3, notfirst=4
+      if (firmware_cond_delay==8'd0 | (firmware_cond_delay==8'd1 & eof_in_delay==1'b1) | (firmware_cond_delay==8'd2 & eof_in_delay==1'b0) |  (firmware_cond_delay==8'd3 & bof_in_delay==1'b1) | (firmware_cond_delay==8'd2 & bof_in_delay==1'b0)) begin
+        cond_valid = 1'b1;
+      end
+      else begin
+        cond_valid = 1'b1;
+      end
     end
 
     //Logic for caching
