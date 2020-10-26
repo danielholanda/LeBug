@@ -289,7 +289,7 @@ def testFRU():
     # Create common input values
     np.random.seed(0)
     input_vectors=[]
-    num_input_vectors=2
+    num_input_vectors=5
     print("********** Input vectors **********")
     for i in range(num_input_vectors):
         input_vectors.append(np.random.randint(5, size=N))
@@ -307,18 +307,14 @@ def testFRU():
     hw_proc.config(fw)
 
     # Run HW simulation and emulation
-    steps=35
+    steps=30
     hw_results = hw_proc.run(steps=steps,gui=False,log=False)
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results
     emu_trace_buffer = emu_results['tb'][-1];
-    #hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
-    hw_trace_buffer = np.array(hw_results['tb']['mem_data'])
-
-    # Print intermediate results
-    #print("\n\n********** Intermediate Data Packer Results **********")
-    #intermediate_results=np.array([print(f'{list(v_out)} valid:{valid}') for v_out, valid in emu_results['dp']])
+    hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
+    #hw_trace_buffer = np.array(hw_results['tb']['mem_data'])
 
     # Print Results
     print("\n\n********** Emulation results **********")
@@ -327,7 +323,7 @@ def testFRU():
     print(hw_trace_buffer)
 
     # Verify that results are equal
-    #assert np.allclose(emu_trace_buffer,hw_trace_buffer), "Failed to match emulator and hardware in DP test"
+    assert np.allclose(emu_trace_buffer,hw_trace_buffer), "Failed to match emulator and hardware in FRU test"
     print("Passed test #5")
 
 testFRU()

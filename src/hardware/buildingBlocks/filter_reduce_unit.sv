@@ -118,10 +118,10 @@
       for(i=0; i<N; i=i+1) begin
         for(j=0; j<M; j=j+1) begin
           if (j<M-1) begin
-            filter_result[j][i] = operand[j]>vector_in_delay[i] & operand[j+1]<=vector_in_delay[i];
+            filter_result[j][i] = vector_in_delay[i]>operand[j] & vector_in_delay[i]<=operand[j+1];
           end
           else begin
-            filter_result[j][i] = operand[j]>vector_in_delay[i];
+            filter_result[j][i] = vector_in_delay[i]>operand[j];
           end
         end
       end
@@ -130,7 +130,7 @@
     // Logic for reduce unit
     always @(*) begin
       // Reduce along N axis
-      if (firmware_reduce_axis_delay==8'd1) begin
+      if (firmware_reduce_axis_delay==8'd2) begin
         for(i=0; i<N; i=i+1) begin
           if (i<M) begin
             reduce_input[i]=filter_result[i];
@@ -155,7 +155,7 @@
       end
     end
 
-    // Logic for reduce unit (MUST REUSE THIS FOR REDUCING ALONG M AXIS - NOW IS ONLY REDUCING ALONG N AXIS)
+    // Logic for reduce unit
     generate 
       for (g=0;g<N;g++) begin
         adderTree #(.N(N), .DATA_WIDTH(DATA_WIDTH))adder_tree_inst(.vector(reduce_input[g]), .result(reduce_result[g]));
