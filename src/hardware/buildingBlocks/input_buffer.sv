@@ -8,7 +8,8 @@
   parameter N=8,
   parameter DATA_WIDTH=32,
   parameter IB_DEPTH=4,
-  parameter MAX_CHAINS=4
+  parameter MAX_CHAINS=4,
+  parameter INITIAL_FIRMWARE=0
   )
   (
   input logic clk,
@@ -21,13 +22,14 @@
   output reg valid_out,
   output reg eof_out,
   output reg [DATA_WIDTH-1:0] vector_out [N-1:0],
-  output reg [$clog2(MAX_CHAINS)-1:0] chainId_out 
+  output reg [$clog2(MAX_CHAINS)-1:0] chainId_out=0
  );
 
     //----------Internal Variables------------
     reg dequeue=1'b1; 
     wire empty,full;
     reg valid_out_delay = 1'b0;
+    reg [7:0] valid_chains = INITIAL_FIRMWARE;
 
     parameter LATENCY = 2;
     parameter RAM_LATENCY = LATENCY-1;
@@ -90,6 +92,14 @@
         eof_out <= eof_in;
 
         valid_out <= valid_out_delay;
+
+        // loop over the different valid chains
+        if (chainId_out<valid_chains-1 & valid_chains!=0) begin
+          chainId_out<=chainId_out+1;
+        end
+        else begin
+          chainId_out<=0;
+        end
     end
 
     // Directly assign module inputs to port A of memory
@@ -103,6 +113,5 @@
     assign empty = (mem_address_a-mem_address_b==1) | (mem_address_a==0 & mem_address_b==IB_DEPTH-1);
     assign full = (mem_address_a==mem_address_b);
 
-    assign chainId_out=0;
  
  endmodule 

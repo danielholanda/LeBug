@@ -121,9 +121,15 @@ def vvalu_simple(cp):
 def fru_simple(cp):
     cp.begin_chain()
     cp.vv_filter(0)
-    cp.m_reduce('N')
+    cp.m_reduce('M')
     cp.v_commit()
     cp.end_chain()
+
+    #cp.begin_chain()
+    #cp.vv_filter(0)
+    #cp.m_reduce('M')
+    #cp.v_commit()
+    #cp.end_chain()
     return cp.compile()
 
 # Ideas for new instruments:

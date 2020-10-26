@@ -338,7 +338,8 @@ class rtlHw():
             ['N'],
             ['DATA_WIDTH'],
             ['IB_DEPTH'],
-            ['MAX_CHAINS']])
+            ['MAX_CHAINS'],
+            ['INITIAL_FIRMWARE']])
         top.mod.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
         top.mod.inputBuffer.setAsConfigurable(configurable_parameters=4)
 
@@ -460,6 +461,7 @@ class rtlHw():
         # Convert FW to RTL
         EMPTY_FIRMWARE= "'{MAX_CHAINS{0}}"
         if self.firmware is None:
+            IB_INITIAL_FIRMWARE=0
             VSRU_INITIAL_FIRMWARE = EMPTY_FIRMWARE
             DP_INITIAL_FIRMWARE = EMPTY_FIRMWARE
             VVALU_INITIAL_FIRMWARE_OP = EMPTY_FIRMWARE
@@ -504,6 +506,7 @@ class rtlHw():
             FRU_INITIAL_FIRMWARE_OP=str([chain.filter for chain in self.firmware['fu']]).replace("[", "'{").replace("]", "}")
             FRU_INITIAL_FIRMWARE_ADDR=str([chain.addr for chain in self.firmware['fu']]).replace("[", "'{").replace("]", "}")
             FRU_INITIAL_FIRMWARE_REDUCE_AXIS=str([chain.axis for chain in self.firmware['mvru']]).replace("[", "'{").replace("]", "}")
+            IB_INITIAL_FIRMWARE=self.firmware['valid_chains']
 
         # Instantiate modules
         top.instantiateModule(top.mod.uart,"comm")
@@ -512,7 +515,9 @@ class rtlHw():
         top.inst.ib.setParameters([
             ['N','N'],
             ['DATA_WIDTH','DATA_WIDTH'],
-            ['IB_DEPTH','IB_DEPTH']])
+            ['IB_DEPTH','IB_DEPTH'],
+            ['MAX_CHAINS','MAX_CHAINS'],
+            ['INITIAL_FIRMWARE',IB_INITIAL_FIRMWARE]])
 
         top.instantiateModule(top.mod.filterReduceUnit,"fru")
         top.inst.fru.setParameters([

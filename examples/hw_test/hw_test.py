@@ -308,7 +308,7 @@ def testFRU():
 
     # Run HW simulation and emulation
     steps=30
-    hw_results = hw_proc.run(steps=steps,gui=False,log=False)
+    hw_results = hw_proc.run(steps=steps,gui=False,log=True)
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results
