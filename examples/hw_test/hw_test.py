@@ -329,7 +329,7 @@ def testFRU():
 #testFRU()
 
 
-def twoChains():
+def multipleChains():
 
     # Overwrite YAML file to define how components are attached to eachother
     BUILDING_BLOCKS=['InputBuffer', 'FilterReduceUnit','VectorVectorALU','VectorScalarReduce','DataPacker','TraceBuffer']
@@ -345,7 +345,7 @@ def twoChains():
     # Create common input values
     np.random.seed(0)
     input_vectors=[]
-    num_input_vectors=3
+    num_input_vectors=1
     print("********** Input vectors **********")
     for i in range(num_input_vectors):
         input_vectors.append(np.random.randint(5, size=N))
@@ -358,13 +358,13 @@ def twoChains():
     hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[list(range(FUVRF_SIZE))]*M
 
     # Configure firmware - Both HW and Emulator work with the same firmware
-    fw = firm.twoChains(hw_proc.compiler)
+    fw = firm.multipleChains(hw_proc.compiler)
     emu_proc.config(fw)
     hw_proc.config(fw)
 
     # Run HW simulation and emulation
     steps=30
-    hw_results = hw_proc.run(steps=steps,gui=False,log=True)
+    hw_results = hw_proc.run(steps=steps,gui=False,log=False)
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results
@@ -382,10 +382,10 @@ def twoChains():
     assert np.allclose(emu_trace_buffer,hw_trace_buffer), "Failed to match emulator and hardware in FRU test"
     print("Passed test #5")
 
-twoChains()
+multipleChains()
 
 
-
+# NEXT -> Correlation... Than distribution! (CORRELATION MIGHT NOT BE WORKING BECAUSE WE HAVE 3 CHAINS)
 
 
 

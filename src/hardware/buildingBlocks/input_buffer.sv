@@ -22,13 +22,15 @@
   output reg valid_out,
   output reg eof_out,
   output reg [DATA_WIDTH-1:0] vector_out [N-1:0],
-  output reg [$clog2(MAX_CHAINS)-1:0] chainId_out=0
+  output reg [$clog2(MAX_CHAINS)-1:0] chainId_out
  );
 
     //----------Internal Variables------------
     wire empty,full;
     reg valid_out_delay = 1'b0;
     reg [7:0] valid_chains = INITIAL_FIRMWARE;
+    reg [$clog2(MAX_CHAINS)-1:0] chainId=0;
+    reg [$clog2(MAX_CHAINS)-1:0] chainId_delay=0;
 
     parameter LATENCY = 2;
     parameter RAM_LATENCY = LATENCY-1;
@@ -78,27 +80,30 @@
         end
 
         //Logic for dequeuing
-        if (chainId_out==1'b0 & empty==1'b0) begin
+        if (chainId==1'b0) begin
+          if (empty==1'b0) begin
             mem_address_b <= mem_address_b<IB_DEPTH-1 ? mem_address_b+1'b1 : 0;
             valid_out_delay <= 1'b1;
-        end
-        if (chainId_out==1'b0 & empty==1'b1) begin
+          end
+          else begin
             valid_out_delay <= 1'b0;
+          end
+        end
+
+        // loop over the different valid chains
+        if (chainId<valid_chains-1 & valid_chains!=0) begin
+          chainId<=chainId+1;
+        end
+        else begin
+          chainId<=0;
         end
 
         // 1-bit wide EOF signal is implemented as a bit shifter
         // FIXME - This is wrong -> We also need to create a memory/buffer for this
         eof_out <= eof_in;
-
         valid_out <= valid_out_delay;
-
-        // loop over the different valid chains
-        if (chainId_out<valid_chains-1 & valid_chains!=0) begin
-          chainId_out<=chainId_out+1;
-        end
-        else begin
-          chainId_out<=0;
-        end
+        chainId_delay<=chainId;
+        chainId_out <=chainId_delay;
 
     end
 

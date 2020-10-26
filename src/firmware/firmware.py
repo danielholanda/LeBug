@@ -126,8 +126,8 @@ def fru_simple(cp):
     cp.end_chain()
     return cp.compile()
 
-# Simple test for fru
-def twoChains(cp):
+# Multiple Chains
+def multipleChains(cp):
     cp.begin_chain()
     cp.vv_filter(0)
     cp.m_reduce('M')
@@ -135,8 +135,11 @@ def twoChains(cp):
     cp.end_chain()
 
     cp.begin_chain()
-    cp.vv_filter(0)
-    cp.m_reduce('N')
+    cp.v_reduce()
+    cp.v_commit()
+    cp.end_chain()
+
+    cp.begin_chain()
     cp.v_commit()
     cp.end_chain()
     return cp.compile()
