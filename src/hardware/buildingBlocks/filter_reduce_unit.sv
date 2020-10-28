@@ -60,7 +60,7 @@
     // Instantiate memory to implement queue
     reg [$clog2(FUVRF_SIZE)-1:0] mem_address_a=0;
     reg [$clog2(FUVRF_SIZE)-1:0] mem_address_b=0;
-    reg mem_write_enable=0;
+    reg mem_write_enable_a=0;
     reg mem_write_enable_b=0;
     reg [MEM_WIDTH-1:0] mem_in_a =0;
     reg [MEM_WIDTH-1:0] mem_in_b =0;
@@ -95,7 +95,6 @@
 
       if (tracing==1'b1) begin
         // Logic for output
-        mem_address_a = firmware_filter_addr[chainId_in];
         vector_out <= firmware_filter_op_delay==8'b1 ? reduce_result : vector_in_delay;
         valid_out <= valid_in_delay;
         eof_out <= eof_in_delay;
@@ -158,6 +157,8 @@
           end
         end
       end
+
+      mem_address_a = firmware_filter_addr[chainId_in];
     end
 
     // Logic for reduce unit
@@ -166,6 +167,8 @@
         adderTree #(.N(N), .DATA_WIDTH(DATA_WIDTH))adder_tree_inst(.vector(reduce_input[g]), .result(reduce_result[g]));
       end
     endgenerate
+
+
  
  endmodule 
 
