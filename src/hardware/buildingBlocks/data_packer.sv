@@ -9,7 +9,8 @@
   parameter DATA_WIDTH=32,
   parameter MAX_CHAINS=4,
   parameter PERSONAL_CONFIG_ID=0,
-  parameter [7:0] INITIAL_FIRMWARE [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
+  parameter [7:0] INITIAL_FIRMWARE      [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
+  parameter [7:0] INITIAL_FIRMWARE_COND [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
   )
   (
   input logic clk,
@@ -26,12 +27,14 @@
  );
 
     //----------Internal Variables------------
+    reg [7:0] firmware_cond       [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_COND;
     reg [DATA_WIDTH-1:0] packed_data [N-1:0];
     reg [31:0] packed_counter = 0;
     reg [7:0] firmware [0:MAX_CHAINS-1] = INITIAL_FIRMWARE;
     reg [31:0] total_length;
     reg [31:0] vector_length;
     reg commit;
+    reg cond_valid;
     wire [DATA_WIDTH-1:0] pack_1 [N-1:0];
     wire [DATA_WIDTH-1:0] pack_M [N-1:0];
 
@@ -40,7 +43,7 @@
     always @(posedge clk) begin
       //Packing is not perfect, otherwise it would be too expensive
       // If we overflow, we just submit things as they are (This may happen if we are mixing precisions)
-      if (valid_in==1'b1 && tracing==1'b1 && commit==1'b1) begin
+      if (valid_in==1'b1 && tracing==1'b1 && commit==1'b1 && cond_valid==1'b1) begin
         if (total_length>N) begin 
             vector_out<=packed_data;
             packed_data<=vector_in;
@@ -89,6 +92,15 @@
         8'd2:    begin vector_length = 1; commit=1; end
         default: begin vector_length = 0; commit=0; end
       endcase
+
+      // Only perform operation if condition is valid
+      // none=0, last=1, notlast=2, first=3, notfirst=4
+      if (firmware_cond[chainId_in]==8'd0 | (firmware_cond[chainId_in]==8'd1 & eof_in==1'b1) | (firmware_cond[chainId_in]==8'd2 & eof_in==1'b0) |  (firmware_cond[chainId_in]==8'd3 & bof_in==1'b1) | (firmware_cond[chainId_in]==8'd4 & bof_in==1'b0)) begin
+        cond_valid = 1'b1;
+      end
+      else begin
+        cond_valid = 1'b0;
+      end
     end
 
     assign total_length = packed_counter+vector_length;

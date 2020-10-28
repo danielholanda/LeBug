@@ -458,7 +458,7 @@ def conditions():
     # Create common input values
     np.random.seed(0)
     input_vectors=[]
-    num_input_vectors=1
+    num_input_vectors=4
     np.random.seed(123)
     print("********** Input vectors **********")
     for i in range(num_input_vectors):

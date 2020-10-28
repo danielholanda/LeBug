@@ -444,7 +444,8 @@ class rtlHw():
             ['DATA_WIDTH'],
             ['MAX_CHAINS'],
             ['PERSONAL_CONFIG_ID'],
-            ['INITIAL_FIRMWARE']])
+            ['INITIAL_FIRMWARE'],
+            ['INITIAL_FIRMWARE_COND']])
         top.mod.dataPacker.setAsConfigurable(configurable_parameters=1)
 
         # TraceBuffer
@@ -481,6 +482,7 @@ class rtlHw():
             FRU_INITIAL_FIRMWARE_OP = EMPTY_FIRMWARE
             FRU_INITIAL_FIRMWARE_ADDR = EMPTY_FIRMWARE
             FRU_INITIAL_FIRMWARE_REDUCE_AXIS = EMPTY_FIRMWARE
+            DP_INITIAL_FIRMWARE_COND = EMPTY_FIRMWARE
         else:
             
             def encodeDpFirmware(commit,size):
@@ -516,6 +518,7 @@ class rtlHw():
             FRU_INITIAL_FIRMWARE_ADDR=str([chain.addr for chain in self.firmware['fu']]).replace("[", "'{").replace("]", "}")
             FRU_INITIAL_FIRMWARE_REDUCE_AXIS=str([chain.axis for chain in self.firmware['mvru']]).replace("[", "'{").replace("]", "}")
             IB_INITIAL_FIRMWARE=self.firmware['valid_chains']
+            DP_INITIAL_FIRMWARE_COND = str([encodeCond(chain.cond) for chain in self.firmware['dp']]).replace("[", "'{").replace("]", "}")
 
         # Instantiate modules
         top.instantiateModule(top.mod.uart,"comm")
@@ -568,7 +571,8 @@ class rtlHw():
             ['DATA_WIDTH','DATA_WIDTH'],
             ['MAX_CHAINS','MAX_CHAINS'],
             ['PERSONAL_CONFIG_ID','0'],
-            ['INITIAL_FIRMWARE',DP_INITIAL_FIRMWARE]])
+            ['INITIAL_FIRMWARE',DP_INITIAL_FIRMWARE],
+            ['INITIAL_FIRMWARE_COND',DP_INITIAL_FIRMWARE_COND]])
 
         top.instantiateModule(top.mod.traceBuffer,"tb")
         top.inst.tb.setParameters([
