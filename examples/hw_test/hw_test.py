@@ -410,8 +410,8 @@ def correlation():
         print(f'Cycle {i}:\t{input_vectors[i]}')
 
     # Initialize the memories the same way
-    #emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
-    #hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[list(range(FUVRF_SIZE))]*M
+    emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
+    hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[list(range(FUVRF_SIZE))]*M
 
     # Configure firmware - Both HW and Emulator work with the same firmware
     fw = firm.correlation(hw_proc.compiler)
@@ -458,11 +458,11 @@ def conditions():
     # Create common input values
     np.random.seed(0)
     input_vectors=[]
-    num_input_vectors=3
+    num_input_vectors=1
     np.random.seed(123)
     print("********** Input vectors **********")
     for i in range(num_input_vectors):
-        eof = False#(i==3);
+        eof = (i==3) or (i==5);
         input_vectors.append(np.random.randint(5, size=N))
         hw_proc.push([input_vectors[i],eof])
         emu_proc.push([input_vectors[i],eof])
@@ -471,11 +471,11 @@ def conditions():
     # Initialize the memories the same way
     #emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
     #hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[list(range(FUVRF_SIZE))]*M
-    emu_proc.vvalu.vrf = [2,2,2,2,2,2,2,2]*VVVRF_SIZE
-    hw_proc.top.mod.vectorVectorALU.mem['vvrf']['init_values']=[[2,2,2,2,2,2,2,2]]*VVVRF_SIZE
+    emu_proc.vvalu.vrf = [1,1,1,1,1,1,1,1]*VVVRF_SIZE
+    hw_proc.top.mod.vectorVectorALU.mem['vvrf']['init_values']=[[1,1,1,1,1,1,1,1]]*VVVRF_SIZE
 
     # Configure firmware - Both HW and Emulator work with the same firmware
-    fw = firm.correlationReduced(hw_proc.compiler)
+    fw = firm.conditions(hw_proc.compiler)
     emu_proc.config(fw)
     hw_proc.config(fw)
 

@@ -113,6 +113,7 @@
       firmware_filter_op_delay <= firmware_filter_op[chainId_in];
       firmware_reduce_axis_delay <= firmware_reduce_axis[chainId_in];
       eof_in_delay <= eof_in;
+      bof_in_delay <= bof_in;
       chainId_in_delay <= chainId_in;
     end
 
