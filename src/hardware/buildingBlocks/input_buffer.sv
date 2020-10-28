@@ -130,7 +130,7 @@
           chainId<=0;
         end
 
-        if (valid_out_delay<=1'b1) begin
+        if (valid_out_delay==1'b1) begin
           if (frame_ended==1'b1) begin
             bof_out <= 1'b1;
             frame_ended<=1'b0;
