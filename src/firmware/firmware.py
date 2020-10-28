@@ -153,6 +153,20 @@ def conditions(cp):
     cp.end_chain()
     return cp.compile()
 
+# Firmware for a distribution with multiple sets of N values
+def fourChains(cp):
+
+    cp.begin_chain()
+    cp.v_commit()
+    cp.end_chain()
+
+    cp.begin_chain()
+    cp.vv_add(0,'notfirst')
+    cp.v_commit()
+    cp.end_chain()
+
+    return cp.compile()
+
 
 
 # Ideas for new instruments:

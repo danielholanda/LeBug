@@ -45,6 +45,7 @@
     reg [$clog2(IB_DEPTH)-1:0] mem_address_b=0;
     wire mem_write_enable_a;
     reg mem_write_enable_b=0;
+    reg bof_out_delay=0;
     wire [MEM_WIDTH-1:0] mem_in_a;
     reg [MEM_WIDTH-1:0] mem_in_b=0;
     wire [MEM_WIDTH-1:0] mem_out_a;
@@ -116,9 +117,21 @@
           if (empty==1'b0) begin
             mem_address_b <= mem_address_b<IB_DEPTH-1 ? mem_address_b+1'b1 : 0;
             valid_out_delay <= 1'b1;
+            if (frame_ended==1'b1) begin
+              bof_out_delay <= 1'b1;
+              frame_ended<=1'b0;
+            end
+            else if (eof_out==1'b1) begin
+              bof_out_delay <= 1'b1;
+              frame_ended<=1'b1;
+            end
+            else begin
+              bof_out_delay <= 1'b0;
+            end
           end
           else begin
             valid_out_delay <= 1'b0;
+            bof_out_delay <= 1'b0;
           end
         end
 
@@ -130,23 +143,10 @@
           chainId<=0;
         end
 
-        if (valid_out_delay==1'b1) begin
-          if (frame_ended==1'b1) begin
-            bof_out <= 1'b1;
-            frame_ended<=1'b0;
-          end
-          else if (eof_out==1'b1) begin
-            bof_out <= 1'b1;
-            frame_ended<=1'b1;
-          end
-          else begin
-            bof_out <= 1'b0;
-          end
-        end
-
         valid_out <= valid_out_delay;
         chainId_delay<=chainId;
         chainId_out <=chainId_delay;
+        bof_out<=bof_out_delay;
 
     end
 
