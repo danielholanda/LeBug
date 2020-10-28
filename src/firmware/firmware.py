@@ -152,6 +152,27 @@ def conditions(cp):
     cp.end_chain()
     return cp.compile()
 
+# Self correlation with the previous sample
+def correlationReduced(cp):
+
+    # sum(X*Y) [Assuming that Y is stored in addr0]
+    cp.begin_chain()
+    cp.vv_mul(0)
+    cp.v_commit()
+    cp.end_chain()
+
+    # sum(X) [Storing X in addr0, which will become the Y of next vector]
+    cp.begin_chain()
+    cp.v_cache(0)
+    cp.v_commit()
+    cp.end_chain()
+
+    # sum(X*X)
+    cp.begin_chain()
+    cp.v_commit()
+    cp.end_chain()
+    return cp.compile()
+
 # Ideas for new instruments:
 # 1- Check elements that are between -inf and min_range OR NaN OR between max_range and Inf (given a specific activation)
 #   In the previous instrumentation, I would need one instrument for each of them (3x more memory)

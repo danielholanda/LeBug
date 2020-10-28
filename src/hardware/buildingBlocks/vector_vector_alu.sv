@@ -68,7 +68,7 @@
     // Instantiate memory to implement queue
     reg [$clog2(VVVRF_SIZE)-1:0] mem_address_a=0;
     reg [$clog2(VVVRF_SIZE)-1:0] mem_address_b=0;
-    wire mem_write_enable_a;
+    reg mem_write_enable_a = 1'b0;
     reg mem_write_enable_b;
     wire [MEM_WIDTH-1:0] mem_in_a;
     reg [MEM_WIDTH-1:0] mem_in_b;
@@ -103,7 +103,7 @@
 
       if (tracing==1'b1) begin
         // Logic for output
-        mem_address_a = firmware_addr_rd[chainId_in];
+        mem_address_a <= firmware_addr_rd[chainId_in];
         vector_out <= cond_valid ? alu_result : vector_in_delay;
         valid_out <= valid_in_delay;
         eof_out <= eof_in_delay;
@@ -164,7 +164,7 @@
     //Logic for caching
     always @(*) begin 
       mem_in_b = {>>{alu_result}};
-      mem_write_enable_b = firmware_cache_delay;
+      mem_write_enable_b = firmware_cache_delay & valid_in_delay;
       mem_address_b = firmware_cache_addr_delay;
     end
  

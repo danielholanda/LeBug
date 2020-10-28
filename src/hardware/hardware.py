@@ -342,6 +342,7 @@ class rtlHw():
             ['MAX_CHAINS'],
             ['INITIAL_FIRMWARE']])
         top.mod.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
+        top.mod.inputBuffer.addMemory("inputBuffer_eof",self.IB_DEPTH,self.N)
         top.mod.inputBuffer.setAsConfigurable(configurable_parameters=4)
 
 
