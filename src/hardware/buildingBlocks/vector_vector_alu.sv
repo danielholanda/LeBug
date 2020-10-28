@@ -38,6 +38,7 @@
     reg [7:0] firmware_cond       [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_COND;
     reg [7:0] firmware_cache      [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_CACHE;
     reg [7:0] firmware_cache_addr [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_CACHE_ADDR;
+    reg [DATA_WIDTH-1:0] valid_result [N-1:0];
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
     reg valid_in_delay = 1'b0;
@@ -104,7 +105,7 @@
       if (tracing==1'b1) begin
         // Logic for output
         mem_address_a <= firmware_addr_rd[chainId_in];
-        vector_out <= cond_valid ? alu_result : vector_in_delay;
+        vector_out <= valid_result;
         valid_out <= valid_in_delay;
         eof_out <= eof_in_delay;
         bof_out <= bof_in_delay;
@@ -159,11 +160,13 @@
       else begin
         cond_valid = 1'b0;
       end
+      valid_result = cond_valid ? alu_result : vector_in_delay;
+
     end
 
     //Logic for caching
     always @(*) begin 
-      mem_in_b = cond_valid ? {>>{alu_result}} : {>>{vector_in_delay}};
+      mem_in_b =  {>>{valid_result}};
       mem_write_enable_b = firmware_cache_delay & valid_in_delay;
       mem_address_b = firmware_cache_addr_delay;
     end

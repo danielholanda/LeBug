@@ -147,16 +147,6 @@ def multipleChains(cp):
 # Firmware for a distribution with multiple sets of N values
 def conditions(cp):
     cp.begin_chain()
-    cp.vv_add(0,'last')
-    cp.v_cache(0)
-    cp.v_commit(8,'notfirst')
-    cp.end_chain()
-    return cp.compile()
-
-# Firmware for a distribution with multiple sets of N values
-def fourChains(cp):
-
-    cp.begin_chain()
     cp.v_commit()
     cp.end_chain()
 
@@ -165,6 +155,12 @@ def fourChains(cp):
     cp.v_commit()
     cp.end_chain()
 
+    cp.begin_chain()
+    cp.vv_add(0,'last')
+    cp.v_cache(0)
+    cp.v_commit(8,'notfirst')
+    cp.v_commit()
+    cp.end_chain()
     return cp.compile()
 
 
