@@ -163,7 +163,7 @@
 
     //Logic for caching
     always @(*) begin 
-      mem_in_b = {>>{alu_result}};
+      mem_in_b = cond_valid ? {>>{alu_result}} : {>>{vector_in_delay}};
       mem_write_enable_b = firmware_cache_delay & valid_in_delay;
       mem_address_b = firmware_cache_addr_delay;
     end
