@@ -125,7 +125,8 @@
             filter_result[j][i] = vector_in_delay[i]>operand[j] & vector_in_delay[i]<=operand[j+1];
           end
           else begin
-            filter_result[j][i] = vector_in_delay[i]>operand[j];
+            // In order to be able to split the distribution into many Ms we assume that the steps between bins is constant for the last bin of every M
+            filter_result[j][i] = vector_in_delay[i]>operand[j] & vector_in_delay[i]<=(operand[j]+operand[1]-operand[0]);
           end
         end
       end
