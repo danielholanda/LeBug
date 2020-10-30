@@ -81,7 +81,10 @@ class emulatedHw():
             if cfg.filter==1:
                 for i in range(self.M):
                     low_range = self.vrf[cfg.addr*self.M+i]
-                    high_range = self.vrf[cfg.addr*self.M+i+1]
+                    if cfg.addr*self.M+i+1<len(self.vrf):
+                        high_range = self.vrf[cfg.addr*self.M+i+1]
+                    else:
+                        high_range = low_range+(low_range-self.vrf[cfg.addr*self.M+i-1])
                     within_range = np.all([self.v_in>low_range, self.v_in<=high_range],axis=0)
                     self.m_out[i]=within_range[:]
             # If we are not filtering, just pass the value through 

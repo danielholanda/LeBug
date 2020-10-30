@@ -541,7 +541,7 @@ def distribution():
     #hw_proc.top.mod.vectorVectorALU.mem['vvrf']['init_values']=[[1,1,1,1,1,1,1,1]]*VVVRF_SIZE
 
     # Configure firmware - Both HW and Emulator work with the same firmware
-    fw = firm.distribution(hw_proc.compiler,8,4)
+    fw = firm.distribution(hw_proc.compiler,16,4)
     emu_proc.config(fw)
     hw_proc.config(fw)
 
