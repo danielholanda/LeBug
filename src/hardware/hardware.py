@@ -213,7 +213,7 @@ class rtlHw():
                     if mod.included==False:
                         rtlCode=rtlCode+mod.dump()
 
-                # Instantiated modules
+                # Create mif file and output wires
                 for i in self.inst.__dict__.keys():
                     inst=self.inst.__dict__[i]
 
@@ -221,10 +221,15 @@ class rtlHw():
                     dumpMifFile(inst.mem)
                     
                     # Declare outputs
-                    apdi('')
+                    apdi('\n// Outputs of '+str(inst.module_class.name))
                     apdi('\n'.join(f'{value.type} [{value.bits}-1:0] {value.name} [{value.elements}-1:0];'.replace("[1-1:0]","") for key, value in inst.instance_output.items()))
 
+                # Instantiated modules
+                for i in self.inst.__dict__.keys():
+                    inst=self.inst.__dict__[i]
+
                     # Print module class name
+                    apdi('\n// Instantiating '+str(inst.module_class.name))
                     apdi(inst.module_class.name)
 
                     # Print parameters
@@ -335,6 +340,8 @@ class rtlHw():
             ['rx_data','logic',8],
             ['new_rx_data','logic',1]])
         top.mod.reconfigUnit.addOutput([
+            ['tx_data','logic',8],
+            ['new_tx_data','logic',1],
             ['tracing','logic',1],
             ['configId','logic',8],
             ['configData','logic',8]])
@@ -696,6 +703,7 @@ class rtlHw():
             reg [DATA_WIDTH-1:0] vector [N-1:0];
             reg uart_rxd = 1'b0;
             reg reset = 1'b1;
+            wire uart_txd;
             
             // Declare outputs
             reg [DATA_WIDTH-1:0] vector_out [N-1:0];
@@ -727,7 +735,10 @@ class rtlHw():
               .vector_in(vector),
               .enqueue(valid),
               .eof_in(eof),
-              .vector_out(vector_out)
+              .vector_out(vector_out),
+              .reset(reset),
+              .uart_rxd(uart_rxd),
+              .uart_txd(uart_txd)
             );
 
             //Task to print all content to file
