@@ -613,7 +613,7 @@ class rtlHw():
                                     'tx_data': 'tx_data_reconfig', 
                                     'new_tx_data': 'new_tx_data_reconfig'}
         top.inst.reconfig.instance_input={'clk': 'clk', 
-                                    'rx_data': 'rx_data', 
+                                    'rx_data': 'rx_data_comm', 
                                     'new_rx_data': 'new_rx_data_comm', 
                                     'tx_busy': 'tx_busy_comm'}
         top.inst.ib.instance_input={'clk': 'clk', 

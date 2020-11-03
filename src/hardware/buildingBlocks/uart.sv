@@ -14,8 +14,8 @@
 module uart
 #(
 parameter USE_SYNC_RESET = 1,
-parameter BAUD_LIMIT = 15337,
-parameter BAUD_FREQ = 288
+parameter [15:0] BAUD_LIMIT = 15337,
+parameter [11:0] BAUD_FREQ = 288
 
 ) 
 (
