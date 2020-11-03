@@ -515,9 +515,6 @@ def distribution():
     hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS)
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
-
-    def cnt(array,val):
-        return len(np.where( array == val)[0])
     # Create common input values
     np.random.seed(0)
     input_vectors=[]
@@ -530,7 +527,6 @@ def distribution():
         hw_proc.push([input_vectors[i],eof])
         emu_proc.push([input_vectors[i],eof])
         print(f'Cycle {i}:\t{input_vectors[i]}')
-        print(f'\t{cnt(input_vectors[i],0)} {cnt(input_vectors[i],1)} {cnt(input_vectors[i],2)} {cnt(input_vectors[i],3)} {cnt(input_vectors[i],4)} {cnt(input_vectors[i],5)} {cnt(input_vectors[i],6)} {cnt(input_vectors[i],7)}')
 
     # Initialize the memories the same way
     emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
@@ -547,7 +543,7 @@ def distribution():
 
     # Run HW simulation and emulation
     steps=45
-    hw_results = hw_proc.run(steps=steps,gui=False,log=False)
+    hw_results = hw_proc.run(steps=steps,gui=False,log=True)
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results

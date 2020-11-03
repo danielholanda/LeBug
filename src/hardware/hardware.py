@@ -62,10 +62,10 @@ class rtlHw():
             if not clock_signal_found:
                 signals_to_connect.append(struct(name='clk',type='logic',bits=1))
             if not config_signals_found and top_module_or_instance != None:
-                signals_to_connect.append(struct(name='tracing_comm',type='logic',bits=1,elements=1))
+                signals_to_connect.append(struct(name='tracing_reconfig',type='logic',bits=1,elements=1))
                 if self.module_class.configurable_parameters!=0:
-                    signals_to_connect.append(struct(name='configData_comm',type='logic',bits=8,elements=1))
-                    signals_to_connect.append(struct(name='configId_comm',type='logic',bits=8,elements=1))
+                    signals_to_connect.append(struct(name='configData_reconfig',type='logic',bits=8,elements=1))
+                    signals_to_connect.append(struct(name='configId_reconfig',type='logic',bits=8,elements=1))
 
             # Check if number of signals is the same
             assert len(signals_to_connect)==len(self.module_input), "Not the same number of connected signals"
@@ -110,15 +110,6 @@ class rtlHw():
             for o in outputs:
                 elements = 1 if len(o)==3 else o[3]
                 self.output.append(struct(name=o[0],type=o[1],bits=o[2],elements=elements))
-
-        # Assign module outputs to the outputs of a given submodule
-        def assignOutputs(self,submodule_outputs):
-            submodule_outputs=submodule_outputs.instance_output
-            for i in self.output:
-                for _,j in submodule_outputs.items():
-                    if i.bits==j.bits and i.name.split("_")[0]==j.name.split("_")[0]:
-                        self.output_assignment[i.name]=j.name
-            assert len(self.output_assignment.keys())==len(self.output), "Output map failed"
 
         def addParameter(self,params):
             for p in params:
@@ -289,11 +280,13 @@ class rtlHw():
         top = self.rtlModule(self,"debugger")
         top.addInput([
             ['clk','logic',1],
+            ['uart_rxd','logic',1],
+            ['reset','logic',1],
             ['enqueue','logic',1],
             ['eof_in','logic',1],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.addOutput([
-            #['valid_out','logic',1],
+            ['uart_txd','logic',1],
             ['vector_out','logic','DATA_WIDTH','N']])
         top.addParameter([
             ['N',self.N],
@@ -313,11 +306,35 @@ class rtlHw():
         top.include("vector_vector_alu.sv")
         top.include("filter_reduce_unit.sv")
         top.include("uart.sv")
+        top.include("reconfig_unit.sv")
 
         # UART module
         top.includeModule("uart")
-        top.mod.uart.addInput([['clk','logic',1]])
+        top.mod.uart.addInput([
+            ['clk','logic',1],
+            ['reset','logic',1],
+            ['uart_rxd','logic',1],
+            ['tx_data','logic',8],
+            ['new_tx_data','logic',1]])
         top.mod.uart.addOutput([
+            ['uart_txd','logic',1],
+            ['tx_busy','logic',1],
+            ['rx_data','logic',8],
+            ['new_rx_data','logic',1]])
+        top.mod.uart.addParameter([
+            ['USE_SYNC_RESET',1],
+            ['BAUD_LIMIT',15337],
+            ['BAUD_FREQ',288]])
+
+        # Reconfig unit module
+        top.includeModule("reconfigUnit")
+        top.mod.reconfigUnit.addInput([
+            ['clk','logic',1],
+            ['uart_txd','logic',1],
+            ['tx_busy','logic',1],
+            ['rx_data','logic',8],
+            ['new_rx_data','logic',1]])
+        top.mod.reconfigUnit.addOutput([
             ['tracing','logic',1],
             ['configId','logic',8],
             ['configData','logic',8]])
@@ -523,6 +540,8 @@ class rtlHw():
         # Instantiate modules
         top.instantiateModule(top.mod.uart,"comm")
 
+        top.instantiateModule(top.mod.reconfigUnit,"reconfig")
+
         top.instantiateModule(top.mod.inputBuffer,"ib")
         top.inst.ib.setParameters([
             ['N','N'],
@@ -580,15 +599,33 @@ class rtlHw():
             ['DATA_WIDTH','DATA_WIDTH'],
             ['TB_SIZE','TB_SIZE']])
 
-        # Connect modules
-        top.inst.comm.connectInputs() 
-        top.inst.ib.connectInputs(top) 
+        # Connect fixed modules
+        top.inst.comm.instance_input={'clk': 'clk', 
+                                    'reset': 'reset', 
+                                    'uart_rxd': 'uart_rxd', 
+                                    'tx_data': 'tx_data_reconfig', 
+                                    'new_tx_data': 'new_tx_data_reconfig'}
+        top.inst.reconfig.instance_input={'clk': 'clk', 
+                                    'rx_data': 'rx_data', 
+                                    'new_rx_data': 'new_rx_data_comm', 
+                                    'tx_busy': 'tx_busy_comm'}
+        top.inst.ib.instance_input={'clk': 'clk', 
+                                    'enqueue': 'enqueue', 
+                                    'eof_in': 'eof_in', 
+                                    'vector_in': 'vector_in', 
+                                    'tracing': 'tracing_reconfig', 
+                                    'configId': 'configId_reconfig', 
+                                    'configData': 'configData_reconfig'}
+
+        # Automatically connect remaining modules
         top.inst.fru.connectInputs(top.inst.ib)
         top.inst.vvalu.connectInputs(top.inst.fru)
         top.inst.vsru.connectInputs(top.inst.vvalu)
         top.inst.dp.connectInputs(top.inst.vsru)
         top.inst.tb.connectInputs(top.inst.dp)
-        top.assignOutputs(top.inst.tb)
+
+        # Assign outputs
+        top.output_assignment={'vector_out': 'vector_out_tb','uart_txd':'uart_txd_comm'}
 
 
     def testbench(self):
@@ -657,6 +694,8 @@ class rtlHw():
             reg valid=1'b0;
             reg eof=1'b0;
             reg [DATA_WIDTH-1:0] vector [N-1:0];
+            reg uart_rxd = 1'b0;
+            reg reset = 1'b1;
             
             // Declare outputs
             reg [DATA_WIDTH-1:0] vector_out [N-1:0];
