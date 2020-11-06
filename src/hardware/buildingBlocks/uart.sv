@@ -45,7 +45,7 @@ wire ser_in;
 wire ser_out;
 
 assign ser_in = uart_rxd;
-assign ser_out = uart_txd;
+assign uart_txd = ser_out;
 
 //---------------------------------------------------------------------------------------
 // module implementation 
