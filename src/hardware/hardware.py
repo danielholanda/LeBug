@@ -351,7 +351,8 @@ class rtlHw():
         top.mod.reconfigUnit.addParameter([
             ['N'],
             ['DATA_WIDTH'],
-            ['TB_SIZE']])
+            ['TB_SIZE'],
+            ['MAX_CHAINS']])
 
         # Input buffer
         top.includeModule("inputBuffer")
@@ -371,7 +372,8 @@ class rtlHw():
             ['DATA_WIDTH'],
             ['IB_DEPTH'],
             ['MAX_CHAINS'],
-            ['INITIAL_FIRMWARE']])
+            ['INITIAL_FIRMWARE'],
+            ['PERSONAL_CONFIG_ID']])
         top.mod.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
         top.mod.inputBuffer.addMemory("inputBuffer_eof",self.IB_DEPTH,self.N)
         top.mod.inputBuffer.setAsConfigurable(configurable_parameters=4)
@@ -559,13 +561,15 @@ class rtlHw():
         top.inst.reconfig.setParameters([
             ['N','N'],
             ['DATA_WIDTH','DATA_WIDTH'],
-            ['TB_SIZE','TB_SIZE']])
+            ['TB_SIZE','TB_SIZE'],
+            ['MAX_CHAINS','MAX_CHAINS']])
 
         top.instantiateModule(top.mod.inputBuffer,"ib")
         top.inst.ib.setParameters([
             ['N','N'],
             ['DATA_WIDTH','DATA_WIDTH'],
             ['IB_DEPTH','IB_DEPTH'],
+            ['PERSONAL_CONFIG_ID','0'],
             ['MAX_CHAINS','MAX_CHAINS'],
             ['INITIAL_FIRMWARE',IB_INITIAL_FIRMWARE]])
 
@@ -576,7 +580,7 @@ class rtlHw():
             ['DATA_WIDTH','DATA_WIDTH'],
             ['MAX_CHAINS','MAX_CHAINS'],
             ['FUVRF_SIZE','FUVRF_SIZE'],
-            ['PERSONAL_CONFIG_ID','0'],
+            ['PERSONAL_CONFIG_ID','1'],
             ['INITIAL_FIRMWARE_FILTER_OP',FRU_INITIAL_FIRMWARE_OP],
             ['INITIAL_FIRMWARE_FILTER_ADDR',FRU_INITIAL_FIRMWARE_ADDR],
             ['INITIAL_FIRMWARE_REDUCE_AXIS',FRU_INITIAL_FIRMWARE_REDUCE_AXIS]])
@@ -586,7 +590,7 @@ class rtlHw():
             ['N','N'],
             ['DATA_WIDTH','DATA_WIDTH'],
             ['MAX_CHAINS','MAX_CHAINS'],
-            ['PERSONAL_CONFIG_ID','0'],
+            ['PERSONAL_CONFIG_ID','2'],
             ['VVVRF_SIZE','VVVRF_SIZE'],
             ['INITIAL_FIRMWARE_OP',VVALU_INITIAL_FIRMWARE_OP],
             ['INITIAL_FIRMWARE_ADDR_RD',VVALU_INITIAL_FIRMWARE_ADDR_RD],
@@ -599,7 +603,7 @@ class rtlHw():
             ['N','N'],
             ['DATA_WIDTH','DATA_WIDTH'],
             ['MAX_CHAINS','MAX_CHAINS'],
-            ['PERSONAL_CONFIG_ID','0'],
+            ['PERSONAL_CONFIG_ID','3'],
             ['INITIAL_FIRMWARE',VSRU_INITIAL_FIRMWARE]])
 
         top.instantiateModule(top.mod.dataPacker,"dp")
@@ -608,7 +612,7 @@ class rtlHw():
             ['M','M'],
             ['DATA_WIDTH','DATA_WIDTH'],
             ['MAX_CHAINS','MAX_CHAINS'],
-            ['PERSONAL_CONFIG_ID','0'],
+            ['PERSONAL_CONFIG_ID','4'],
             ['INITIAL_FIRMWARE',DP_INITIAL_FIRMWARE],
             ['INITIAL_FIRMWARE_COND',DP_INITIAL_FIRMWARE_COND]])
 

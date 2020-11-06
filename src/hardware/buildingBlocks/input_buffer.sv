@@ -9,7 +9,8 @@
   parameter DATA_WIDTH=32,
   parameter IB_DEPTH=4,
   parameter MAX_CHAINS=4,
-  parameter INITIAL_FIRMWARE=0
+  parameter INITIAL_FIRMWARE=0,
+  parameter PERSONAL_CONFIG_ID=0
   )
   (
   input logic clk,

@@ -6,7 +6,8 @@
   module  reconfigUnit     #(
       N=8,
       TB_SIZE=8,
-      DATA_WIDTH=32
+      DATA_WIDTH=32,
+      MAX_CHAINS=4
   )
   (
   input logic clk,
@@ -34,7 +35,6 @@
     DBG_CHECK_DONE              = 10'b0010000000,
     DBG_FINAL                   = 10'b0100000000,
     DBG_UPDATING_INTRUMENTATION = 10'b1000000000;
-  parameter   UART_BYTES_TO_RECEIVE=0;
 
   parameter BYTES_TO_DUMP=N*DATA_WIDTH/8;
   reg [9:0]   dbg_state = DBG_TRACING;
@@ -42,7 +42,6 @@
   reg [31:0]  dbg_TB_SIZE_counter = 0;
   reg [31:0]  dbg_sleep_half_second = 0;
   reg [7:0]   dbg_rx_counter = 0;
-  reg [7:0]   dbg_rx_data_valid = 0;
   reg         dbg_last_uart_byte_received=0;
   reg [DATA_WIDTH*N-1:0] vector_to_dump;
   reg new_tx_data_reg=0;
@@ -51,12 +50,20 @@
   assign tx_data=vector_to_dump[7:0];
   assign tb_mem_address = dbg_TB_SIZE_counter;
   assign new_tx_data=new_tx_data_reg;
-
-  //Those following assignments need to be changed in the future
   assign tracing= (dbg_state == DBG_TRACING);
-  assign configId=rx_data;
-  assign configData=rx_data+1'b1;
 
+  parameter BYTES_IB=1;
+  parameter BYTES_FRU=3*MAX_CHAINS;
+  parameter BYTES_VVALU=5*MAX_CHAINS;
+  parameter BYTES_VSRU=MAX_CHAINS;
+  parameter BYTES_DP=2*MAX_CHAINS;
+  parameter BYTES_TO_RECEIVE=BYTES_IB+BYTES_FRU+BYTES_VVALU+BYTES_VSRU+BYTES_DP;
+
+  parameter ID_IB=0;
+  parameter ID_FRU=1;
+  parameter ID_VVALU=2;
+  parameter ID_VSRU=3;
+  parameter ID_DP=4;
 
   // State transitions
   always @(posedge clk) begin
@@ -78,10 +85,25 @@
       DBG_UPDATING_INTRUMENTATION:
       begin
           if (new_rx_data) begin
-              dbg_rx_data_valid           <= rx_data;
+              configData	              <= rx_data;
               dbg_rx_counter              <= dbg_rx_counter+1;
               dbg_state                   <= DBG_UPDATING_INTRUMENTATION;
-              dbg_last_uart_byte_received <= (dbg_rx_counter==UART_BYTES_TO_RECEIVE-1);
+              dbg_last_uart_byte_received <= (dbg_rx_counter==BYTES_TO_RECEIVE-1);
+              if (dbg_rx_counter<BYTES_IB) begin
+              	configId <= ID_IB;
+              end
+              else if (dbg_rx_counter<BYTES_IB+ID_FRU) begin
+              	configId <= ID_FRU;
+              end
+              else if (dbg_rx_counter<BYTES_IB+ID_FRU+BYTES_VVALU) begin
+              	configId <= ID_VVALU;
+              end
+              else if (dbg_rx_counter<BYTES_IB+ID_FRU+BYTES_VVALU+BYTES_VSRU) begin
+              	configId <= ID_VSRU;
+              end
+              else if (dbg_rx_counter<BYTES_TO_RECEIVE) begin
+              	configId <= ID_DP;
+              end
           end
           else if (dbg_last_uart_byte_received==1'b1) begin
                   dbg_rx_counter              <= 8'b0;
