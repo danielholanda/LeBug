@@ -37,6 +37,7 @@
     reg cond_valid;
     wire [DATA_WIDTH-1:0] pack_1 [N-1:0];
     wire [DATA_WIDTH-1:0] pack_M [N-1:0];
+    reg [7:0] byte_counter=0;
 
     //-------------Code Start-----------------
 
@@ -78,6 +79,20 @@
       end
       else begin
         valid_out<=0;
+        if (tracing==1'b0) begin // If we are not tracing, we are reconfiguring the instrumentation
+          if (configId==PERSONAL_CONFIG_ID) begin
+            byte_counter<=byte_counter+1;
+            if (byte_counter<MAX_CHAINS)begin
+              firmware_cond[byte_counter]=configData;
+            end
+            else if (byte_counter<MAX_CHAINS*2)begin
+              firmware[byte_counter]=configData;
+            end
+          end
+          else begin
+            byte_counter<=0;
+          end
+        end
       end
         //$display("New Cycle:");
         //$display("\tvector_in: %0d %0d %0d %0d %0d %0d %0d %0d (valid = %d)",vector_in[0],vector_in[1],vector_in[2],vector_in[3],vector_in[4],vector_in[5],vector_in[6],vector_in[7],valid_in);

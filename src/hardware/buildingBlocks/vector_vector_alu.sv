@@ -57,6 +57,7 @@
     reg [DATA_WIDTH-1:0] alu_add [N-1:0];
     reg [DATA_WIDTH-1:0] alu_mul [N-1:0];
     reg [DATA_WIDTH-1:0] alu_sub [N-1:0];
+    reg [7:0] byte_counter=0;
 
     parameter LATENCY = 2;
     parameter RAM_LATENCY = LATENCY-1;
@@ -114,6 +115,27 @@
       end
       else begin
         valid_out<=0;
+        if (configId==PERSONAL_CONFIG_ID) begin
+          byte_counter<=byte_counter+1;
+          if (byte_counter<MAX_CHAINS)begin
+            firmware_op[byte_counter]=configData;
+          end
+          else if (byte_counter<MAX_CHAINS*2)begin
+            firmware_addr_rd[byte_counter]=configData;
+          end
+          else if (byte_counter<MAX_CHAINS*3)begin
+            firmware_cond[byte_counter]=configData;
+          end
+          else if (byte_counter<MAX_CHAINS*4)begin
+            firmware_cache[byte_counter]=configData;
+          end
+          else if (byte_counter<MAX_CHAINS*5)begin
+            firmware_cache_addr[byte_counter]=configData;
+          end
+        end
+        else begin
+          byte_counter<=0;
+        end
       end
 
       // Delay values until we can read the value to perform the op

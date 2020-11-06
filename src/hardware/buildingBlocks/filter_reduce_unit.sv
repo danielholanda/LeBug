@@ -47,6 +47,7 @@
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
     reg [7:0] firmware_filter_op_delay;
     reg [7:0] firmware_reduce_axis_delay;
+    reg [7:0] byte_counter=0;
 
     parameter LATENCY = 2;
     parameter RAM_LATENCY = LATENCY-1;
@@ -102,8 +103,23 @@
         chainId_out <= chainId_in_delay;
 
       end
-      else begin
+      else begin // If we are not tracing, we are reconfiguring the instrumentation
         valid_out<=0;
+          if (configId==PERSONAL_CONFIG_ID) begin
+            byte_counter<=byte_counter+1;
+            if (byte_counter<MAX_CHAINS)begin
+              firmware_filter_op[byte_counter]=configData;
+            end
+            else if (byte_counter<MAX_CHAINS*2)begin
+              firmware_filter_addr[byte_counter]=configData;
+            end
+            else if (byte_counter<MAX_CHAINS*3)begin
+              firmware_reduce_axis[byte_counter]=configData;
+            end
+          end
+          else begin
+            byte_counter<=0;
+          end
       end
 
       // Delay values until we can read the value to perform the op

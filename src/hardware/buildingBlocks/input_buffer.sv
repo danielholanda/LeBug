@@ -108,6 +108,7 @@
 
     always @(posedge clk) begin
 
+      if (tracing==1'b1) begin
         // Logic for enqueuing values
         if (enqueue==1'b1 & full==1'b0) begin
             mem_address_a <= mem_address_a<IB_DEPTH-1 ? mem_address_a+1'b1 : 0;
@@ -148,6 +149,16 @@
         chainId_delay<=chainId;
         chainId_out <=chainId_delay;
         bof_out<=bof_out_delay;
+      end
+
+      // If we are not tracing, we are reconfiguring the instrumentation
+      else begin
+        valid_out<=0;
+        if (configId==PERSONAL_CONFIG_ID )begin
+          valid_chains<=configData;
+        end
+      end
+
 
     end
 
