@@ -13,6 +13,7 @@
   input logic clk,
   input logic tracing,
   input logic valid_in,
+  input logic [$clog2(TB_SIZE)-1:0] tb_mem_address,
   input logic [DATA_WIDTH-1:0] vector_in [N-1:0],
   output reg [DATA_WIDTH-1:0] vector_out [N-1:0]
  );
@@ -28,7 +29,6 @@
 
     // Instantiate memory to implement queue
     reg [$clog2(TB_SIZE)-1:0] mem_address_a=0;
-    reg [$clog2(TB_SIZE)-1:0] mem_address_b=0;
     wire mem_write_enable_a;
     reg mem_write_enable_b=0;
     wire [MEM_WIDTH-1:0] mem_in_a;
@@ -39,7 +39,7 @@
       .clk( clk ),
       .clken( 1'b1 ),
       .address_a( mem_address_a ),
-      .address_b( mem_address_b ),
+      .address_b( tb_mem_address ),
       .wren_a( mem_write_enable_a ),
       .wren_b( mem_write_enable_b ),
       .data_a( mem_in_a ),

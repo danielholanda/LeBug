@@ -338,13 +338,20 @@ class rtlHw():
             ['uart_txd','logic',1],
             ['tx_busy','logic',1],
             ['rx_data','logic',8],
-            ['new_rx_data','logic',1]])
+            ['new_rx_data','logic',1],
+            ['vector_out_tb','logic','DATA_WIDTH','N']
+            ])
         top.mod.reconfigUnit.addOutput([
             ['tx_data','logic',8],
             ['new_tx_data','logic',1],
             ['tracing','logic',1],
             ['configId','logic',8],
-            ['configData','logic',8]])
+            ['configData','logic',8],
+            ['tb_mem_address','logic','$clog2(TB_SIZE)']])
+        top.mod.reconfigUnit.addParameter([
+            ['N'],
+            ['DATA_WIDTH'],
+            ['TB_SIZE']])
 
         # Input buffer
         top.includeModule("inputBuffer")
@@ -478,7 +485,8 @@ class rtlHw():
             ['clk','logic',1],
             ['valid_in','logic',1],
             ['vector_in','logic','DATA_WIDTH','N'],
-            ['tracing','logic',1]])
+            ['tracing','logic',1],
+            ['tb_mem_address','logic','$clog2(TB_SIZE)']])
         top.mod.traceBuffer.addOutput([
             ['vector_out','logic','DATA_WIDTH','N']])
         top.mod.traceBuffer.addParameter([
@@ -548,6 +556,10 @@ class rtlHw():
         top.instantiateModule(top.mod.uart,"comm")
 
         top.instantiateModule(top.mod.reconfigUnit,"reconfig")
+        top.inst.reconfig.setParameters([
+            ['N','N'],
+            ['DATA_WIDTH','DATA_WIDTH'],
+            ['TB_SIZE','TB_SIZE']])
 
         top.instantiateModule(top.mod.inputBuffer,"ib")
         top.inst.ib.setParameters([
@@ -615,7 +627,8 @@ class rtlHw():
         top.inst.reconfig.instance_input={'clk': 'clk', 
                                     'rx_data': 'rx_data_comm', 
                                     'new_rx_data': 'new_rx_data_comm', 
-                                    'tx_busy': 'tx_busy_comm'}
+                                    'tx_busy': 'tx_busy_comm',
+                                    'vector_out_tb': 'vector_out_tb'}
         top.inst.ib.instance_input={'clk': 'clk', 
                                     'enqueue': 'enqueue', 
                                     'eof_in': 'eof_in', 
@@ -629,7 +642,12 @@ class rtlHw():
         top.inst.vvalu.connectInputs(top.inst.fru)
         top.inst.vsru.connectInputs(top.inst.vvalu)
         top.inst.dp.connectInputs(top.inst.vsru)
-        top.inst.tb.connectInputs(top.inst.dp)
+
+        top.inst.tb.instance_input={'clk': 'clk', 
+                                    'valid_in': 'valid_out_dp', 
+                                    'vector_in': 'vector_out_dp', 
+                                    'tracing': 'tracing_reconfig',
+                                    'tb_mem_address':'tb_mem_address_reconfig'}
 
         # Assign outputs
         top.output_assignment={'vector_out': 'vector_out_tb','uart_txd':'uart_txd_comm'}
