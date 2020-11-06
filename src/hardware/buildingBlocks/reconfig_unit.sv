@@ -53,7 +53,7 @@
   assign new_tx_data=new_tx_data_reg;
 
   //Those following assignments need to be changed in the future
-  assign tracing=1'b1 + tx_busy;
+  assign tracing= (dbg_state == DBG_TRACING);
   assign configId=rx_data;
   assign configData=rx_data+1'b1;
 
