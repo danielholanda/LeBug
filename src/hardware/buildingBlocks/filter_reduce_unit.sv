@@ -41,7 +41,7 @@
     reg bof_in_delay = 1'b0;
     reg [DATA_WIDTH-1:0] operand [M-1:0];
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
-    reg [DATA_WIDTH-1:0] filter_result [M-1:0] [N-1:0];
+    reg filter_result [M-1:0] [N-1:0];
     reg [DATA_WIDTH-1:0] reduce_input [N-1:0] [N-1:0];
     reg [DATA_WIDTH-1:0] reduce_result [N-1:0];
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
@@ -153,11 +153,13 @@
       // Reduce along N axis
       if (firmware_reduce_axis_delay==8'd2) begin
         for(i=0; i<N; i=i+1) begin
-          if (i<M) begin
-            reduce_input[i]=filter_result[i];
-          end
-          else begin
-            reduce_input[i]='{N{0}};
+          for(j=0; j<N; j=j+1) begin
+            if (i<M) begin
+              reduce_input[i][j]=filter_result[i][j]+32'd0;
+            end
+            else begin
+              reduce_input[i][j]=0;
+            end
           end
         end
       end
@@ -166,7 +168,7 @@
         for(i=0; i<N; i=i+1) begin
           for(j=0; j<N; j=j+1) begin
             if (j<M) begin
-              reduce_input[i][j]=filter_result[j][i];
+              reduce_input[i][j]=filter_result[j][i]+32'd0;
             end
             else begin
               reduce_input[i][j]=0;
