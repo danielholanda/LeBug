@@ -47,7 +47,7 @@
     reg [DATA_WIDTH-1:0] operand [M-1:0];
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
     reg filter_result [M-1:0] [N-1:0];
-    reg [FRU_WIDTH-1:0] reduce_input [N-1:0] [N-1:0];
+    reg reduce_input [N-1:0] [N-1:0];
     reg [FRU_WIDTH-1:0] reduce_result [N-1:0];
     reg [DATA_WIDTH-1:0] reduce_result_wide [N-1:0];
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
@@ -157,7 +157,7 @@
         for(i=0; i<N; i=i+1) begin
           for(j=0; j<N; j=j+1) begin
             if (i<M) begin
-              reduce_input[i][j]=filter_result[i][j]+{FRU_WIDTH{1'b0}};;
+              reduce_input[i][j]=filter_result[i][j];
             end
             else begin
               reduce_input[i][j]=0;
@@ -170,7 +170,7 @@
         for(i=0; i<N; i=i+1) begin
           for(j=0; j<N; j=j+1) begin
             if (j<M) begin
-              reduce_input[i][j]=filter_result[j][i]+{FRU_WIDTH{1'b0}};;
+              reduce_input[i][j]=filter_result[j][i];
             end
             else begin
               reduce_input[i][j]=0;
@@ -185,14 +185,14 @@
     // Logic for reduce unit
     generate 
       for (g=0;g<N;g++) begin
-        adderTreeNarrow #(.N(N), .WIDTH_IN(FRU_WIDTH),.WIDTH_OUT(FRU_WIDTH))adder_tree_inst(.vector(reduce_input[g]), .result(reduce_result[g]));
+        adderTreeNarrow #(.N(N), .WIDTH_IN(1), .WIDTH_OUT($clog2(N+1)))adder_tree_inst(.vector(reduce_input[g]), .result(reduce_result[g]));
       end
     endgenerate
 
     always @(*) begin
       // Pad result with zeros
       for (i=0;i<N;i++) begin
-        reduce_result_wide[i]=reduce_result[i]+{DATA_WIDTH{1'b0}};;
+        reduce_result_wide[i]=reduce_result[i]+{DATA_WIDTH{1'b0}};
       end
     end
  
