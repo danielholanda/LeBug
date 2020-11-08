@@ -3,6 +3,7 @@
  // Function    : Parameterizable combinational adder tree
  //-----------------------------------------------------
 
+// This is an adder tree with inputs that are DATA_WIDTH-bit wide
 module adderTree #(parameter N = 8, DATA_WIDTH = 32)(
 	input wire [DATA_WIDTH-1:0] vector [N-1:0],
 	output wire [DATA_WIDTH-1:0] result
@@ -40,6 +41,15 @@ module addPairs #(parameter N = 8, DATA_WIDTH = 32, RESULTS=4)(
 	endgenerate
 endmodule 
 
+
+// This is an adder tree with inputs that are 1-bit wide
+module adderTree1Bit #(parameter N = 8)(
+	input wire vector [N-1:0],
+	output wire [$clog2(N+1)-1:0] result
+);
+	adderTreeNarrow #(.N(N), .WIDTH_IN(1), .WIDTH_OUT($clog2(N+1)))
+		adder_tree_inst(.vector(vector), .result(result));
+endmodule
 
 
 module adderTreeNarrow #(parameter N = 8, WIDTH_IN = 32, WIDTH_OUT = 32)(

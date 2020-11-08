@@ -185,7 +185,7 @@
     // Logic for reduce unit
     generate 
       for (g=0;g<N;g++) begin
-        adderTreeNarrow #(.N(N), .WIDTH_IN(1), .WIDTH_OUT($clog2(N+1)))adder_tree_inst(.vector(reduce_input[g]), .result(reduce_result[g]));
+        adderTree1Bit #(.N(N))adder_tree_inst(.vector(reduce_input[g]), .result(reduce_result[g]));
       end
     endgenerate
 
