@@ -182,18 +182,21 @@
       mem_address_a = firmware_filter_addr[chainId_in];
     end
 
-    // Sum all values
+    // Logic for reduce unit
+    generate 
+      for (g=0;g<N;g++) begin
+        adderTree1Bit #(.N(N))adder_tree_inst(.vector(reduce_input[g]), .result(reduce_result[g]));
+      end
+    endgenerate
+
     always @(*) begin
-      for(i=0; i<N; i=i+1) begin
-        reduce_result_wide[i]=0;
-        for(j=0; j<N; j=j+1) begin
-          reduce_result_wide[i]=reduce_result_wide[i]+reduce_input[i][j];
-        end
+      // Pad result with zeros
+      for (i=0;i<N;i++) begin
+        reduce_result_wide[i]=reduce_result[i]+{DATA_WIDTH{1'b0}};
       end
     end
  
  endmodule 
-
 
 
 
