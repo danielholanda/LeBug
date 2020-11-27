@@ -783,7 +783,9 @@ class rtlHw():
                 $fclose(write_data);
                 write_data2 = $fopen("simulation_results_tb.txt");
                 for (i=0; i<dbg.tb.TB_SIZE; i=i+1) begin
-                    tmp = dbg.tb.mem.altsyncram_component.mem_data[i];
+                    tmp = dbg.tb.mem.altera_syncram_component.mem_data[i];
+                    //tmp = dbg.tb.mem.altsyncram_component.altera_syncram_inst.mem_data[i];
+                    //tmp = dbg.tb.mem.altsyncram_component.mem_data[i];
                     for (j=0; j<N; j=j+1) begin
                         // Verilog you can't have two variable expressions in a range, even if they evaluate to a constant difference.  
                         // Specifically: [j*DATA_WIDTH+DATA_WIDTH-1:j*DATA_WIDTH] should be:[j*DATA_WIDTH +: DATA_WIDTH]
@@ -843,7 +845,7 @@ class rtlHw():
         modelsim.exec('mkdir rtl')
         modelsim.copy(rtl_folder,'modelsim:.')
         modelsim.exec('vlib work',working_directory='/rtl')
-        modelsim.exec('vlog altera_mf.v testbench.sv',working_directory='/rtl')
+        modelsim.exec('vlog altera_mf.v altera_lnsim.sv testbench.sv',working_directory='/rtl')
         if gui:
             print("Opening GUI\n\tMake sure to open socket using this command on your mac:\n\tsocat TCP-LISTEN:6000,reuseaddr,fork UNIX-CLIENT:\\\"$DISPLAY\\\"")
             modelsim.exec('vsim -gui -do "run -all" testbench',working_directory='/rtl')

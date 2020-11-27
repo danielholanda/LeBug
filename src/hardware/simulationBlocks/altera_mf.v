@@ -1,17 +1,18 @@
-// Copyright (C) 1991-2011 Altera Corporation
-// Your use of Altera Corporation's design tools, logic functions 
-// and other software and tools, and its AMPP partner logic 
+// Copyright (C) 2020 Intel Corporation. All rights reserved.
+// Your use of Intel Corporation's design tools, logic functions 
+// and other software and tools, and any partner logic 
 // functions, and any output files from any of the foregoing 
 // (including device programming or simulation files), and any 
 // associated documentation or information are expressly subject 
-// to the terms and conditions of the Altera Program License 
-// Subscription Agreement, Altera MegaCore Function License 
-// Agreement, or other applicable license agreement, including, 
-// without limitation, that your use is for the sole purpose of 
-// programming logic devices manufactured by Altera and sold by 
-// Altera or its authorized distributors.  Please refer to the 
-// applicable agreement for further details.
-// Quartus II 11.0 Build 157 04/27/2011
+// to the terms and conditions of the Intel Program License 
+// Subscription Agreement, the Intel Quartus Prime License Agreement,
+// the Intel FPGA IP License Agreement, or other applicable license
+// agreement, including, without limitation, that your use is for
+// the sole purpose of programming logic devices manufactured by
+// Intel and sold by Intel or its authorized distributors.  Please
+// refer to the applicable agreement for further details, at
+// https://fpgasoftware.intel.com/eula.
+// Quartus Prime 20.3.0 Build 158 09/24/2020
 
 //START_MODULE_NAME------------------------------------------------------------
 //
@@ -47,7 +48,7 @@ endmodule
 `define EOF -1
 `define MAX_BUFFER_SZ   2048
 `define MAX_NAME_SZ     256
-`define MAX_WIDTH       256
+`define MAX_WIDTH       1024
 `define COLON           ":"
 `define DOT             "."
 `define NEWLINE         "\n"
@@ -86,6 +87,82 @@ begin
     else
         tolower = given_character;    
 end
+endfunction
+
+
+/****************************************************************/
+/* function for ecc parity                                      */
+/****************************************************************/
+function [7:0] ecc_parity;
+    input [7:0] i_eccencparity;
+    integer pointer,pointer_max,pointer_min,flag_err,flag,flag_double,flag_triple,flag_single,flag_no_err ,flag_uncorr; 
+    integer n;
+    integer err,found ;
+    integer found_2;
+begin
+    pointer=0;
+    pointer_max=0;
+    pointer_min=0;
+    flag_err=0;
+    flag=0;
+    flag_double=0;
+    flag_triple=0;
+    flag_single=0;
+    flag_no_err =0;
+    flag_uncorr=0;
+    err=0;
+    found=0;
+    found_2=0;
+        for (n = 0 ; n<8 ;n=n+1)
+        begin
+            if (i_eccencparity[n] == 'b1 && found == 0 )
+            begin
+                pointer_min = n;
+                found = 1;
+            end  
+        end
+
+        for (n = 7 ; n>=0 ;n=n-1)
+        begin
+            if (i_eccencparity[n] == 'b1 && found_2 == 0)
+            begin
+                pointer_max = n;
+                found_2 = 1;
+            end  
+        end
+
+        pointer = pointer_max - pointer_min ;
+
+        if (i_eccencparity == 8'h0) 
+        begin
+            flag_no_err =1;
+            ecc_parity = 2'b00;
+        end
+
+        else if (pointer == 0)
+        begin
+            flag_single =1;
+            ecc_parity = 2'b10;
+        end 
+
+        else if (pointer == 1)
+        begin
+            flag_double =1;
+            ecc_parity = 2'b10;
+        end 
+
+        else if (pointer == 2)
+        begin
+            flag_triple =1;
+            ecc_parity = 2'b10;
+        end 
+        
+        else if (pointer > 2)
+        begin
+            flag_uncorr =1;
+            ecc_parity = 2'b11;
+        end
+end//function
 endfunction
     
 /****************************************************************/
@@ -127,7 +204,7 @@ task convert_mif2ver;
     integer value;
     integer ifp, ofp, r, r2;
     integer i, j, k, m, n;
-    
+    integer negative;
     integer off_addr, nn, address, tt, cc, aah, aal, dd, sum ;
     integer start_address, end_address;
     integer line_no;
@@ -136,10 +213,6 @@ task convert_mif2ver;
     integer comment_with_double_minus_found;
 
 begin
-`ifdef NO_PLI
-`else
-    `ifdef USE_RIF
-    `else
         done = `FALSE;
         error_status = `FALSE;
         first_rec = `FALSE;
@@ -294,36 +367,41 @@ begin
                 end
                 else if (r == `MINUS)
                 begin
-                    r = $fgetc(ifp);
-                    if (r == `MINUS)
-                    begin
-                        // Ignore all the characters which which is part of comment.
+                    if(get_data == `TRUE && data_radix == "dec")begin
+                        negative = 1;
+                    end
+                    else begin
                         r = $fgetc(ifp);
-    
-                        while ((r != `NEWLINE) && (r != `CARRIAGE_RETURN))
+                        if (r == `MINUS)
                         begin
+                            // Ignore all the characters which which is part of comment.
                             r = $fgetc(ifp);
-                            
-                        end
     
-                        if ((r == `NEWLINE) || (r == `CARRIAGE_RETURN))
-                        begin
-                            line_no = line_no +1;
-
-                            if ((buffer == "contentbegin") && (get_address_data_pairs == `FALSE))
+                            while ((r != `NEWLINE) && (r != `CARRIAGE_RETURN))
                             begin
-                                get_address_data_pairs = `TRUE;
-                                get_address = `TRUE;
-                                buffer = "";
+                                r = $fgetc(ifp);
+                                
+                            end
+    
+                            if ((r == `NEWLINE) || (r == `CARRIAGE_RETURN))
+                            begin
+                                line_no = line_no +1;
+    
+                                if ((buffer == "contentbegin") && (get_address_data_pairs == `FALSE))
+                                begin
+                                    get_address_data_pairs = `TRUE;
+                                    get_address = `TRUE;
+                                    buffer = "";
+                                end
                             end
                         end
-                    end
-                    else
-                    begin
-                        error_status = `TRUE;
-                        $display("ERROR: %0s, line %0d, Invalid Altera-mif record.", in_file, line_no);
-                        done = `TRUE;
-                        disable READER;
+                        else
+                        begin
+                            error_status = `TRUE;
+                            $display("ERROR: %0s, line %0d, Invalid Altera-mif record.", in_file, line_no);
+                            done = `TRUE;
+                            disable READER;
+                        end
                     end
                 end
                 else if (r == `EQUAL)
@@ -378,6 +456,7 @@ begin
                         get_address = `FALSE;
                         get_data = `TRUE;
                         display_address = `TRUE;
+                        negative = 0;
                     end
                 end
                 else if (r == `DOT)
@@ -503,7 +582,9 @@ begin
                             for (address = start_address; address <= end_address; address = address+1)
                             begin
                                 $fdisplay(ofp,"@%0h", address);
-                                
+                                if (negative == 1) begin
+                                    memory_data1 = memory_data1 * -1;                                   
+                                end
                                 for (i = memory_width -1; i >= 0; i = i-1 )
                                 begin
                                     hex[(i % 4)] =  memory_data1[i];
@@ -529,6 +610,10 @@ begin
                             begin
                                 $fdisplay(ofp,"@%0h", address);
                                 display_address = `FALSE;
+                            end
+                            
+                            if (negative == 1) begin
+                                memory_data1 = memory_data1 * -1;                                   
                             end
                             
                             for (i = memory_width -1; i >= 0; i = i-1 )
@@ -727,8 +812,6 @@ begin
             $fclose(ifp);
             $fclose(ofp);
         end
-    `endif 
-`endif    
 end
 endtask // convert_mif2ver
 
@@ -760,10 +843,6 @@ task convert_hex2ver;
     integer divide_factor;
 
 begin
-`ifdef NO_PLI
-`else
-    `ifdef USE_RIF
-    `else
         done = `FALSE;
         error_status = `FALSE;
         first_rec = `FALSE;
@@ -1186,8 +1265,6 @@ begin
             $fclose(ifp);
             $fclose(ofp);
         end
-    `endif 
-`endif    
 end
 endtask // convert_hex2ver
 
@@ -1355,83 +1432,31 @@ endmodule // ALTERA_MF_HINT_EVALUATION
 // MODULE DECLARATION
 module ALTERA_DEVICE_FAMILIES;
 
-function IS_FAMILY_STRATIX;
+function IS_FAMILY_AGILEX;
     input[8*20:1] device;
-    reg is_stratix;
+    reg is_agilex;
 begin
-    if ((device == "Stratix") || (device == "STRATIX") || (device == "stratix") || (device == "Yeager") || (device == "YEAGER") || (device == "yeager"))
-        is_stratix = 1;
+    if ((device == "Agilex") || (device == "AGILEX") || (device == "agilex") || (device == "AGILEX") || (device == "agilex") || (device == "Falcon Mesa") || (device == "FALCON MESA") || (device == "falcon mesa") || (device == "FALCONMESA") || (device == "falconmesa") || (device == "falconmesa") || (device == "FALCONMESA") || (device == "Stratix 20") || (device == "STRATIX 20") || (device == "stratix 20") || (device == "Stratix20") || (device == "STRATIX20") || (device == "stratix20") || (device == "stratix 20") || (device == "STRATIX 20") || (device == "stratix20") || (device == "STRATIX20") || (device == "STRATIX 20") || (device == "stratix 20") || (device == "STRATIX20") || (device == "stratix20") || (device == "Agilex (F-Series/I-Series)") || (device == "AGILEX (F-SERIES/I-SERIES)") || (device == "agilex (f-series/i-series)") || (device == "Agilex(F-Series/I-Series)") || (device == "AGILEX(F-SERIES/I-SERIES)") || (device == "agilex(f-series/i-series)") || (device == "Agilex (F-Series)") || (device == "AGILEX (F-SERIES)") || (device == "agilex (f-series)") || (device == "Agilex(F-Series)") || (device == "AGILEX(F-SERIES)") || (device == "agilex(f-series)") || (device == "Agilex (I-Series)") || (device == "AGILEX (I-SERIES)") || (device == "agilex (i-series)") || (device == "Agilex(I-Series)") || (device == "AGILEX(I-SERIES)") || (device == "agilex(i-series)"))
+        is_agilex = 1;
     else
-        is_stratix = 0;
+        is_agilex = 0;
 
-    IS_FAMILY_STRATIX  = is_stratix;
+    IS_FAMILY_AGILEX  = is_agilex;
 end
-endfunction //IS_FAMILY_STRATIX
+endfunction //IS_FAMILY_AGILEX
 
-function IS_FAMILY_STRATIXGX;
+function IS_FAMILY_ARRIA10;
     input[8*20:1] device;
-    reg is_stratixgx;
+    reg is_arria10;
 begin
-    if ((device == "Stratix GX") || (device == "STRATIX GX") || (device == "stratix gx") || (device == "Stratix-GX") || (device == "STRATIX-GX") || (device == "stratix-gx") || (device == "StratixGX") || (device == "STRATIXGX") || (device == "stratixgx") || (device == "Aurora") || (device == "AURORA") || (device == "aurora"))
-        is_stratixgx = 1;
+    if ((device == "Arria 10") || (device == "ARRIA 10") || (device == "arria 10") || (device == "Arria10") || (device == "ARRIA10") || (device == "arria10") || (device == "Arria VI") || (device == "ARRIA VI") || (device == "arria vi") || (device == "ArriaVI") || (device == "ARRIAVI") || (device == "arriavi") || (device == "Night Fury") || (device == "NIGHT FURY") || (device == "night fury") || (device == "nightfury") || (device == "NIGHTFURY") || (device == "Arria 10 (GX/SX/GT)") || (device == "ARRIA 10 (GX/SX/GT)") || (device == "arria 10 (gx/sx/gt)") || (device == "Arria10(GX/SX/GT)") || (device == "ARRIA10(GX/SX/GT)") || (device == "arria10(gx/sx/gt)") || (device == "Arria 10 (GX)") || (device == "ARRIA 10 (GX)") || (device == "arria 10 (gx)") || (device == "Arria10(GX)") || (device == "ARRIA10(GX)") || (device == "arria10(gx)") || (device == "Arria 10 (SX)") || (device == "ARRIA 10 (SX)") || (device == "arria 10 (sx)") || (device == "Arria10(SX)") || (device == "ARRIA10(SX)") || (device == "arria10(sx)") || (device == "Arria 10 (GT)") || (device == "ARRIA 10 (GT)") || (device == "arria 10 (gt)") || (device == "Arria10(GT)") || (device == "ARRIA10(GT)") || (device == "arria10(gt)"))
+        is_arria10 = 1;
     else
-        is_stratixgx = 0;
+        is_arria10 = 0;
 
-    IS_FAMILY_STRATIXGX  = is_stratixgx;
+    IS_FAMILY_ARRIA10  = is_arria10;
 end
-endfunction //IS_FAMILY_STRATIXGX
-
-function IS_FAMILY_CYCLONE;
-    input[8*20:1] device;
-    reg is_cyclone;
-begin
-    if ((device == "Cyclone") || (device == "CYCLONE") || (device == "cyclone") || (device == "ACEX2K") || (device == "acex2k") || (device == "ACEX 2K") || (device == "acex 2k") || (device == "Tornado") || (device == "TORNADO") || (device == "tornado"))
-        is_cyclone = 1;
-    else
-        is_cyclone = 0;
-
-    IS_FAMILY_CYCLONE  = is_cyclone;
-end
-endfunction //IS_FAMILY_CYCLONE
-
-function IS_FAMILY_MAXII;
-    input[8*20:1] device;
-    reg is_maxii;
-begin
-    if ((device == "MAX II") || (device == "max ii") || (device == "MAXII") || (device == "maxii") || (device == "Tsunami") || (device == "TSUNAMI") || (device == "tsunami"))
-        is_maxii = 1;
-    else
-        is_maxii = 0;
-
-    IS_FAMILY_MAXII  = is_maxii;
-end
-endfunction //IS_FAMILY_MAXII
-
-function IS_FAMILY_STRATIXII;
-    input[8*20:1] device;
-    reg is_stratixii;
-begin
-    if ((device == "Stratix II") || (device == "STRATIX II") || (device == "stratix ii") || (device == "StratixII") || (device == "STRATIXII") || (device == "stratixii") || (device == "Armstrong") || (device == "ARMSTRONG") || (device == "armstrong"))
-        is_stratixii = 1;
-    else
-        is_stratixii = 0;
-
-    IS_FAMILY_STRATIXII  = is_stratixii;
-end
-endfunction //IS_FAMILY_STRATIXII
-
-function IS_FAMILY_STRATIXIIGX;
-    input[8*20:1] device;
-    reg is_stratixiigx;
-begin
-    if ((device == "Stratix II GX") || (device == "STRATIX II GX") || (device == "stratix ii gx") || (device == "StratixIIGX") || (device == "STRATIXIIGX") || (device == "stratixiigx"))
-        is_stratixiigx = 1;
-    else
-        is_stratixiigx = 0;
-
-    IS_FAMILY_STRATIXIIGX  = is_stratixiigx;
-end
-endfunction //IS_FAMILY_STRATIXIIGX
+endfunction //IS_FAMILY_ARRIA10
 
 function IS_FAMILY_ARRIAGX;
     input[8*20:1] device;
@@ -1446,11 +1471,76 @@ begin
 end
 endfunction //IS_FAMILY_ARRIAGX
 
+function IS_FAMILY_ARRIAIIGX;
+    input[8*20:1] device;
+    reg is_arriaiigx;
+begin
+    if ((device == "Arria II GX") || (device == "ARRIA II GX") || (device == "arria ii gx") || (device == "ArriaIIGX") || (device == "ARRIAIIGX") || (device == "arriaiigx") || (device == "Arria IIGX") || (device == "ARRIA IIGX") || (device == "arria iigx") || (device == "ArriaII GX") || (device == "ARRIAII GX") || (device == "arriaii gx") || (device == "Arria II") || (device == "ARRIA II") || (device == "arria ii") || (device == "ArriaII") || (device == "ARRIAII") || (device == "arriaii") || (device == "Arria II (GX/E)") || (device == "ARRIA II (GX/E)") || (device == "arria ii (gx/e)") || (device == "ArriaII(GX/E)") || (device == "ARRIAII(GX/E)") || (device == "arriaii(gx/e)") || (device == "PIRANHA") || (device == "piranha"))
+        is_arriaiigx = 1;
+    else
+        is_arriaiigx = 0;
+
+    IS_FAMILY_ARRIAIIGX  = is_arriaiigx;
+end
+endfunction //IS_FAMILY_ARRIAIIGX
+
+function IS_FAMILY_ARRIAIIGZ;
+    input[8*20:1] device;
+    reg is_arriaiigz;
+begin
+    if ((device == "Arria II GZ") || (device == "ARRIA II GZ") || (device == "arria ii gz") || (device == "ArriaII GZ") || (device == "ARRIAII GZ") || (device == "arriaii gz") || (device == "Arria IIGZ") || (device == "ARRIA IIGZ") || (device == "arria iigz") || (device == "ArriaIIGZ") || (device == "ARRIAIIGZ") || (device == "arriaiigz"))
+        is_arriaiigz = 1;
+    else
+        is_arriaiigz = 0;
+
+    IS_FAMILY_ARRIAIIGZ  = is_arriaiigz;
+end
+endfunction //IS_FAMILY_ARRIAIIGZ
+
+function IS_FAMILY_ARRIAVGZ;
+    input[8*20:1] device;
+    reg is_arriavgz;
+begin
+    if ((device == "Arria V GZ") || (device == "ARRIA V GZ") || (device == "arria v gz") || (device == "ArriaVGZ") || (device == "ARRIAVGZ") || (device == "arriavgz"))
+        is_arriavgz = 1;
+    else
+        is_arriavgz = 0;
+
+    IS_FAMILY_ARRIAVGZ  = is_arriavgz;
+end
+endfunction //IS_FAMILY_ARRIAVGZ
+
+function IS_FAMILY_ARRIAV;
+    input[8*20:1] device;
+    reg is_arriav;
+begin
+    if ((device == "Arria V") || (device == "ARRIA V") || (device == "arria v") || (device == "Arria V (GT/GX)") || (device == "ARRIA V (GT/GX)") || (device == "arria v (gt/gx)") || (device == "ArriaV(GT/GX)") || (device == "ARRIAV(GT/GX)") || (device == "arriav(gt/gx)") || (device == "ArriaV") || (device == "ARRIAV") || (device == "arriav") || (device == "Arria V (GT/GX/ST/SX)") || (device == "ARRIA V (GT/GX/ST/SX)") || (device == "arria v (gt/gx/st/sx)") || (device == "ArriaV(GT/GX/ST/SX)") || (device == "ARRIAV(GT/GX/ST/SX)") || (device == "arriav(gt/gx/st/sx)") || (device == "Arria V (GT)") || (device == "ARRIA V (GT)") || (device == "arria v (gt)") || (device == "ArriaV(GT)") || (device == "ARRIAV(GT)") || (device == "arriav(gt)") || (device == "Arria V (GX)") || (device == "ARRIA V (GX)") || (device == "arria v (gx)") || (device == "ArriaV(GX)") || (device == "ARRIAV(GX)") || (device == "arriav(gx)") || (device == "Arria V (ST)") || (device == "ARRIA V (ST)") || (device == "arria v (st)") || (device == "ArriaV(ST)") || (device == "ARRIAV(ST)") || (device == "arriav(st)") || (device == "Arria V (SX)") || (device == "ARRIA V (SX)") || (device == "arria v (sx)") || (device == "ArriaV(SX)") || (device == "ARRIAV(SX)") || (device == "arriav(sx)"))
+        is_arriav = 1;
+    else
+        is_arriav = 0;
+
+    IS_FAMILY_ARRIAV  = is_arriav;
+end
+endfunction //IS_FAMILY_ARRIAV
+
+function IS_FAMILY_CYCLONE10GX;
+    input[8*20:1] device;
+    reg is_cyclone10gx;
+begin
+    if ((device == "Cyclone 10 GX") || (device == "CYCLONE 10 GX") || (device == "cyclone 10 gx") || (device == "Cyclone10GX") || (device == "CYCLONE10GX") || (device == "cyclone10gx"))
+        is_cyclone10gx = 1;
+    else
+        is_cyclone10gx = 0;
+
+    IS_FAMILY_CYCLONE10GX  = is_cyclone10gx;
+end
+endfunction //IS_FAMILY_CYCLONE10GX
+
 function IS_FAMILY_CYCLONEII;
     input[8*20:1] device;
     reg is_cycloneii;
 begin
-    if ((device == "Cyclone II") || (device == "CYCLONE II") || (device == "cyclone ii") || (device == "Cycloneii") || (device == "CYCLONEII") || (device == "cycloneii") || (device == "Magellan") || (device == "MAGELLAN") || (device == "magellan"))
+    if ((device == "Cyclone II") || (device == "CYCLONE II") || (device == "cyclone ii") || (device == "Cycloneii") || (device == "CYCLONEII") || (device == "cycloneii") || (device == "Magellan") || (device == "MAGELLAN") || (device == "magellan") || (device == "CycloneII") || (device == "CYCLONEII") || (device == "cycloneii"))
         is_cycloneii = 1;
     else
         is_cycloneii = 0;
@@ -1459,31 +1549,18 @@ begin
 end
 endfunction //IS_FAMILY_CYCLONEII
 
-function IS_FAMILY_HARDCOPYII;
+function IS_FAMILY_CYCLONEIIILS;
     input[8*20:1] device;
-    reg is_hardcopyii;
+    reg is_cycloneiiils;
 begin
-    if ((device == "HardCopy II") || (device == "HARDCOPY II") || (device == "hardcopy ii") || (device == "HardCopyII") || (device == "HARDCOPYII") || (device == "hardcopyii") || (device == "Fusion") || (device == "FUSION") || (device == "fusion"))
-        is_hardcopyii = 1;
+    if ((device == "Cyclone III LS") || (device == "CYCLONE III LS") || (device == "cyclone iii ls") || (device == "CycloneIIILS") || (device == "CYCLONEIIILS") || (device == "cycloneiiils") || (device == "Cyclone III LPS") || (device == "CYCLONE III LPS") || (device == "cyclone iii lps") || (device == "Cyclone LPS") || (device == "CYCLONE LPS") || (device == "cyclone lps") || (device == "CycloneLPS") || (device == "CYCLONELPS") || (device == "cyclonelps") || (device == "Tarpon") || (device == "TARPON") || (device == "tarpon") || (device == "Cyclone IIIE") || (device == "CYCLONE IIIE") || (device == "cyclone iiie"))
+        is_cycloneiiils = 1;
     else
-        is_hardcopyii = 0;
+        is_cycloneiiils = 0;
 
-    IS_FAMILY_HARDCOPYII  = is_hardcopyii;
+    IS_FAMILY_CYCLONEIIILS  = is_cycloneiiils;
 end
-endfunction //IS_FAMILY_HARDCOPYII
-
-function IS_FAMILY_STRATIXIII;
-    input[8*20:1] device;
-    reg is_stratixiii;
-begin
-    if ((device == "Stratix III") || (device == "STRATIX III") || (device == "stratix iii") || (device == "StratixIII") || (device == "STRATIXIII") || (device == "stratixiii") || (device == "Titan") || (device == "TITAN") || (device == "titan") || (device == "SIII") || (device == "siii"))
-        is_stratixiii = 1;
-    else
-        is_stratixiii = 0;
-
-    IS_FAMILY_STRATIXIII  = is_stratixiii;
-end
-endfunction //IS_FAMILY_STRATIXIII
+endfunction //IS_FAMILY_CYCLONEIIILS
 
 function IS_FAMILY_CYCLONEIII;
     input[8*20:1] device;
@@ -1498,31 +1575,70 @@ begin
 end
 endfunction //IS_FAMILY_CYCLONEIII
 
-function IS_FAMILY_STRATIXIV;
+function IS_FAMILY_CYCLONEIVE;
     input[8*20:1] device;
-    reg is_stratixiv;
+    reg is_cycloneive;
 begin
-    if ((device == "Stratix IV") || (device == "STRATIX IV") || (device == "stratix iv") || (device == "TGX") || (device == "tgx") || (device == "StratixIV") || (device == "STRATIXIV") || (device == "stratixiv") || (device == "Stratix IV (GT)") || (device == "STRATIX IV (GT)") || (device == "stratix iv (gt)") || (device == "Stratix IV (GX)") || (device == "STRATIX IV (GX)") || (device == "stratix iv (gx)") || (device == "Stratix IV (E)") || (device == "STRATIX IV (E)") || (device == "stratix iv (e)") || (device == "StratixIV(GT)") || (device == "STRATIXIV(GT)") || (device == "stratixiv(gt)") || (device == "StratixIV(GX)") || (device == "STRATIXIV(GX)") || (device == "stratixiv(gx)") || (device == "StratixIV(E)") || (device == "STRATIXIV(E)") || (device == "stratixiv(e)") || (device == "StratixIIIGX") || (device == "STRATIXIIIGX") || (device == "stratixiiigx") || (device == "Stratix IV (GT/GX/E)") || (device == "STRATIX IV (GT/GX/E)") || (device == "stratix iv (gt/gx/e)") || (device == "Stratix IV (GT/E/GX)") || (device == "STRATIX IV (GT/E/GX)") || (device == "stratix iv (gt/e/gx)") || (device == "Stratix IV (E/GT/GX)") || (device == "STRATIX IV (E/GT/GX)") || (device == "stratix iv (e/gt/gx)") || (device == "Stratix IV (E/GX/GT)") || (device == "STRATIX IV (E/GX/GT)") || (device == "stratix iv (e/gx/gt)") || (device == "StratixIV(GT/GX/E)") || (device == "STRATIXIV(GT/GX/E)") || (device == "stratixiv(gt/gx/e)") || (device == "StratixIV(GT/E/GX)") || (device == "STRATIXIV(GT/E/GX)") || (device == "stratixiv(gt/e/gx)") || (device == "StratixIV(E/GX/GT)") || (device == "STRATIXIV(E/GX/GT)") || (device == "stratixiv(e/gx/gt)") || (device == "StratixIV(E/GT/GX)") || (device == "STRATIXIV(E/GT/GX)") || (device == "stratixiv(e/gt/gx)") || (device == "Stratix IV (GX/E)") || (device == "STRATIX IV (GX/E)") || (device == "stratix iv (gx/e)") || (device == "StratixIV(GX/E)") || (device == "STRATIXIV(GX/E)") || (device == "stratixiv(gx/e)"))
-        is_stratixiv = 1;
+    if ((device == "Cyclone IV E") || (device == "CYCLONE IV E") || (device == "cyclone iv e") || (device == "CycloneIV E") || (device == "CYCLONEIV E") || (device == "cycloneiv e") || (device == "Cyclone IVE") || (device == "CYCLONE IVE") || (device == "cyclone ive") || (device == "CycloneIVE") || (device == "CYCLONEIVE") || (device == "cycloneive"))
+        is_cycloneive = 1;
     else
-        is_stratixiv = 0;
+        is_cycloneive = 0;
 
-    IS_FAMILY_STRATIXIV  = is_stratixiv;
+    IS_FAMILY_CYCLONEIVE  = is_cycloneive;
 end
-endfunction //IS_FAMILY_STRATIXIV
+endfunction //IS_FAMILY_CYCLONEIVE
 
-function IS_FAMILY_ARRIAIIGX;
+function IS_FAMILY_CYCLONEIVGX;
     input[8*20:1] device;
-    reg is_arriaiigx;
+    reg is_cycloneivgx;
 begin
-    if ((device == "Arria II GX") || (device == "ARRIA II GX") || (device == "arria ii gx") || (device == "ArriaIIGX") || (device == "ARRIAIIGX") || (device == "arriaiigx") || (device == "Arria IIGX") || (device == "ARRIA IIGX") || (device == "arria iigx") || (device == "ArriaII GX") || (device == "ARRIAII GX") || (device == "arriaii gx") || (device == "Arria II") || (device == "ARRIA II") || (device == "arria ii") || (device == "ArriaII") || (device == "ARRIAII") || (device == "arriaii") || (device == "Arria II (GX/E)") || (device == "ARRIA II (GX/E)") || (device == "arria ii (gx/e)") || (device == "ArriaII(GX/E)") || (device == "ARRIAII(GX/E)") || (device == "arriaii(gx/e)") || (device == "PIRANHA") || (device == "piranha"))
-        is_arriaiigx = 1;
+    if ((device == "Cyclone IV GX") || (device == "CYCLONE IV GX") || (device == "cyclone iv gx") || (device == "Cyclone IVGX") || (device == "CYCLONE IVGX") || (device == "cyclone ivgx") || (device == "CycloneIV GX") || (device == "CYCLONEIV GX") || (device == "cycloneiv gx") || (device == "CycloneIVGX") || (device == "CYCLONEIVGX") || (device == "cycloneivgx") || (device == "Cyclone IV") || (device == "CYCLONE IV") || (device == "cyclone iv") || (device == "CycloneIV") || (device == "CYCLONEIV") || (device == "cycloneiv") || (device == "Cyclone IV (GX)") || (device == "CYCLONE IV (GX)") || (device == "cyclone iv (gx)") || (device == "CycloneIV(GX)") || (device == "CYCLONEIV(GX)") || (device == "cycloneiv(gx)") || (device == "Cyclone III GX") || (device == "CYCLONE III GX") || (device == "cyclone iii gx") || (device == "CycloneIII GX") || (device == "CYCLONEIII GX") || (device == "cycloneiii gx") || (device == "Cyclone IIIGX") || (device == "CYCLONE IIIGX") || (device == "cyclone iiigx") || (device == "CycloneIIIGX") || (device == "CYCLONEIIIGX") || (device == "cycloneiiigx") || (device == "Cyclone III GL") || (device == "CYCLONE III GL") || (device == "cyclone iii gl") || (device == "CycloneIII GL") || (device == "CYCLONEIII GL") || (device == "cycloneiii gl") || (device == "Cyclone IIIGL") || (device == "CYCLONE IIIGL") || (device == "cyclone iiigl") || (device == "CycloneIIIGL") || (device == "CYCLONEIIIGL") || (device == "cycloneiiigl") || (device == "Stingray") || (device == "STINGRAY") || (device == "stingray"))
+        is_cycloneivgx = 1;
     else
-        is_arriaiigx = 0;
+        is_cycloneivgx = 0;
 
-    IS_FAMILY_ARRIAIIGX  = is_arriaiigx;
+    IS_FAMILY_CYCLONEIVGX  = is_cycloneivgx;
 end
-endfunction //IS_FAMILY_ARRIAIIGX
+endfunction //IS_FAMILY_CYCLONEIVGX
+
+function IS_FAMILY_CYCLONEV;
+    input[8*20:1] device;
+    reg is_cyclonev;
+begin
+    if ((device == "Cyclone V") || (device == "CYCLONE V") || (device == "cyclone v") || (device == "CycloneV") || (device == "CYCLONEV") || (device == "cyclonev") || (device == "Cyclone V (GT/GX/E/SX)") || (device == "CYCLONE V (GT/GX/E/SX)") || (device == "cyclone v (gt/gx/e/sx)") || (device == "CycloneV(GT/GX/E/SX)") || (device == "CYCLONEV(GT/GX/E/SX)") || (device == "cyclonev(gt/gx/e/sx)") || (device == "Cyclone V (E/GX/GT/SX/SE/ST)") || (device == "CYCLONE V (E/GX/GT/SX/SE/ST)") || (device == "cyclone v (e/gx/gt/sx/se/st)") || (device == "CycloneV(E/GX/GT/SX/SE/ST)") || (device == "CYCLONEV(E/GX/GT/SX/SE/ST)") || (device == "cyclonev(e/gx/gt/sx/se/st)") || (device == "Cyclone V (E)") || (device == "CYCLONE V (E)") || (device == "cyclone v (e)") || (device == "CycloneV(E)") || (device == "CYCLONEV(E)") || (device == "cyclonev(e)") || (device == "Cyclone V (GX)") || (device == "CYCLONE V (GX)") || (device == "cyclone v (gx)") || (device == "CycloneV(GX)") || (device == "CYCLONEV(GX)") || (device == "cyclonev(gx)") || (device == "Cyclone V (GT)") || (device == "CYCLONE V (GT)") || (device == "cyclone v (gt)") || (device == "CycloneV(GT)") || (device == "CYCLONEV(GT)") || (device == "cyclonev(gt)") || (device == "Cyclone V (SX)") || (device == "CYCLONE V (SX)") || (device == "cyclone v (sx)") || (device == "CycloneV(SX)") || (device == "CYCLONEV(SX)") || (device == "cyclonev(sx)") || (device == "Cyclone V (SE)") || (device == "CYCLONE V (SE)") || (device == "cyclone v (se)") || (device == "CycloneV(SE)") || (device == "CYCLONEV(SE)") || (device == "cyclonev(se)") || (device == "Cyclone V (ST)") || (device == "CYCLONE V (ST)") || (device == "cyclone v (st)") || (device == "CycloneV(ST)") || (device == "CYCLONEV(ST)") || (device == "cyclonev(st)"))
+        is_cyclonev = 1;
+    else
+        is_cyclonev = 0;
+
+    IS_FAMILY_CYCLONEV  = is_cyclonev;
+end
+endfunction //IS_FAMILY_CYCLONEV
+
+function IS_FAMILY_CYCLONE;
+    input[8*20:1] device;
+    reg is_cyclone;
+begin
+    if ((device == "Cyclone") || (device == "CYCLONE") || (device == "cyclone") || (device == "ACEX2K") || (device == "acex2k") || (device == "ACEX 2K") || (device == "acex 2k") || (device == "Tornado") || (device == "TORNADO") || (device == "tornado"))
+        is_cyclone = 1;
+    else
+        is_cyclone = 0;
+
+    IS_FAMILY_CYCLONE  = is_cyclone;
+end
+endfunction //IS_FAMILY_CYCLONE
+
+function IS_FAMILY_HARDCOPYII;
+    input[8*20:1] device;
+    reg is_hardcopyii;
+begin
+    if ((device == "HardCopy II") || (device == "HARDCOPY II") || (device == "hardcopy ii") || (device == "HardCopyII") || (device == "HARDCOPYII") || (device == "hardcopyii") || (device == "Fusion") || (device == "FUSION") || (device == "fusion"))
+        is_hardcopyii = 1;
+    else
+        is_hardcopyii = 0;
+
+    IS_FAMILY_HARDCOPYII  = is_hardcopyii;
+end
+endfunction //IS_FAMILY_HARDCOPYII
 
 function IS_FAMILY_HARDCOPYIII;
     input[8*20:1] device;
@@ -1550,70 +1666,31 @@ begin
 end
 endfunction //IS_FAMILY_HARDCOPYIV
 
-function IS_FAMILY_CYCLONEIIILS;
+function IS_FAMILY_MAX10;
     input[8*20:1] device;
-    reg is_cycloneiiils;
+    reg is_max10;
 begin
-    if ((device == "Cyclone III LS") || (device == "CYCLONE III LS") || (device == "cyclone iii ls") || (device == "CycloneIIILS") || (device == "CYCLONEIIILS") || (device == "cycloneiiils") || (device == "Cyclone III LPS") || (device == "CYCLONE III LPS") || (device == "cyclone iii lps") || (device == "Cyclone LPS") || (device == "CYCLONE LPS") || (device == "cyclone lps") || (device == "CycloneLPS") || (device == "CYCLONELPS") || (device == "cyclonelps") || (device == "Tarpon") || (device == "TARPON") || (device == "tarpon") || (device == "Cyclone IIIE") || (device == "CYCLONE IIIE") || (device == "cyclone iiie"))
-        is_cycloneiiils = 1;
+    if ((device == "MAX 10") || (device == "max 10") || (device == "MAX 10 FPGA") || (device == "max 10 fpga") || (device == "Zippleback") || (device == "ZIPPLEBACK") || (device == "zippleback") || (device == "MAX10") || (device == "max10") || (device == "MAX 10 (DA/DF/DC/SA/SC)") || (device == "max 10 (da/df/dc/sa/sc)") || (device == "MAX10(DA/DF/DC/SA/SC)") || (device == "max10(da/df/dc/sa/sc)") || (device == "MAX 10 (DA)") || (device == "max 10 (da)") || (device == "MAX10(DA)") || (device == "max10(da)") || (device == "MAX 10 (DF)") || (device == "max 10 (df)") || (device == "MAX10(DF)") || (device == "max10(df)") || (device == "MAX 10 (DC)") || (device == "max 10 (dc)") || (device == "MAX10(DC)") || (device == "max10(dc)") || (device == "MAX 10 (SA)") || (device == "max 10 (sa)") || (device == "MAX10(SA)") || (device == "max10(sa)") || (device == "MAX 10 (SC)") || (device == "max 10 (sc)") || (device == "MAX10(SC)") || (device == "max10(sc)"))
+        is_max10 = 1;
     else
-        is_cycloneiiils = 0;
+        is_max10 = 0;
 
-    IS_FAMILY_CYCLONEIIILS  = is_cycloneiiils;
+    IS_FAMILY_MAX10  = is_max10;
 end
-endfunction //IS_FAMILY_CYCLONEIIILS
+endfunction //IS_FAMILY_MAX10
 
-function IS_FAMILY_CYCLONEIVGX;
+function IS_FAMILY_MAXII;
     input[8*20:1] device;
-    reg is_cycloneivgx;
+    reg is_maxii;
 begin
-    if ((device == "Cyclone IV GX") || (device == "CYCLONE IV GX") || (device == "cyclone iv gx") || (device == "Cyclone IVGX") || (device == "CYCLONE IVGX") || (device == "cyclone ivgx") || (device == "CycloneIV GX") || (device == "CYCLONEIV GX") || (device == "cycloneiv gx") || (device == "CycloneIVGX") || (device == "CYCLONEIVGX") || (device == "cycloneivgx") || (device == "Cyclone IV") || (device == "CYCLONE IV") || (device == "cyclone iv") || (device == "CycloneIV") || (device == "CYCLONEIV") || (device == "cycloneiv") || (device == "Cyclone IV (GX)") || (device == "CYCLONE IV (GX)") || (device == "cyclone iv (gx)") || (device == "CycloneIV(GX)") || (device == "CYCLONEIV(GX)") || (device == "cycloneiv(gx)") || (device == "Cyclone III GX") || (device == "CYCLONE III GX") || (device == "cyclone iii gx") || (device == "CycloneIII GX") || (device == "CYCLONEIII GX") || (device == "cycloneiii gx") || (device == "Cyclone IIIGX") || (device == "CYCLONE IIIGX") || (device == "cyclone iiigx") || (device == "CycloneIIIGX") || (device == "CYCLONEIIIGX") || (device == "cycloneiiigx") || (device == "Cyclone III GL") || (device == "CYCLONE III GL") || (device == "cyclone iii gl") || (device == "CycloneIII GL") || (device == "CYCLONEIII GL") || (device == "cycloneiii gl") || (device == "Cyclone IIIGL") || (device == "CYCLONE IIIGL") || (device == "cyclone iiigl") || (device == "CycloneIIIGL") || (device == "CYCLONEIIIGL") || (device == "cycloneiiigl") || (device == "Stingray") || (device == "STINGRAY") || (device == "stingray"))
-        is_cycloneivgx = 1;
+    if ((device == "MAX II") || (device == "max ii") || (device == "MAXII") || (device == "maxii") || (device == "Tsunami") || (device == "TSUNAMI") || (device == "tsunami"))
+        is_maxii = 1;
     else
-        is_cycloneivgx = 0;
+        is_maxii = 0;
 
-    IS_FAMILY_CYCLONEIVGX  = is_cycloneivgx;
+    IS_FAMILY_MAXII  = is_maxii;
 end
-endfunction //IS_FAMILY_CYCLONEIVGX
-
-function IS_FAMILY_CYCLONEIVE;
-    input[8*20:1] device;
-    reg is_cycloneive;
-begin
-    if ((device == "Cyclone IV E") || (device == "CYCLONE IV E") || (device == "cyclone iv e") || (device == "CycloneIV E") || (device == "CYCLONEIV E") || (device == "cycloneiv e") || (device == "Cyclone IVE") || (device == "CYCLONE IVE") || (device == "cyclone ive") || (device == "CycloneIVE") || (device == "CYCLONEIVE") || (device == "cycloneive"))
-        is_cycloneive = 1;
-    else
-        is_cycloneive = 0;
-
-    IS_FAMILY_CYCLONEIVE  = is_cycloneive;
-end
-endfunction //IS_FAMILY_CYCLONEIVE
-
-function IS_FAMILY_STRATIXV;
-    input[8*20:1] device;
-    reg is_stratixv;
-begin
-    if ((device == "Stratix V") || (device == "STRATIX V") || (device == "stratix v") || (device == "StratixV") || (device == "STRATIXV") || (device == "stratixv") || (device == "Stratix V (GS)") || (device == "STRATIX V (GS)") || (device == "stratix v (gs)") || (device == "StratixV(GS)") || (device == "STRATIXV(GS)") || (device == "stratixv(gs)") || (device == "Stratix V (GT)") || (device == "STRATIX V (GT)") || (device == "stratix v (gt)") || (device == "StratixV(GT)") || (device == "STRATIXV(GT)") || (device == "stratixv(gt)") || (device == "Stratix V (GX)") || (device == "STRATIX V (GX)") || (device == "stratix v (gx)") || (device == "StratixV(GX)") || (device == "STRATIXV(GX)") || (device == "stratixv(gx)") || (device == "Stratix V (GS/GX)") || (device == "STRATIX V (GS/GX)") || (device == "stratix v (gs/gx)") || (device == "StratixV(GS/GX)") || (device == "STRATIXV(GS/GX)") || (device == "stratixv(gs/gx)") || (device == "Stratix V (GS/GT)") || (device == "STRATIX V (GS/GT)") || (device == "stratix v (gs/gt)") || (device == "StratixV(GS/GT)") || (device == "STRATIXV(GS/GT)") || (device == "stratixv(gs/gt)") || (device == "Stratix V (GT/GX)") || (device == "STRATIX V (GT/GX)") || (device == "stratix v (gt/gx)") || (device == "StratixV(GT/GX)") || (device == "STRATIXV(GT/GX)") || (device == "stratixv(gt/gx)") || (device == "Stratix V (GX/GS)") || (device == "STRATIX V (GX/GS)") || (device == "stratix v (gx/gs)") || (device == "StratixV(GX/GS)") || (device == "STRATIXV(GX/GS)") || (device == "stratixv(gx/gs)") || (device == "Stratix V (GT/GS)") || (device == "STRATIX V (GT/GS)") || (device == "stratix v (gt/gs)") || (device == "StratixV(GT/GS)") || (device == "STRATIXV(GT/GS)") || (device == "stratixv(gt/gs)") || (device == "Stratix V (GX/GT)") || (device == "STRATIX V (GX/GT)") || (device == "stratix v (gx/gt)") || (device == "StratixV(GX/GT)") || (device == "STRATIXV(GX/GT)") || (device == "stratixv(gx/gt)") || (device == "Stratix V (GS/GT/GX)") || (device == "STRATIX V (GS/GT/GX)") || (device == "stratix v (gs/gt/gx)") || (device == "Stratix V (GS/GX/GT)") || (device == "STRATIX V (GS/GX/GT)") || (device == "stratix v (gs/gx/gt)") || (device == "Stratix V (GT/GS/GX)") || (device == "STRATIX V (GT/GS/GX)") || (device == "stratix v (gt/gs/gx)") || (device == "Stratix V (GT/GX/GS)") || (device == "STRATIX V (GT/GX/GS)") || (device == "stratix v (gt/gx/gs)") || (device == "Stratix V (GX/GS/GT)") || (device == "STRATIX V (GX/GS/GT)") || (device == "stratix v (gx/gs/gt)") || (device == "Stratix V (GX/GT/GS)") || (device == "STRATIX V (GX/GT/GS)") || (device == "stratix v (gx/gt/gs)") || (device == "StratixV(GS/GT/GX)") || (device == "STRATIXV(GS/GT/GX)") || (device == "stratixv(gs/gt/gx)") || (device == "StratixV(GS/GX/GT)") || (device == "STRATIXV(GS/GX/GT)") || (device == "stratixv(gs/gx/gt)") || (device == "StratixV(GT/GS/GX)") || (device == "STRATIXV(GT/GS/GX)") || (device == "stratixv(gt/gs/gx)") || (device == "StratixV(GT/GX/GS)") || (device == "STRATIXV(GT/GX/GS)") || (device == "stratixv(gt/gx/gs)") || (device == "StratixV(GX/GS/GT)") || (device == "STRATIXV(GX/GS/GT)") || (device == "stratixv(gx/gs/gt)") || (device == "StratixV(GX/GT/GS)") || (device == "STRATIXV(GX/GT/GS)") || (device == "stratixv(gx/gt/gs)"))
-        is_stratixv = 1;
-    else
-        is_stratixv = 0;
-
-    IS_FAMILY_STRATIXV  = is_stratixv;
-end
-endfunction //IS_FAMILY_STRATIXV
-
-function IS_FAMILY_ARRIAIIGZ;
-    input[8*20:1] device;
-    reg is_arriaiigz;
-begin
-    if ((device == "Arria II GZ") || (device == "ARRIA II GZ") || (device == "arria ii gz") || (device == "ArriaII GZ") || (device == "ARRIAII GZ") || (device == "arriaii gz") || (device == "Arria IIGZ") || (device == "ARRIA IIGZ") || (device == "arria iigz") || (device == "ArriaIIGZ") || (device == "ARRIAIIGZ") || (device == "arriaiigz"))
-        is_arriaiigz = 1;
-    else
-        is_arriaiigz = 0;
-
-    IS_FAMILY_ARRIAIIGZ  = is_arriaiigz;
-end
-endfunction //IS_FAMILY_ARRIAIIGZ
+endfunction //IS_FAMILY_MAXII
 
 function IS_FAMILY_MAXV;
     input[8*20:1] device;
@@ -1628,18 +1705,109 @@ begin
 end
 endfunction //IS_FAMILY_MAXV
 
-function IS_FAMILY_ARRIAV;
+function IS_FAMILY_STRATIX10;
     input[8*20:1] device;
-    reg is_arriav;
+    reg is_stratix10;
 begin
-    if ((device == "Arria V") || (device == "ARRIA V") || (device == "arria v") || (device == "ArriaV") || (device == "ARRIAV") || (device == "arriav"))
-        is_arriav = 1;
+    if ((device == "Stratix 10") || (device == "STRATIX 10") || (device == "stratix 10") || (device == "Stratix10") || (device == "STRATIX10") || (device == "stratix10") || (device == "nadder") || (device == "NADDER") || (device == "Stratix 10 (GX/SX/MX/TX/DX)") || (device == "STRATIX 10 (GX/SX/MX/TX/DX)") || (device == "stratix 10 (gx/sx/mx/tx/dx)") || (device == "Stratix10(GX/SX/MX/TX/DX)") || (device == "STRATIX10(GX/SX/MX/TX/DX)") || (device == "stratix10(gx/sx/mx/tx/dx)") || (device == "Stratix 10 (GX)") || (device == "STRATIX 10 (GX)") || (device == "stratix 10 (gx)") || (device == "Stratix10(GX)") || (device == "STRATIX10(GX)") || (device == "stratix10(gx)") || (device == "Stratix 10 (SX)") || (device == "STRATIX 10 (SX)") || (device == "stratix 10 (sx)") || (device == "Stratix10(SX)") || (device == "STRATIX10(SX)") || (device == "stratix10(sx)") || (device == "Stratix 10 (MX)") || (device == "STRATIX 10 (MX)") || (device == "stratix 10 (mx)") || (device == "Stratix10(MX)") || (device == "STRATIX10(MX)") || (device == "stratix10(mx)") || (device == "Stratix 10 (TX)") || (device == "STRATIX 10 (TX)") || (device == "stratix 10 (tx)") || (device == "Stratix10(TX)") || (device == "STRATIX10(TX)") || (device == "stratix10(tx)") || (device == "Stratix 10 (DX)") || (device == "STRATIX 10 (DX)") || (device == "stratix 10 (dx)") || (device == "Stratix10(DX)") || (device == "STRATIX10(DX)") || (device == "stratix10(dx)"))
+        is_stratix10 = 1;
     else
-        is_arriav = 0;
+        is_stratix10 = 0;
 
-    IS_FAMILY_ARRIAV  = is_arriav;
+    IS_FAMILY_STRATIX10  = is_stratix10;
 end
-endfunction //IS_FAMILY_ARRIAV
+endfunction //IS_FAMILY_STRATIX10
+
+function IS_FAMILY_STRATIXGX;
+    input[8*20:1] device;
+    reg is_stratixgx;
+begin
+    if ((device == "Stratix GX") || (device == "STRATIX GX") || (device == "stratix gx") || (device == "Stratix-GX") || (device == "STRATIX-GX") || (device == "stratix-gx") || (device == "StratixGX") || (device == "STRATIXGX") || (device == "stratixgx") || (device == "Aurora") || (device == "AURORA") || (device == "aurora"))
+        is_stratixgx = 1;
+    else
+        is_stratixgx = 0;
+
+    IS_FAMILY_STRATIXGX  = is_stratixgx;
+end
+endfunction //IS_FAMILY_STRATIXGX
+
+function IS_FAMILY_STRATIXIIGX;
+    input[8*20:1] device;
+    reg is_stratixiigx;
+begin
+    if ((device == "Stratix II GX") || (device == "STRATIX II GX") || (device == "stratix ii gx") || (device == "StratixIIGX") || (device == "STRATIXIIGX") || (device == "stratixiigx"))
+        is_stratixiigx = 1;
+    else
+        is_stratixiigx = 0;
+
+    IS_FAMILY_STRATIXIIGX  = is_stratixiigx;
+end
+endfunction //IS_FAMILY_STRATIXIIGX
+
+function IS_FAMILY_STRATIXII;
+    input[8*20:1] device;
+    reg is_stratixii;
+begin
+    if ((device == "Stratix II") || (device == "STRATIX II") || (device == "stratix ii") || (device == "StratixII") || (device == "STRATIXII") || (device == "stratixii") || (device == "Armstrong") || (device == "ARMSTRONG") || (device == "armstrong"))
+        is_stratixii = 1;
+    else
+        is_stratixii = 0;
+
+    IS_FAMILY_STRATIXII  = is_stratixii;
+end
+endfunction //IS_FAMILY_STRATIXII
+
+function IS_FAMILY_STRATIXIII;
+    input[8*20:1] device;
+    reg is_stratixiii;
+begin
+    if ((device == "Stratix III") || (device == "STRATIX III") || (device == "stratix iii") || (device == "StratixIII") || (device == "STRATIXIII") || (device == "stratixiii") || (device == "Titan") || (device == "TITAN") || (device == "titan") || (device == "SIII") || (device == "siii"))
+        is_stratixiii = 1;
+    else
+        is_stratixiii = 0;
+
+    IS_FAMILY_STRATIXIII  = is_stratixiii;
+end
+endfunction //IS_FAMILY_STRATIXIII
+
+function IS_FAMILY_STRATIXIV;
+    input[8*20:1] device;
+    reg is_stratixiv;
+begin
+    if ((device == "Stratix IV") || (device == "STRATIX IV") || (device == "stratix iv") || (device == "TGX") || (device == "tgx") || (device == "StratixIV") || (device == "STRATIXIV") || (device == "stratixiv") || (device == "Stratix IV (GT)") || (device == "STRATIX IV (GT)") || (device == "stratix iv (gt)") || (device == "Stratix IV (GX)") || (device == "STRATIX IV (GX)") || (device == "stratix iv (gx)") || (device == "Stratix IV (E)") || (device == "STRATIX IV (E)") || (device == "stratix iv (e)") || (device == "StratixIV(GT)") || (device == "STRATIXIV(GT)") || (device == "stratixiv(gt)") || (device == "StratixIV(GX)") || (device == "STRATIXIV(GX)") || (device == "stratixiv(gx)") || (device == "StratixIV(E)") || (device == "STRATIXIV(E)") || (device == "stratixiv(e)") || (device == "StratixIIIGX") || (device == "STRATIXIIIGX") || (device == "stratixiiigx") || (device == "Stratix IV (GT/GX/E)") || (device == "STRATIX IV (GT/GX/E)") || (device == "stratix iv (gt/gx/e)") || (device == "Stratix IV (GT/E/GX)") || (device == "STRATIX IV (GT/E/GX)") || (device == "stratix iv (gt/e/gx)") || (device == "Stratix IV (E/GT/GX)") || (device == "STRATIX IV (E/GT/GX)") || (device == "stratix iv (e/gt/gx)") || (device == "Stratix IV (E/GX/GT)") || (device == "STRATIX IV (E/GX/GT)") || (device == "stratix iv (e/gx/gt)") || (device == "StratixIV(GT/GX/E)") || (device == "STRATIXIV(GT/GX/E)") || (device == "stratixiv(gt/gx/e)") || (device == "StratixIV(GT/E/GX)") || (device == "STRATIXIV(GT/E/GX)") || (device == "stratixiv(gt/e/gx)") || (device == "StratixIV(E/GX/GT)") || (device == "STRATIXIV(E/GX/GT)") || (device == "stratixiv(e/gx/gt)") || (device == "StratixIV(E/GT/GX)") || (device == "STRATIXIV(E/GT/GX)") || (device == "stratixiv(e/gt/gx)") || (device == "Stratix IV (GX/E)") || (device == "STRATIX IV (GX/E)") || (device == "stratix iv (gx/e)") || (device == "StratixIV(GX/E)") || (device == "STRATIXIV(GX/E)") || (device == "stratixiv(gx/e)"))
+        is_stratixiv = 1;
+    else
+        is_stratixiv = 0;
+
+    IS_FAMILY_STRATIXIV  = is_stratixiv;
+end
+endfunction //IS_FAMILY_STRATIXIV
+
+function IS_FAMILY_STRATIXV;
+    input[8*20:1] device;
+    reg is_stratixv;
+begin
+    if ((device == "Stratix V") || (device == "STRATIX V") || (device == "stratix v") || (device == "StratixV") || (device == "STRATIXV") || (device == "stratixv") || (device == "Stratix V (GS)") || (device == "STRATIX V (GS)") || (device == "stratix v (gs)") || (device == "StratixV(GS)") || (device == "STRATIXV(GS)") || (device == "stratixv(gs)") || (device == "Stratix V (GT)") || (device == "STRATIX V (GT)") || (device == "stratix v (gt)") || (device == "StratixV(GT)") || (device == "STRATIXV(GT)") || (device == "stratixv(gt)") || (device == "Stratix V (GX)") || (device == "STRATIX V (GX)") || (device == "stratix v (gx)") || (device == "StratixV(GX)") || (device == "STRATIXV(GX)") || (device == "stratixv(gx)") || (device == "Stratix V (GS/GX)") || (device == "STRATIX V (GS/GX)") || (device == "stratix v (gs/gx)") || (device == "StratixV(GS/GX)") || (device == "STRATIXV(GS/GX)") || (device == "stratixv(gs/gx)") || (device == "Stratix V (GS/GT)") || (device == "STRATIX V (GS/GT)") || (device == "stratix v (gs/gt)") || (device == "StratixV(GS/GT)") || (device == "STRATIXV(GS/GT)") || (device == "stratixv(gs/gt)") || (device == "Stratix V (GT/GX)") || (device == "STRATIX V (GT/GX)") || (device == "stratix v (gt/gx)") || (device == "StratixV(GT/GX)") || (device == "STRATIXV(GT/GX)") || (device == "stratixv(gt/gx)") || (device == "Stratix V (GX/GS)") || (device == "STRATIX V (GX/GS)") || (device == "stratix v (gx/gs)") || (device == "StratixV(GX/GS)") || (device == "STRATIXV(GX/GS)") || (device == "stratixv(gx/gs)") || (device == "Stratix V (GT/GS)") || (device == "STRATIX V (GT/GS)") || (device == "stratix v (gt/gs)") || (device == "StratixV(GT/GS)") || (device == "STRATIXV(GT/GS)") || (device == "stratixv(gt/gs)") || (device == "Stratix V (GX/GT)") || (device == "STRATIX V (GX/GT)") || (device == "stratix v (gx/gt)") || (device == "StratixV(GX/GT)") || (device == "STRATIXV(GX/GT)") || (device == "stratixv(gx/gt)") || (device == "Stratix V (GS/GT/GX)") || (device == "STRATIX V (GS/GT/GX)") || (device == "stratix v (gs/gt/gx)") || (device == "Stratix V (GS/GX/GT)") || (device == "STRATIX V (GS/GX/GT)") || (device == "stratix v (gs/gx/gt)") || (device == "Stratix V (GT/GS/GX)") || (device == "STRATIX V (GT/GS/GX)") || (device == "stratix v (gt/gs/gx)") || (device == "Stratix V (GT/GX/GS)") || (device == "STRATIX V (GT/GX/GS)") || (device == "stratix v (gt/gx/gs)") || (device == "Stratix V (GX/GS/GT)") || (device == "STRATIX V (GX/GS/GT)") || (device == "stratix v (gx/gs/gt)") || (device == "Stratix V (GX/GT/GS)") || (device == "STRATIX V (GX/GT/GS)") || (device == "stratix v (gx/gt/gs)") || (device == "StratixV(GS/GT/GX)") || (device == "STRATIXV(GS/GT/GX)") || (device == "stratixv(gs/gt/gx)") || (device == "StratixV(GS/GX/GT)") || (device == "STRATIXV(GS/GX/GT)") || (device == "stratixv(gs/gx/gt)") || (device == "StratixV(GT/GS/GX)") || (device == "STRATIXV(GT/GS/GX)") || (device == "stratixv(gt/gs/gx)") || (device == "StratixV(GT/GX/GS)") || (device == "STRATIXV(GT/GX/GS)") || (device == "stratixv(gt/gx/gs)") || (device == "StratixV(GX/GS/GT)") || (device == "STRATIXV(GX/GS/GT)") || (device == "stratixv(gx/gs/gt)") || (device == "StratixV(GX/GT/GS)") || (device == "STRATIXV(GX/GT/GS)") || (device == "stratixv(gx/gt/gs)") || (device == "Stratix V (GS/GT/GX/E)") || (device == "STRATIX V (GS/GT/GX/E)") || (device == "stratix v (gs/gt/gx/e)") || (device == "StratixV(GS/GT/GX/E)") || (device == "STRATIXV(GS/GT/GX/E)") || (device == "stratixv(gs/gt/gx/e)") || (device == "Stratix V (E)") || (device == "STRATIX V (E)") || (device == "stratix v (e)") || (device == "StratixV(E)") || (device == "STRATIXV(E)") || (device == "stratixv(e)"))
+        is_stratixv = 1;
+    else
+        is_stratixv = 0;
+
+    IS_FAMILY_STRATIXV  = is_stratixv;
+end
+endfunction //IS_FAMILY_STRATIXV
+
+function IS_FAMILY_STRATIX;
+    input[8*20:1] device;
+    reg is_stratix;
+begin
+    if ((device == "Stratix") || (device == "STRATIX") || (device == "stratix") || (device == "Yeager") || (device == "YEAGER") || (device == "yeager"))
+        is_stratix = 1;
+    else
+        is_stratix = 0;
+
+    IS_FAMILY_STRATIX  = is_stratix;
+end
+endfunction //IS_FAMILY_STRATIX
 
 function FEATURE_FAMILY_STRATIXGX;
     input[8*20:1] device;
@@ -1684,7 +1852,7 @@ function FEATURE_FAMILY_STRATIXIII;
     input[8*20:1] device;
     reg var_family_stratixiii;
 begin
-    if (IS_FAMILY_STRATIXIII(device) || FEATURE_FAMILY_STRATIXIV(device) || IS_FAMILY_HARDCOPYIII(device) )
+    if (IS_FAMILY_STRATIXIII(device) || FEATURE_FAMILY_STRATIXIV(device) || FEATURE_FAMILY_HARDCOPYIII(device) )
         var_family_stratixiii = 1;
     else
         var_family_stratixiii = 0;
@@ -1693,11 +1861,24 @@ begin
 end
 endfunction //FEATURE_FAMILY_STRATIXIII
 
+function FEATURE_FAMILY_ARRIAVGZ;
+    input[8*20:1] device;
+    reg var_family_arriavgz;
+begin
+    if (IS_FAMILY_ARRIAVGZ(device) )
+        var_family_arriavgz = 1;
+    else
+        var_family_arriavgz = 0;
+
+    FEATURE_FAMILY_ARRIAVGZ  = var_family_arriavgz;
+end
+endfunction //FEATURE_FAMILY_ARRIAVGZ
+
 function FEATURE_FAMILY_STRATIXV;
     input[8*20:1] device;
     reg var_family_stratixv;
 begin
-    if (IS_FAMILY_STRATIXV(device) )
+    if (IS_FAMILY_STRATIXV(device) || FEATURE_FAMILY_ARRIAVGZ(device) )
         var_family_stratixv = 1;
     else
         var_family_stratixv = 0;
@@ -1705,6 +1886,32 @@ begin
     FEATURE_FAMILY_STRATIXV  = var_family_stratixv;
 end
 endfunction //FEATURE_FAMILY_STRATIXV
+
+function FEATURE_FAMILY_ARRIA10;
+    input[8*20:1] device;
+    reg var_family_arria10;
+begin
+    if (IS_FAMILY_ARRIA10(device) || IS_FAMILY_ARRIA10(device) )
+        var_family_arria10 = 1;
+    else
+        var_family_arria10 = 0;
+
+    FEATURE_FAMILY_ARRIA10  = var_family_arria10;
+end
+endfunction //FEATURE_FAMILY_ARRIA10
+
+function FEATURE_FAMILY_CYCLONE10GX;
+    input[8*20:1] device;
+    reg var_family_cyclone10gx;
+begin
+    if (IS_FAMILY_CYCLONE10GX(device) || IS_FAMILY_CYCLONE10GX(device) )
+        var_family_cyclone10gx = 1;
+    else
+        var_family_cyclone10gx = 0;
+
+    FEATURE_FAMILY_CYCLONE10GX  = var_family_cyclone10gx;
+end
+endfunction //FEATURE_FAMILY_CYCLONE10GX
 
 function FEATURE_FAMILY_STRATIXII;
     input[8*20:1] device;
@@ -1749,7 +1956,7 @@ function FEATURE_FAMILY_CYCLONEIII;
     input[8*20:1] device;
     reg var_family_cycloneiii;
 begin
-    if (IS_FAMILY_CYCLONEIII(device) || IS_FAMILY_CYCLONEIIILS(device) || FEATURE_FAMILY_CYCLONEIVGX(device) || FEATURE_FAMILY_CYCLONEIVE(device) )
+    if (IS_FAMILY_CYCLONEIII(device) || IS_FAMILY_CYCLONEIIILS(device) || FEATURE_FAMILY_CYCLONEIVGX(device) || FEATURE_FAMILY_CYCLONEIVE(device) || FEATURE_FAMILY_MAX10(device) )
         var_family_cycloneiii = 1;
     else
         var_family_cycloneiii = 0;
@@ -1827,7 +2034,7 @@ function FEATURE_FAMILY_STRATIXIV;
     input[8*20:1] device;
     reg var_family_stratixiv;
 begin
-    if (IS_FAMILY_STRATIXIV(device) || IS_FAMILY_ARRIAIIGX(device) || IS_FAMILY_HARDCOPYIV(device) || FEATURE_FAMILY_STRATIXV(device) || FEATURE_FAMILY_ARRIAV(device) || FEATURE_FAMILY_ARRIAIIGZ(device) )
+    if (IS_FAMILY_STRATIXIV(device) || IS_FAMILY_ARRIAIIGX(device) || FEATURE_FAMILY_HARDCOPYIV(device) || FEATURE_FAMILY_STRATIXV(device) || FEATURE_FAMILY_ARRIAV(device) || FEATURE_FAMILY_ARRIAIIGZ(device) || FEATURE_FAMILY_ARRIA10(device) || FEATURE_FAMILY_CYCLONE10GX(device) || FEATURE_FAMILY_STRATIX10(device) || FEATURE_FAMILY_FALCON_MESA(device) )
         var_family_stratixiv = 1;
     else
         var_family_stratixiv = 0;
@@ -1862,11 +2069,50 @@ begin
 end
 endfunction //FEATURE_FAMILY_ARRIAIIGX
 
+function FEATURE_FAMILY_HARDCOPYIII;
+    input[8*20:1] device;
+    reg var_family_hardcopyiii;
+begin
+    if (IS_FAMILY_HARDCOPYIII(device) || IS_FAMILY_HARDCOPYIII(device) )
+        var_family_hardcopyiii = 1;
+    else
+        var_family_hardcopyiii = 0;
+
+    FEATURE_FAMILY_HARDCOPYIII  = var_family_hardcopyiii;
+end
+endfunction //FEATURE_FAMILY_HARDCOPYIII
+
+function FEATURE_FAMILY_HARDCOPYIV;
+    input[8*20:1] device;
+    reg var_family_hardcopyiv;
+begin
+    if (IS_FAMILY_HARDCOPYIV(device) || IS_FAMILY_HARDCOPYIV(device) )
+        var_family_hardcopyiv = 1;
+    else
+        var_family_hardcopyiv = 0;
+
+    FEATURE_FAMILY_HARDCOPYIV  = var_family_hardcopyiv;
+end
+endfunction //FEATURE_FAMILY_HARDCOPYIV
+
+function FEATURE_FAMILY_CYCLONEV;
+    input[8*20:1] device;
+    reg var_family_cyclonev;
+begin
+    if (IS_FAMILY_CYCLONEV(device) )
+        var_family_cyclonev = 1;
+    else
+        var_family_cyclonev = 0;
+
+    FEATURE_FAMILY_CYCLONEV  = var_family_cyclonev;
+end
+endfunction //FEATURE_FAMILY_CYCLONEV
+
 function FEATURE_FAMILY_ARRIAV;
     input[8*20:1] device;
     reg var_family_arriav;
 begin
-    if (IS_FAMILY_ARRIAV(device) )
+    if (IS_FAMILY_ARRIAV(device) || FEATURE_FAMILY_CYCLONEV(device) )
         var_family_arriav = 1;
     else
         var_family_arriav = 0;
@@ -1874,6 +2120,45 @@ begin
     FEATURE_FAMILY_ARRIAV  = var_family_arriav;
 end
 endfunction //FEATURE_FAMILY_ARRIAV
+
+function FEATURE_FAMILY_MAX10;
+    input[8*20:1] device;
+    reg var_family_max10;
+begin
+    if (IS_FAMILY_MAX10(device) )
+        var_family_max10 = 1;
+    else
+        var_family_max10 = 0;
+
+    FEATURE_FAMILY_MAX10  = var_family_max10;
+end
+endfunction //FEATURE_FAMILY_MAX10
+
+function FEATURE_FAMILY_STRATIX10;
+    input[8*20:1] device;
+    reg var_family_stratix10;
+begin
+    if (IS_FAMILY_STRATIX10(device) || IS_FAMILY_STRATIX10(device) )
+        var_family_stratix10 = 1;
+    else
+        var_family_stratix10 = 0;
+
+    FEATURE_FAMILY_STRATIX10  = var_family_stratix10;
+end
+endfunction //FEATURE_FAMILY_STRATIX10
+
+function FEATURE_FAMILY_FALCON_MESA;
+    input[8*20:1] device;
+    reg var_family_falcon_mesa;
+begin
+    if (IS_FAMILY_AGILEX(device) )
+        var_family_falcon_mesa = 1;
+    else
+        var_family_falcon_mesa = 0;
+
+    FEATURE_FAMILY_FALCON_MESA  = var_family_falcon_mesa;
+end
+endfunction //FEATURE_FAMILY_FALCON_MESA
 
 function FEATURE_FAMILY_BASE_STRATIXII;
     input[8*20:1] device;
@@ -1926,6 +2211,32 @@ begin
     FEATURE_FAMILY_BASE_CYCLONE  = var_family_base_cyclone;
 end
 endfunction //FEATURE_FAMILY_BASE_CYCLONE
+
+function FEATURE_FAMILY_HAS_ALTERA_MULT_ADD_FLOW;
+    input[8*20:1] device;
+    reg var_family_has_altera_mult_add_flow;
+begin
+    if (FEATURE_FAMILY_STRATIXV(device) || FEATURE_FAMILY_ARRIAV(device) || FEATURE_FAMILY_CYCLONEV(device) || FEATURE_FAMILY_ARRIA10(device) || FEATURE_FAMILY_STRATIX10(device) || FEATURE_FAMILY_CYCLONE10GX(device) || FEATURE_FAMILY_FALCON_MESA(device) )
+        var_family_has_altera_mult_add_flow = 1;
+    else
+        var_family_has_altera_mult_add_flow = 0;
+
+    FEATURE_FAMILY_HAS_ALTERA_MULT_ADD_FLOW  = var_family_has_altera_mult_add_flow;
+end
+endfunction //FEATURE_FAMILY_HAS_ALTERA_MULT_ADD_FLOW
+
+function FEATURE_FAMILY_IS_ALTMULT_ADD_EOL;
+    input[8*20:1] device;
+    reg var_family_is_altmult_add_eol;
+begin
+    if (FEATURE_FAMILY_ARRIA10(device) || FEATURE_FAMILY_STRATIX10(device) || FEATURE_FAMILY_CYCLONE10GX(device) || FEATURE_FAMILY_FALCON_MESA(device) )
+        var_family_is_altmult_add_eol = 1;
+    else
+        var_family_is_altmult_add_eol = 0;
+
+    FEATURE_FAMILY_IS_ALTMULT_ADD_EOL  = var_family_is_altmult_add_eol;
+end
+endfunction //FEATURE_FAMILY_IS_ALTMULT_ADD_EOL
 
 function FEATURE_FAMILY_HAS_STRATIXII_STYLE_RAM;
     input[8*20:1] device;
@@ -1996,35 +2307,44 @@ function IS_VALID_FAMILY;
     input[8*20:1] device;
     reg is_valid;
 begin
-    if (((device == "MAX7000B") || (device == "max7000b") || (device == "MAX 7000B") || (device == "max 7000b"))
-    || ((device == "MAX7000AE") || (device == "max7000ae") || (device == "MAX 7000AE") || (device == "max 7000ae"))
-    || ((device == "MAX3000A") || (device == "max3000a") || (device == "MAX 3000A") || (device == "max 3000a"))
-    || ((device == "MAX7000S") || (device == "max7000s") || (device == "MAX 7000S") || (device == "max 7000s"))
-    || ((device == "Stratix") || (device == "STRATIX") || (device == "stratix") || (device == "Yeager") || (device == "YEAGER") || (device == "yeager"))
-    || ((device == "Stratix GX") || (device == "STRATIX GX") || (device == "stratix gx") || (device == "Stratix-GX") || (device == "STRATIX-GX") || (device == "stratix-gx") || (device == "StratixGX") || (device == "STRATIXGX") || (device == "stratixgx") || (device == "Aurora") || (device == "AURORA") || (device == "aurora"))
-    || ((device == "Cyclone") || (device == "CYCLONE") || (device == "cyclone") || (device == "ACEX2K") || (device == "acex2k") || (device == "ACEX 2K") || (device == "acex 2k") || (device == "Tornado") || (device == "TORNADO") || (device == "tornado"))
-    || ((device == "MAX II") || (device == "max ii") || (device == "MAXII") || (device == "maxii") || (device == "Tsunami") || (device == "TSUNAMI") || (device == "tsunami"))
-    || ((device == "Stratix II") || (device == "STRATIX II") || (device == "stratix ii") || (device == "StratixII") || (device == "STRATIXII") || (device == "stratixii") || (device == "Armstrong") || (device == "ARMSTRONG") || (device == "armstrong"))
-    || ((device == "Stratix II GX") || (device == "STRATIX II GX") || (device == "stratix ii gx") || (device == "StratixIIGX") || (device == "STRATIXIIGX") || (device == "stratixiigx"))
+    if (((device == "Agilex") || (device == "AGILEX") || (device == "agilex") || (device == "AGILEX") || (device == "agilex") || (device == "Falcon Mesa") || (device == "FALCON MESA") || (device == "falcon mesa") || (device == "FALCONMESA") || (device == "falconmesa") || (device == "falconmesa") || (device == "FALCONMESA") || (device == "Stratix 20") || (device == "STRATIX 20") || (device == "stratix 20") || (device == "Stratix20") || (device == "STRATIX20") || (device == "stratix20") || (device == "stratix 20") || (device == "STRATIX 20") || (device == "stratix20") || (device == "STRATIX20") || (device == "STRATIX 20") || (device == "stratix 20") || (device == "STRATIX20") || (device == "stratix20") || (device == "Agilex (F-Series/I-Series)") || (device == "AGILEX (F-SERIES/I-SERIES)") || (device == "agilex (f-series/i-series)") || (device == "Agilex(F-Series/I-Series)") || (device == "AGILEX(F-SERIES/I-SERIES)") || (device == "agilex(f-series/i-series)") || (device == "Agilex (F-Series)") || (device == "AGILEX (F-SERIES)") || (device == "agilex (f-series)") || (device == "Agilex(F-Series)") || (device == "AGILEX(F-SERIES)") || (device == "agilex(f-series)") || (device == "Agilex (I-Series)") || (device == "AGILEX (I-SERIES)") || (device == "agilex (i-series)") || (device == "Agilex(I-Series)") || (device == "AGILEX(I-SERIES)") || (device == "agilex(i-series)"))
+    || ((device == "Arria 10") || (device == "ARRIA 10") || (device == "arria 10") || (device == "Arria10") || (device == "ARRIA10") || (device == "arria10") || (device == "Arria VI") || (device == "ARRIA VI") || (device == "arria vi") || (device == "ArriaVI") || (device == "ARRIAVI") || (device == "arriavi") || (device == "Night Fury") || (device == "NIGHT FURY") || (device == "night fury") || (device == "nightfury") || (device == "NIGHTFURY") || (device == "Arria 10 (GX/SX/GT)") || (device == "ARRIA 10 (GX/SX/GT)") || (device == "arria 10 (gx/sx/gt)") || (device == "Arria10(GX/SX/GT)") || (device == "ARRIA10(GX/SX/GT)") || (device == "arria10(gx/sx/gt)") || (device == "Arria 10 (GX)") || (device == "ARRIA 10 (GX)") || (device == "arria 10 (gx)") || (device == "Arria10(GX)") || (device == "ARRIA10(GX)") || (device == "arria10(gx)") || (device == "Arria 10 (SX)") || (device == "ARRIA 10 (SX)") || (device == "arria 10 (sx)") || (device == "Arria10(SX)") || (device == "ARRIA10(SX)") || (device == "arria10(sx)") || (device == "Arria 10 (GT)") || (device == "ARRIA 10 (GT)") || (device == "arria 10 (gt)") || (device == "Arria10(GT)") || (device == "ARRIA10(GT)") || (device == "arria10(gt)"))
     || ((device == "Arria GX") || (device == "ARRIA GX") || (device == "arria gx") || (device == "ArriaGX") || (device == "ARRIAGX") || (device == "arriagx") || (device == "Stratix II GX Lite") || (device == "STRATIX II GX LITE") || (device == "stratix ii gx lite") || (device == "StratixIIGXLite") || (device == "STRATIXIIGXLITE") || (device == "stratixiigxlite"))
-    || ((device == "Cyclone II") || (device == "CYCLONE II") || (device == "cyclone ii") || (device == "Cycloneii") || (device == "CYCLONEII") || (device == "cycloneii") || (device == "Magellan") || (device == "MAGELLAN") || (device == "magellan"))
-    || ((device == "HardCopy II") || (device == "HARDCOPY II") || (device == "hardcopy ii") || (device == "HardCopyII") || (device == "HARDCOPYII") || (device == "hardcopyii") || (device == "Fusion") || (device == "FUSION") || (device == "fusion"))
-    || ((device == "Stratix III") || (device == "STRATIX III") || (device == "stratix iii") || (device == "StratixIII") || (device == "STRATIXIII") || (device == "stratixiii") || (device == "Titan") || (device == "TITAN") || (device == "titan") || (device == "SIII") || (device == "siii"))
-    || ((device == "Cyclone III") || (device == "CYCLONE III") || (device == "cyclone iii") || (device == "CycloneIII") || (device == "CYCLONEIII") || (device == "cycloneiii") || (device == "Barracuda") || (device == "BARRACUDA") || (device == "barracuda") || (device == "Cuda") || (device == "CUDA") || (device == "cuda") || (device == "CIII") || (device == "ciii"))
-    || ((device == "BS") || (device == "bs"))
-    || ((device == "Stratix IV") || (device == "STRATIX IV") || (device == "stratix iv") || (device == "TGX") || (device == "tgx") || (device == "StratixIV") || (device == "STRATIXIV") || (device == "stratixiv") || (device == "Stratix IV (GT)") || (device == "STRATIX IV (GT)") || (device == "stratix iv (gt)") || (device == "Stratix IV (GX)") || (device == "STRATIX IV (GX)") || (device == "stratix iv (gx)") || (device == "Stratix IV (E)") || (device == "STRATIX IV (E)") || (device == "stratix iv (e)") || (device == "StratixIV(GT)") || (device == "STRATIXIV(GT)") || (device == "stratixiv(gt)") || (device == "StratixIV(GX)") || (device == "STRATIXIV(GX)") || (device == "stratixiv(gx)") || (device == "StratixIV(E)") || (device == "STRATIXIV(E)") || (device == "stratixiv(e)") || (device == "StratixIIIGX") || (device == "STRATIXIIIGX") || (device == "stratixiiigx") || (device == "Stratix IV (GT/GX/E)") || (device == "STRATIX IV (GT/GX/E)") || (device == "stratix iv (gt/gx/e)") || (device == "Stratix IV (GT/E/GX)") || (device == "STRATIX IV (GT/E/GX)") || (device == "stratix iv (gt/e/gx)") || (device == "Stratix IV (E/GT/GX)") || (device == "STRATIX IV (E/GT/GX)") || (device == "stratix iv (e/gt/gx)") || (device == "Stratix IV (E/GX/GT)") || (device == "STRATIX IV (E/GX/GT)") || (device == "stratix iv (e/gx/gt)") || (device == "StratixIV(GT/GX/E)") || (device == "STRATIXIV(GT/GX/E)") || (device == "stratixiv(gt/gx/e)") || (device == "StratixIV(GT/E/GX)") || (device == "STRATIXIV(GT/E/GX)") || (device == "stratixiv(gt/e/gx)") || (device == "StratixIV(E/GX/GT)") || (device == "STRATIXIV(E/GX/GT)") || (device == "stratixiv(e/gx/gt)") || (device == "StratixIV(E/GT/GX)") || (device == "STRATIXIV(E/GT/GX)") || (device == "stratixiv(e/gt/gx)") || (device == "Stratix IV (GX/E)") || (device == "STRATIX IV (GX/E)") || (device == "stratix iv (gx/e)") || (device == "StratixIV(GX/E)") || (device == "STRATIXIV(GX/E)") || (device == "stratixiv(gx/e)"))
-    || ((device == "tgx_commercial_v1_1") || (device == "TGX_COMMERCIAL_V1_1"))
     || ((device == "Arria II GX") || (device == "ARRIA II GX") || (device == "arria ii gx") || (device == "ArriaIIGX") || (device == "ARRIAIIGX") || (device == "arriaiigx") || (device == "Arria IIGX") || (device == "ARRIA IIGX") || (device == "arria iigx") || (device == "ArriaII GX") || (device == "ARRIAII GX") || (device == "arriaii gx") || (device == "Arria II") || (device == "ARRIA II") || (device == "arria ii") || (device == "ArriaII") || (device == "ARRIAII") || (device == "arriaii") || (device == "Arria II (GX/E)") || (device == "ARRIA II (GX/E)") || (device == "arria ii (gx/e)") || (device == "ArriaII(GX/E)") || (device == "ARRIAII(GX/E)") || (device == "arriaii(gx/e)") || (device == "PIRANHA") || (device == "piranha"))
+    || ((device == "Arria II GZ") || (device == "ARRIA II GZ") || (device == "arria ii gz") || (device == "ArriaII GZ") || (device == "ARRIAII GZ") || (device == "arriaii gz") || (device == "Arria IIGZ") || (device == "ARRIA IIGZ") || (device == "arria iigz") || (device == "ArriaIIGZ") || (device == "ARRIAIIGZ") || (device == "arriaiigz"))
+    || ((device == "Arria V GZ") || (device == "ARRIA V GZ") || (device == "arria v gz") || (device == "ArriaVGZ") || (device == "ARRIAVGZ") || (device == "arriavgz"))
+    || ((device == "Arria V") || (device == "ARRIA V") || (device == "arria v") || (device == "Arria V (GT/GX)") || (device == "ARRIA V (GT/GX)") || (device == "arria v (gt/gx)") || (device == "ArriaV(GT/GX)") || (device == "ARRIAV(GT/GX)") || (device == "arriav(gt/gx)") || (device == "ArriaV") || (device == "ARRIAV") || (device == "arriav") || (device == "Arria V (GT/GX/ST/SX)") || (device == "ARRIA V (GT/GX/ST/SX)") || (device == "arria v (gt/gx/st/sx)") || (device == "ArriaV(GT/GX/ST/SX)") || (device == "ARRIAV(GT/GX/ST/SX)") || (device == "arriav(gt/gx/st/sx)") || (device == "Arria V (GT)") || (device == "ARRIA V (GT)") || (device == "arria v (gt)") || (device == "ArriaV(GT)") || (device == "ARRIAV(GT)") || (device == "arriav(gt)") || (device == "Arria V (GX)") || (device == "ARRIA V (GX)") || (device == "arria v (gx)") || (device == "ArriaV(GX)") || (device == "ARRIAV(GX)") || (device == "arriav(gx)") || (device == "Arria V (ST)") || (device == "ARRIA V (ST)") || (device == "arria v (st)") || (device == "ArriaV(ST)") || (device == "ARRIAV(ST)") || (device == "arriav(st)") || (device == "Arria V (SX)") || (device == "ARRIA V (SX)") || (device == "arria v (sx)") || (device == "ArriaV(SX)") || (device == "ARRIAV(SX)") || (device == "arriav(sx)"))
+    || ((device == "BS") || (device == "bs"))
+    || ((device == "Cyclone 10 GX") || (device == "CYCLONE 10 GX") || (device == "cyclone 10 gx") || (device == "Cyclone10GX") || (device == "CYCLONE10GX") || (device == "cyclone10gx"))
+    || ((device == "Cyclone II") || (device == "CYCLONE II") || (device == "cyclone ii") || (device == "Cycloneii") || (device == "CYCLONEII") || (device == "cycloneii") || (device == "Magellan") || (device == "MAGELLAN") || (device == "magellan") || (device == "CycloneII") || (device == "CYCLONEII") || (device == "cycloneii"))
+    || ((device == "Cyclone III LS") || (device == "CYCLONE III LS") || (device == "cyclone iii ls") || (device == "CycloneIIILS") || (device == "CYCLONEIIILS") || (device == "cycloneiiils") || (device == "Cyclone III LPS") || (device == "CYCLONE III LPS") || (device == "cyclone iii lps") || (device == "Cyclone LPS") || (device == "CYCLONE LPS") || (device == "cyclone lps") || (device == "CycloneLPS") || (device == "CYCLONELPS") || (device == "cyclonelps") || (device == "Tarpon") || (device == "TARPON") || (device == "tarpon") || (device == "Cyclone IIIE") || (device == "CYCLONE IIIE") || (device == "cyclone iiie"))
+    || ((device == "Cyclone III") || (device == "CYCLONE III") || (device == "cyclone iii") || (device == "CycloneIII") || (device == "CYCLONEIII") || (device == "cycloneiii") || (device == "Barracuda") || (device == "BARRACUDA") || (device == "barracuda") || (device == "Cuda") || (device == "CUDA") || (device == "cuda") || (device == "CIII") || (device == "ciii"))
+    || ((device == "Cyclone IV E") || (device == "CYCLONE IV E") || (device == "cyclone iv e") || (device == "CycloneIV E") || (device == "CYCLONEIV E") || (device == "cycloneiv e") || (device == "Cyclone IVE") || (device == "CYCLONE IVE") || (device == "cyclone ive") || (device == "CycloneIVE") || (device == "CYCLONEIVE") || (device == "cycloneive"))
+    || ((device == "Cyclone IV GX") || (device == "CYCLONE IV GX") || (device == "cyclone iv gx") || (device == "Cyclone IVGX") || (device == "CYCLONE IVGX") || (device == "cyclone ivgx") || (device == "CycloneIV GX") || (device == "CYCLONEIV GX") || (device == "cycloneiv gx") || (device == "CycloneIVGX") || (device == "CYCLONEIVGX") || (device == "cycloneivgx") || (device == "Cyclone IV") || (device == "CYCLONE IV") || (device == "cyclone iv") || (device == "CycloneIV") || (device == "CYCLONEIV") || (device == "cycloneiv") || (device == "Cyclone IV (GX)") || (device == "CYCLONE IV (GX)") || (device == "cyclone iv (gx)") || (device == "CycloneIV(GX)") || (device == "CYCLONEIV(GX)") || (device == "cycloneiv(gx)") || (device == "Cyclone III GX") || (device == "CYCLONE III GX") || (device == "cyclone iii gx") || (device == "CycloneIII GX") || (device == "CYCLONEIII GX") || (device == "cycloneiii gx") || (device == "Cyclone IIIGX") || (device == "CYCLONE IIIGX") || (device == "cyclone iiigx") || (device == "CycloneIIIGX") || (device == "CYCLONEIIIGX") || (device == "cycloneiiigx") || (device == "Cyclone III GL") || (device == "CYCLONE III GL") || (device == "cyclone iii gl") || (device == "CycloneIII GL") || (device == "CYCLONEIII GL") || (device == "cycloneiii gl") || (device == "Cyclone IIIGL") || (device == "CYCLONE IIIGL") || (device == "cyclone iiigl") || (device == "CycloneIIIGL") || (device == "CYCLONEIIIGL") || (device == "cycloneiiigl") || (device == "Stingray") || (device == "STINGRAY") || (device == "stingray"))
+    || ((device == "Cyclone V") || (device == "CYCLONE V") || (device == "cyclone v") || (device == "CycloneV") || (device == "CYCLONEV") || (device == "cyclonev") || (device == "Cyclone V (GT/GX/E/SX)") || (device == "CYCLONE V (GT/GX/E/SX)") || (device == "cyclone v (gt/gx/e/sx)") || (device == "CycloneV(GT/GX/E/SX)") || (device == "CYCLONEV(GT/GX/E/SX)") || (device == "cyclonev(gt/gx/e/sx)") || (device == "Cyclone V (E/GX/GT/SX/SE/ST)") || (device == "CYCLONE V (E/GX/GT/SX/SE/ST)") || (device == "cyclone v (e/gx/gt/sx/se/st)") || (device == "CycloneV(E/GX/GT/SX/SE/ST)") || (device == "CYCLONEV(E/GX/GT/SX/SE/ST)") || (device == "cyclonev(e/gx/gt/sx/se/st)") || (device == "Cyclone V (E)") || (device == "CYCLONE V (E)") || (device == "cyclone v (e)") || (device == "CycloneV(E)") || (device == "CYCLONEV(E)") || (device == "cyclonev(e)") || (device == "Cyclone V (GX)") || (device == "CYCLONE V (GX)") || (device == "cyclone v (gx)") || (device == "CycloneV(GX)") || (device == "CYCLONEV(GX)") || (device == "cyclonev(gx)") || (device == "Cyclone V (GT)") || (device == "CYCLONE V (GT)") || (device == "cyclone v (gt)") || (device == "CycloneV(GT)") || (device == "CYCLONEV(GT)") || (device == "cyclonev(gt)") || (device == "Cyclone V (SX)") || (device == "CYCLONE V (SX)") || (device == "cyclone v (sx)") || (device == "CycloneV(SX)") || (device == "CYCLONEV(SX)") || (device == "cyclonev(sx)") || (device == "Cyclone V (SE)") || (device == "CYCLONE V (SE)") || (device == "cyclone v (se)") || (device == "CycloneV(SE)") || (device == "CYCLONEV(SE)") || (device == "cyclonev(se)") || (device == "Cyclone V (ST)") || (device == "CYCLONE V (ST)") || (device == "cyclone v (st)") || (device == "CycloneV(ST)") || (device == "CYCLONEV(ST)") || (device == "cyclonev(st)"))
+    || ((device == "Cyclone") || (device == "CYCLONE") || (device == "cyclone") || (device == "ACEX2K") || (device == "acex2k") || (device == "ACEX 2K") || (device == "acex 2k") || (device == "Tornado") || (device == "TORNADO") || (device == "tornado"))
+    || ((device == "Diamond Mesa") || (device == "DIAMOND MESA") || (device == "diamond mesa") || (device == "Diamondmesa") || (device == "DIAMONDMESA") || (device == "diamondmesa") || (device == "DiamondMesa") || (device == "DIAMONDMESA") || (device == "diamondmesa") || (device == "Diamond Mesa (GX/SX)") || (device == "DIAMOND MESA (GX/SX)") || (device == "diamond mesa (gx/sx)") || (device == "DiamondMesa(GX/SX)") || (device == "DIAMONDMESA(GX/SX)") || (device == "diamondmesa(gx/sx)") || (device == "Diamond Mesa (GX)") || (device == "DIAMOND MESA (GX)") || (device == "diamond mesa (gx)") || (device == "DiamondMesa(GX)") || (device == "DIAMONDMESA(GX)") || (device == "diamondmesa(gx)") || (device == "Diamond Mesa (SX)") || (device == "DIAMOND MESA (SX)") || (device == "diamond mesa (sx)") || (device == "DiamondMesa(SX)") || (device == "DIAMONDMESA(SX)") || (device == "diamondmesa(sx)"))
+    || ((device == "HardCopy II") || (device == "HARDCOPY II") || (device == "hardcopy ii") || (device == "HardCopyII") || (device == "HARDCOPYII") || (device == "hardcopyii") || (device == "Fusion") || (device == "FUSION") || (device == "fusion"))
     || ((device == "HardCopy III") || (device == "HARDCOPY III") || (device == "hardcopy iii") || (device == "HardCopyIII") || (device == "HARDCOPYIII") || (device == "hardcopyiii") || (device == "HCX") || (device == "hcx"))
     || ((device == "HardCopy IV") || (device == "HARDCOPY IV") || (device == "hardcopy iv") || (device == "HardCopyIV") || (device == "HARDCOPYIV") || (device == "hardcopyiv") || (device == "HardCopy IV (GX)") || (device == "HARDCOPY IV (GX)") || (device == "hardcopy iv (gx)") || (device == "HardCopy IV (E)") || (device == "HARDCOPY IV (E)") || (device == "hardcopy iv (e)") || (device == "HardCopyIV(GX)") || (device == "HARDCOPYIV(GX)") || (device == "hardcopyiv(gx)") || (device == "HardCopyIV(E)") || (device == "HARDCOPYIV(E)") || (device == "hardcopyiv(e)") || (device == "HCXIV") || (device == "hcxiv") || (device == "HardCopy IV (GX/E)") || (device == "HARDCOPY IV (GX/E)") || (device == "hardcopy iv (gx/e)") || (device == "HardCopy IV (E/GX)") || (device == "HARDCOPY IV (E/GX)") || (device == "hardcopy iv (e/gx)") || (device == "HardCopyIV(GX/E)") || (device == "HARDCOPYIV(GX/E)") || (device == "hardcopyiv(gx/e)") || (device == "HardCopyIV(E/GX)") || (device == "HARDCOPYIV(E/GX)") || (device == "hardcopyiv(e/gx)"))
-    || ((device == "Cyclone III LS") || (device == "CYCLONE III LS") || (device == "cyclone iii ls") || (device == "CycloneIIILS") || (device == "CYCLONEIIILS") || (device == "cycloneiiils") || (device == "Cyclone III LPS") || (device == "CYCLONE III LPS") || (device == "cyclone iii lps") || (device == "Cyclone LPS") || (device == "CYCLONE LPS") || (device == "cyclone lps") || (device == "CycloneLPS") || (device == "CYCLONELPS") || (device == "cyclonelps") || (device == "Tarpon") || (device == "TARPON") || (device == "tarpon") || (device == "Cyclone IIIE") || (device == "CYCLONE IIIE") || (device == "cyclone iiie"))
-    || ((device == "Cyclone IV GX") || (device == "CYCLONE IV GX") || (device == "cyclone iv gx") || (device == "Cyclone IVGX") || (device == "CYCLONE IVGX") || (device == "cyclone ivgx") || (device == "CycloneIV GX") || (device == "CYCLONEIV GX") || (device == "cycloneiv gx") || (device == "CycloneIVGX") || (device == "CYCLONEIVGX") || (device == "cycloneivgx") || (device == "Cyclone IV") || (device == "CYCLONE IV") || (device == "cyclone iv") || (device == "CycloneIV") || (device == "CYCLONEIV") || (device == "cycloneiv") || (device == "Cyclone IV (GX)") || (device == "CYCLONE IV (GX)") || (device == "cyclone iv (gx)") || (device == "CycloneIV(GX)") || (device == "CYCLONEIV(GX)") || (device == "cycloneiv(gx)") || (device == "Cyclone III GX") || (device == "CYCLONE III GX") || (device == "cyclone iii gx") || (device == "CycloneIII GX") || (device == "CYCLONEIII GX") || (device == "cycloneiii gx") || (device == "Cyclone IIIGX") || (device == "CYCLONE IIIGX") || (device == "cyclone iiigx") || (device == "CycloneIIIGX") || (device == "CYCLONEIIIGX") || (device == "cycloneiiigx") || (device == "Cyclone III GL") || (device == "CYCLONE III GL") || (device == "cyclone iii gl") || (device == "CycloneIII GL") || (device == "CYCLONEIII GL") || (device == "cycloneiii gl") || (device == "Cyclone IIIGL") || (device == "CYCLONE IIIGL") || (device == "cyclone iiigl") || (device == "CycloneIIIGL") || (device == "CYCLONEIIIGL") || (device == "cycloneiiigl") || (device == "Stingray") || (device == "STINGRAY") || (device == "stingray"))
-    || ((device == "Cyclone IV E") || (device == "CYCLONE IV E") || (device == "cyclone iv e") || (device == "CycloneIV E") || (device == "CYCLONEIV E") || (device == "cycloneiv e") || (device == "Cyclone IVE") || (device == "CYCLONE IVE") || (device == "cyclone ive") || (device == "CycloneIVE") || (device == "CYCLONEIVE") || (device == "cycloneive"))
-    || ((device == "Stratix V") || (device == "STRATIX V") || (device == "stratix v") || (device == "StratixV") || (device == "STRATIXV") || (device == "stratixv") || (device == "Stratix V (GS)") || (device == "STRATIX V (GS)") || (device == "stratix v (gs)") || (device == "StratixV(GS)") || (device == "STRATIXV(GS)") || (device == "stratixv(gs)") || (device == "Stratix V (GT)") || (device == "STRATIX V (GT)") || (device == "stratix v (gt)") || (device == "StratixV(GT)") || (device == "STRATIXV(GT)") || (device == "stratixv(gt)") || (device == "Stratix V (GX)") || (device == "STRATIX V (GX)") || (device == "stratix v (gx)") || (device == "StratixV(GX)") || (device == "STRATIXV(GX)") || (device == "stratixv(gx)") || (device == "Stratix V (GS/GX)") || (device == "STRATIX V (GS/GX)") || (device == "stratix v (gs/gx)") || (device == "StratixV(GS/GX)") || (device == "STRATIXV(GS/GX)") || (device == "stratixv(gs/gx)") || (device == "Stratix V (GS/GT)") || (device == "STRATIX V (GS/GT)") || (device == "stratix v (gs/gt)") || (device == "StratixV(GS/GT)") || (device == "STRATIXV(GS/GT)") || (device == "stratixv(gs/gt)") || (device == "Stratix V (GT/GX)") || (device == "STRATIX V (GT/GX)") || (device == "stratix v (gt/gx)") || (device == "StratixV(GT/GX)") || (device == "STRATIXV(GT/GX)") || (device == "stratixv(gt/gx)") || (device == "Stratix V (GX/GS)") || (device == "STRATIX V (GX/GS)") || (device == "stratix v (gx/gs)") || (device == "StratixV(GX/GS)") || (device == "STRATIXV(GX/GS)") || (device == "stratixv(gx/gs)") || (device == "Stratix V (GT/GS)") || (device == "STRATIX V (GT/GS)") || (device == "stratix v (gt/gs)") || (device == "StratixV(GT/GS)") || (device == "STRATIXV(GT/GS)") || (device == "stratixv(gt/gs)") || (device == "Stratix V (GX/GT)") || (device == "STRATIX V (GX/GT)") || (device == "stratix v (gx/gt)") || (device == "StratixV(GX/GT)") || (device == "STRATIXV(GX/GT)") || (device == "stratixv(gx/gt)") || (device == "Stratix V (GS/GT/GX)") || (device == "STRATIX V (GS/GT/GX)") || (device == "stratix v (gs/gt/gx)") || (device == "Stratix V (GS/GX/GT)") || (device == "STRATIX V (GS/GX/GT)") || (device == "stratix v (gs/gx/gt)") || (device == "Stratix V (GT/GS/GX)") || (device == "STRATIX V (GT/GS/GX)") || (device == "stratix v (gt/gs/gx)") || (device == "Stratix V (GT/GX/GS)") || (device == "STRATIX V (GT/GX/GS)") || (device == "stratix v (gt/gx/gs)") || (device == "Stratix V (GX/GS/GT)") || (device == "STRATIX V (GX/GS/GT)") || (device == "stratix v (gx/gs/gt)") || (device == "Stratix V (GX/GT/GS)") || (device == "STRATIX V (GX/GT/GS)") || (device == "stratix v (gx/gt/gs)") || (device == "StratixV(GS/GT/GX)") || (device == "STRATIXV(GS/GT/GX)") || (device == "stratixv(gs/gt/gx)") || (device == "StratixV(GS/GX/GT)") || (device == "STRATIXV(GS/GX/GT)") || (device == "stratixv(gs/gx/gt)") || (device == "StratixV(GT/GS/GX)") || (device == "STRATIXV(GT/GS/GX)") || (device == "stratixv(gt/gs/gx)") || (device == "StratixV(GT/GX/GS)") || (device == "STRATIXV(GT/GX/GS)") || (device == "stratixv(gt/gx/gs)") || (device == "StratixV(GX/GS/GT)") || (device == "STRATIXV(GX/GS/GT)") || (device == "stratixv(gx/gs/gt)") || (device == "StratixV(GX/GT/GS)") || (device == "STRATIXV(GX/GT/GS)") || (device == "stratixv(gx/gt/gs)"))
-    || ((device == "Arria II GZ") || (device == "ARRIA II GZ") || (device == "arria ii gz") || (device == "ArriaII GZ") || (device == "ARRIAII GZ") || (device == "arriaii gz") || (device == "Arria IIGZ") || (device == "ARRIA IIGZ") || (device == "arria iigz") || (device == "ArriaIIGZ") || (device == "ARRIAIIGZ") || (device == "arriaiigz"))
-    || ((device == "arriaiigz_commercial_v1_1") || (device == "ARRIAIIGZ_COMMERCIAL_V1_1"))
+    || ((device == "MAX 10") || (device == "max 10") || (device == "MAX 10 FPGA") || (device == "max 10 fpga") || (device == "Zippleback") || (device == "ZIPPLEBACK") || (device == "zippleback") || (device == "MAX10") || (device == "max10") || (device == "MAX 10 (DA/DF/DC/SA/SC)") || (device == "max 10 (da/df/dc/sa/sc)") || (device == "MAX10(DA/DF/DC/SA/SC)") || (device == "max10(da/df/dc/sa/sc)") || (device == "MAX 10 (DA)") || (device == "max 10 (da)") || (device == "MAX10(DA)") || (device == "max10(da)") || (device == "MAX 10 (DF)") || (device == "max 10 (df)") || (device == "MAX10(DF)") || (device == "max10(df)") || (device == "MAX 10 (DC)") || (device == "max 10 (dc)") || (device == "MAX10(DC)") || (device == "max10(dc)") || (device == "MAX 10 (SA)") || (device == "max 10 (sa)") || (device == "MAX10(SA)") || (device == "max10(sa)") || (device == "MAX 10 (SC)") || (device == "max 10 (sc)") || (device == "MAX10(SC)") || (device == "max10(sc)"))
+    || ((device == "MAX II") || (device == "max ii") || (device == "MAXII") || (device == "maxii") || (device == "Tsunami") || (device == "TSUNAMI") || (device == "tsunami"))
     || ((device == "MAX V") || (device == "max v") || (device == "MAXV") || (device == "maxv") || (device == "Jade") || (device == "JADE") || (device == "jade"))
-    || ((device == "Arria V") || (device == "ARRIA V") || (device == "arria v") || (device == "ArriaV") || (device == "ARRIAV") || (device == "arriav")))
+    || ((device == "MAX3000A") || (device == "max3000a") || (device == "MAX 3000A") || (device == "max 3000a"))
+    || ((device == "MAX7000A") || (device == "max7000a") || (device == "MAX 7000A") || (device == "max 7000a"))
+    || ((device == "MAX7000AE") || (device == "max7000ae") || (device == "MAX 7000AE") || (device == "max 7000ae"))
+    || ((device == "MAX7000B") || (device == "max7000b") || (device == "MAX 7000B") || (device == "max 7000b"))
+    || ((device == "MAX7000S") || (device == "max7000s") || (device == "MAX 7000S") || (device == "max 7000s"))
+    || ((device == "Periphery") || (device == "PERIPHERY") || (device == "periphery") || (device == "PERIPHERY") || (device == "periphery") || (device == "Periphery Tile") || (device == "PERIPHERY TILE") || (device == "periphery tile") || (device == "PERIPHERY TILE") || (device == "periphery tile") || (device == "HSSI") || (device == "hssi") || (device == "HSSI TILE") || (device == "hssi tile") || (device == "Periphery (HIGH_SPEED/TRANSCEIVER)") || (device == "PERIPHERY (HIGH_SPEED/TRANSCEIVER)") || (device == "periphery (high_speed/transceiver)") || (device == "Periphery(HIGH_SPEED/TRANSCEIVER)") || (device == "PERIPHERY(HIGH_SPEED/TRANSCEIVER)") || (device == "periphery(high_speed/transceiver)") || (device == "Periphery (HIGH_SPEED)") || (device == "PERIPHERY (HIGH_SPEED)") || (device == "periphery (high_speed)") || (device == "Periphery(HIGH_SPEED)") || (device == "PERIPHERY(HIGH_SPEED)") || (device == "periphery(high_speed)") || (device == "Periphery (TRANSCEIVER)") || (device == "PERIPHERY (TRANSCEIVER)") || (device == "periphery (transceiver)") || (device == "Periphery(TRANSCEIVER)") || (device == "PERIPHERY(TRANSCEIVER)") || (device == "periphery(transceiver)"))
+    || ((device == "Stratix 10") || (device == "STRATIX 10") || (device == "stratix 10") || (device == "Stratix10") || (device == "STRATIX10") || (device == "stratix10") || (device == "nadder") || (device == "NADDER") || (device == "Stratix 10 (GX/SX/MX/TX/DX)") || (device == "STRATIX 10 (GX/SX/MX/TX/DX)") || (device == "stratix 10 (gx/sx/mx/tx/dx)") || (device == "Stratix10(GX/SX/MX/TX/DX)") || (device == "STRATIX10(GX/SX/MX/TX/DX)") || (device == "stratix10(gx/sx/mx/tx/dx)") || (device == "Stratix 10 (GX)") || (device == "STRATIX 10 (GX)") || (device == "stratix 10 (gx)") || (device == "Stratix10(GX)") || (device == "STRATIX10(GX)") || (device == "stratix10(gx)") || (device == "Stratix 10 (SX)") || (device == "STRATIX 10 (SX)") || (device == "stratix 10 (sx)") || (device == "Stratix10(SX)") || (device == "STRATIX10(SX)") || (device == "stratix10(sx)") || (device == "Stratix 10 (MX)") || (device == "STRATIX 10 (MX)") || (device == "stratix 10 (mx)") || (device == "Stratix10(MX)") || (device == "STRATIX10(MX)") || (device == "stratix10(mx)") || (device == "Stratix 10 (TX)") || (device == "STRATIX 10 (TX)") || (device == "stratix 10 (tx)") || (device == "Stratix10(TX)") || (device == "STRATIX10(TX)") || (device == "stratix10(tx)") || (device == "Stratix 10 (DX)") || (device == "STRATIX 10 (DX)") || (device == "stratix 10 (dx)") || (device == "Stratix10(DX)") || (device == "STRATIX10(DX)") || (device == "stratix10(dx)"))
+    || ((device == "Stratix GX") || (device == "STRATIX GX") || (device == "stratix gx") || (device == "Stratix-GX") || (device == "STRATIX-GX") || (device == "stratix-gx") || (device == "StratixGX") || (device == "STRATIXGX") || (device == "stratixgx") || (device == "Aurora") || (device == "AURORA") || (device == "aurora"))
+    || ((device == "Stratix II GX") || (device == "STRATIX II GX") || (device == "stratix ii gx") || (device == "StratixIIGX") || (device == "STRATIXIIGX") || (device == "stratixiigx"))
+    || ((device == "Stratix II") || (device == "STRATIX II") || (device == "stratix ii") || (device == "StratixII") || (device == "STRATIXII") || (device == "stratixii") || (device == "Armstrong") || (device == "ARMSTRONG") || (device == "armstrong"))
+    || ((device == "Stratix III") || (device == "STRATIX III") || (device == "stratix iii") || (device == "StratixIII") || (device == "STRATIXIII") || (device == "stratixiii") || (device == "Titan") || (device == "TITAN") || (device == "titan") || (device == "SIII") || (device == "siii"))
+    || ((device == "Stratix IV") || (device == "STRATIX IV") || (device == "stratix iv") || (device == "TGX") || (device == "tgx") || (device == "StratixIV") || (device == "STRATIXIV") || (device == "stratixiv") || (device == "Stratix IV (GT)") || (device == "STRATIX IV (GT)") || (device == "stratix iv (gt)") || (device == "Stratix IV (GX)") || (device == "STRATIX IV (GX)") || (device == "stratix iv (gx)") || (device == "Stratix IV (E)") || (device == "STRATIX IV (E)") || (device == "stratix iv (e)") || (device == "StratixIV(GT)") || (device == "STRATIXIV(GT)") || (device == "stratixiv(gt)") || (device == "StratixIV(GX)") || (device == "STRATIXIV(GX)") || (device == "stratixiv(gx)") || (device == "StratixIV(E)") || (device == "STRATIXIV(E)") || (device == "stratixiv(e)") || (device == "StratixIIIGX") || (device == "STRATIXIIIGX") || (device == "stratixiiigx") || (device == "Stratix IV (GT/GX/E)") || (device == "STRATIX IV (GT/GX/E)") || (device == "stratix iv (gt/gx/e)") || (device == "Stratix IV (GT/E/GX)") || (device == "STRATIX IV (GT/E/GX)") || (device == "stratix iv (gt/e/gx)") || (device == "Stratix IV (E/GT/GX)") || (device == "STRATIX IV (E/GT/GX)") || (device == "stratix iv (e/gt/gx)") || (device == "Stratix IV (E/GX/GT)") || (device == "STRATIX IV (E/GX/GT)") || (device == "stratix iv (e/gx/gt)") || (device == "StratixIV(GT/GX/E)") || (device == "STRATIXIV(GT/GX/E)") || (device == "stratixiv(gt/gx/e)") || (device == "StratixIV(GT/E/GX)") || (device == "STRATIXIV(GT/E/GX)") || (device == "stratixiv(gt/e/gx)") || (device == "StratixIV(E/GX/GT)") || (device == "STRATIXIV(E/GX/GT)") || (device == "stratixiv(e/gx/gt)") || (device == "StratixIV(E/GT/GX)") || (device == "STRATIXIV(E/GT/GX)") || (device == "stratixiv(e/gt/gx)") || (device == "Stratix IV (GX/E)") || (device == "STRATIX IV (GX/E)") || (device == "stratix iv (gx/e)") || (device == "StratixIV(GX/E)") || (device == "STRATIXIV(GX/E)") || (device == "stratixiv(gx/e)"))
+    || ((device == "Stratix V") || (device == "STRATIX V") || (device == "stratix v") || (device == "StratixV") || (device == "STRATIXV") || (device == "stratixv") || (device == "Stratix V (GS)") || (device == "STRATIX V (GS)") || (device == "stratix v (gs)") || (device == "StratixV(GS)") || (device == "STRATIXV(GS)") || (device == "stratixv(gs)") || (device == "Stratix V (GT)") || (device == "STRATIX V (GT)") || (device == "stratix v (gt)") || (device == "StratixV(GT)") || (device == "STRATIXV(GT)") || (device == "stratixv(gt)") || (device == "Stratix V (GX)") || (device == "STRATIX V (GX)") || (device == "stratix v (gx)") || (device == "StratixV(GX)") || (device == "STRATIXV(GX)") || (device == "stratixv(gx)") || (device == "Stratix V (GS/GX)") || (device == "STRATIX V (GS/GX)") || (device == "stratix v (gs/gx)") || (device == "StratixV(GS/GX)") || (device == "STRATIXV(GS/GX)") || (device == "stratixv(gs/gx)") || (device == "Stratix V (GS/GT)") || (device == "STRATIX V (GS/GT)") || (device == "stratix v (gs/gt)") || (device == "StratixV(GS/GT)") || (device == "STRATIXV(GS/GT)") || (device == "stratixv(gs/gt)") || (device == "Stratix V (GT/GX)") || (device == "STRATIX V (GT/GX)") || (device == "stratix v (gt/gx)") || (device == "StratixV(GT/GX)") || (device == "STRATIXV(GT/GX)") || (device == "stratixv(gt/gx)") || (device == "Stratix V (GX/GS)") || (device == "STRATIX V (GX/GS)") || (device == "stratix v (gx/gs)") || (device == "StratixV(GX/GS)") || (device == "STRATIXV(GX/GS)") || (device == "stratixv(gx/gs)") || (device == "Stratix V (GT/GS)") || (device == "STRATIX V (GT/GS)") || (device == "stratix v (gt/gs)") || (device == "StratixV(GT/GS)") || (device == "STRATIXV(GT/GS)") || (device == "stratixv(gt/gs)") || (device == "Stratix V (GX/GT)") || (device == "STRATIX V (GX/GT)") || (device == "stratix v (gx/gt)") || (device == "StratixV(GX/GT)") || (device == "STRATIXV(GX/GT)") || (device == "stratixv(gx/gt)") || (device == "Stratix V (GS/GT/GX)") || (device == "STRATIX V (GS/GT/GX)") || (device == "stratix v (gs/gt/gx)") || (device == "Stratix V (GS/GX/GT)") || (device == "STRATIX V (GS/GX/GT)") || (device == "stratix v (gs/gx/gt)") || (device == "Stratix V (GT/GS/GX)") || (device == "STRATIX V (GT/GS/GX)") || (device == "stratix v (gt/gs/gx)") || (device == "Stratix V (GT/GX/GS)") || (device == "STRATIX V (GT/GX/GS)") || (device == "stratix v (gt/gx/gs)") || (device == "Stratix V (GX/GS/GT)") || (device == "STRATIX V (GX/GS/GT)") || (device == "stratix v (gx/gs/gt)") || (device == "Stratix V (GX/GT/GS)") || (device == "STRATIX V (GX/GT/GS)") || (device == "stratix v (gx/gt/gs)") || (device == "StratixV(GS/GT/GX)") || (device == "STRATIXV(GS/GT/GX)") || (device == "stratixv(gs/gt/gx)") || (device == "StratixV(GS/GX/GT)") || (device == "STRATIXV(GS/GX/GT)") || (device == "stratixv(gs/gx/gt)") || (device == "StratixV(GT/GS/GX)") || (device == "STRATIXV(GT/GS/GX)") || (device == "stratixv(gt/gs/gx)") || (device == "StratixV(GT/GX/GS)") || (device == "STRATIXV(GT/GX/GS)") || (device == "stratixv(gt/gx/gs)") || (device == "StratixV(GX/GS/GT)") || (device == "STRATIXV(GX/GS/GT)") || (device == "stratixv(gx/gs/gt)") || (device == "StratixV(GX/GT/GS)") || (device == "STRATIXV(GX/GT/GS)") || (device == "stratixv(gx/gt/gs)") || (device == "Stratix V (GS/GT/GX/E)") || (device == "STRATIX V (GS/GT/GX/E)") || (device == "stratix v (gs/gt/gx/e)") || (device == "StratixV(GS/GT/GX/E)") || (device == "STRATIXV(GS/GT/GX/E)") || (device == "stratixv(gs/gt/gx/e)") || (device == "Stratix V (E)") || (device == "STRATIX V (E)") || (device == "stratix v (e)") || (device == "StratixV(E)") || (device == "STRATIXV(E)") || (device == "stratixv(e)"))
+    || ((device == "Stratix") || (device == "STRATIX") || (device == "stratix") || (device == "Yeager") || (device == "YEAGER") || (device == "yeager"))
+    || ((device == "eFPGA 28 HPM") || (device == "EFPGA 28 HPM") || (device == "efpga 28 hpm") || (device == "eFPGA28HPM") || (device == "EFPGA28HPM") || (device == "efpga28hpm") || (device == "Bedrock") || (device == "BEDROCK") || (device == "bedrock")))
         is_valid = 1;
     else
         is_valid = 0;
@@ -11932,7 +12252,7 @@ parameter auto_settings = "true";
 
             // set the limit of the divide_by value that can be returned by
             // the following function.
-            max_d_value = 500;
+            max_d_value = 1500;
             
             // scale down the multiply_by and divide_by values provided by the design
             // before attempting to use them in the calculations below
@@ -15908,7 +16228,7 @@ parameter auto_settings = "true";
 
             // set the limit of the divide_by value that can be returned by
             // the following function.
-            max_d_value = 500;
+            max_d_value = 1500;
             
             // scale down the multiply_by and divide_by values provided by the design
             // before attempting to use them in the calculations below
@@ -22361,7 +22681,7 @@ begin
     
     family_stratixiii = dev.FEATURE_FAMILY_STRATIXIII(intended_device_family);
     family_cycloneiiigl = dev.FEATURE_FAMILY_CYCLONEIVGX(intended_device_family);
-    family_cycloneiii = !family_cycloneiiigl && dev.FEATURE_FAMILY_CYCLONEIII(intended_device_family);
+    family_cycloneiii = !family_cycloneiiigl && (dev.FEATURE_FAMILY_CYCLONEIII(intended_device_family) || dev.FEATURE_FAMILY_MAX10(intended_device_family) );
     family_base_cycloneii = dev.FEATURE_FAMILY_BASE_CYCLONEII(intended_device_family);
     family_arriaii = dev.FEATURE_FAMILY_ARRIAIIGX(intended_device_family);
     family_has_stratix_style_pll = dev.FEATURE_FAMILY_HAS_STRATIX_STYLE_PLL(intended_device_family);
@@ -22770,6 +23090,7 @@ if ((intended_device_family == "Stratix III") || (intended_device_family == "STR
     || (intended_device_family == "Arria II GX") || (intended_device_family == "ARRIA II GX") || (intended_device_family == "arria ii gx") || (intended_device_family == "ArriaIIGX") || (intended_device_family == "ARRIAIIGX") || (intended_device_family == "arriaiigx") || (intended_device_family == "Arria IIGX") || (intended_device_family == "ARRIA IIGX") || (intended_device_family == "arria iigx") || (intended_device_family == "ArriaII GX") || (intended_device_family == "ARRIAII GX") || (intended_device_family == "arriaii gx") || (intended_device_family == "Arria II") || (intended_device_family == "ARRIA II") || (intended_device_family == "arria ii") || (intended_device_family == "ArriaII") || (intended_device_family == "ARRIAII") || (intended_device_family == "arriaii") || (intended_device_family == "Arria II (GX/E)") || (intended_device_family == "ARRIA II (GX/E)") || (intended_device_family == "arria ii (gx/e)") || (intended_device_family == "ArriaII(GX/E)") || (intended_device_family == "ARRIAII(GX/E)") || (intended_device_family == "arriaii(gx/e)") || (intended_device_family == "PIRANHA") || (intended_device_family == "piranha")
     || (intended_device_family == "HardCopy IV") || (intended_device_family == "HARDCOPY IV") || (intended_device_family == "hardcopy iv") || (intended_device_family == "HardCopyIV") || (intended_device_family == "HARDCOPYIV") || (intended_device_family == "hardcopyiv") || (intended_device_family == "HardCopy IV (GX)") || (intended_device_family == "HARDCOPY IV (GX)") || (intended_device_family == "hardcopy iv (gx)") || (intended_device_family == "HardCopy IV (E)") || (intended_device_family == "HARDCOPY IV (E)") || (intended_device_family == "hardcopy iv (e)") || (intended_device_family == "HardCopyIV(GX)") || (intended_device_family == "HARDCOPYIV(GX)") || (intended_device_family == "hardcopyiv(gx)") || (intended_device_family == "HardCopyIV(E)") || (intended_device_family == "HARDCOPYIV(E)") || (intended_device_family == "hardcopyiv(e)") || (intended_device_family == "HCXIV") || (intended_device_family == "hcxiv") || (intended_device_family == "HardCopy IV (GX/E)") || (intended_device_family == "HARDCOPY IV (GX/E)") || (intended_device_family == "hardcopy iv (gx/e)") || (intended_device_family == "HardCopy IV (E/GX)") || (intended_device_family == "HARDCOPY IV (E/GX)") || (intended_device_family == "hardcopy iv (e/gx)") || (intended_device_family == "HardCopyIV(GX/E)") || (intended_device_family == "HARDCOPYIV(GX/E)") || (intended_device_family == "hardcopyiv(gx/e)") || (intended_device_family == "HardCopyIV(E/GX)") || (intended_device_family == "HARDCOPYIV(E/GX)") || (intended_device_family == "hardcopyiv(e/gx)")
     || (intended_device_family == "Stratix V") || (intended_device_family == "STRATIX V") || (intended_device_family == "stratix v") || (intended_device_family == "StratixV") || (intended_device_family == "STRATIXV") || (intended_device_family == "stratixv") || (intended_device_family == "Stratix V (GS)") || (intended_device_family == "STRATIX V (GS)") || (intended_device_family == "stratix v (gs)") || (intended_device_family == "StratixV(GS)") || (intended_device_family == "STRATIXV(GS)") || (intended_device_family == "stratixv(gs)") || (intended_device_family == "Stratix V (GX)") || (intended_device_family == "STRATIX V (GX)") || (intended_device_family == "stratix v (gx)") || (intended_device_family == "StratixV(GX)") || (intended_device_family == "STRATIXV(GX)") || (intended_device_family == "stratixv(gx)") || (intended_device_family == "Stratix V (GS/GX)") || (intended_device_family == "STRATIX V (GS/GX)") || (intended_device_family == "stratix v (gs/gx)") || (intended_device_family == "StratixV(GS/GX)") || (intended_device_family == "STRATIXV(GS/GX)") || (intended_device_family == "stratixv(gs/gx)") || (intended_device_family == "Stratix V (GX/GS)") || (intended_device_family == "STRATIX V (GX/GS)") || (intended_device_family == "stratix v (gx/gs)") || (intended_device_family == "StratixV(GX/GS)") || (intended_device_family == "STRATIXV(GX/GS)") || (intended_device_family == "stratixv(gx/gs)")
+    || (intended_device_family == "Arria V GZ") || (intended_device_family == "ARRIA V GZ") || (intended_device_family == "arria v gz") || (intended_device_family == "ArriaVGZ")  || (intended_device_family == "ARRIAVGZ")  || (intended_device_family == "arriavgz")
     || (intended_device_family == "ArriaV") || (intended_device_family == "ARRIAV") || (intended_device_family == "arriav") || (intended_device_family == "Arria V") || (intended_device_family == "ARRIA V") || (intended_device_family == "arria v")
     || (intended_device_family == "Arria II GZ") || (intended_device_family == "ARRIA II GZ") || (intended_device_family == "arria ii gz") || (intended_device_family == "ArriaII GZ") || (intended_device_family == "ARRIAII GZ") || (intended_device_family == "arriaii gz") || (intended_device_family == "Arria IIGZ") || (intended_device_family == "ARRIA IIGZ") || (intended_device_family == "arria iigz") || (intended_device_family == "ArriaIIGZ") || (intended_device_family == "ARRIAIIGZ") || (intended_device_family == "arriaiigz")
     || (intended_device_family == "HardCopy III") || (intended_device_family == "HARDCOPY III") || (intended_device_family == "hardcopy iii") || (intended_device_family == "HardCopyIII") || (intended_device_family == "HARDCOPYIII") || (intended_device_family == "hardcopyiii") || (intended_device_family == "HCX") || (intended_device_family == "hcx"))
@@ -22997,7 +23318,8 @@ endgenerate
 generate
 if ((intended_device_family == "Cyclone III") || (intended_device_family == "CYCLONE III") || (intended_device_family == "cyclone iii") || (intended_device_family == "CycloneIII") || (intended_device_family == "CYCLONEIII") || (intended_device_family == "cycloneiii") || (intended_device_family == "Barracuda") || (intended_device_family == "BARRACUDA") || (intended_device_family == "barracuda") || (intended_device_family == "Cuda") || (intended_device_family == "CUDA") || (intended_device_family == "cuda") || (intended_device_family == "CIII") || (intended_device_family == "ciii")
     || (intended_device_family == "Cyclone III LS") || (intended_device_family == "CYCLONE III LS") || (intended_device_family == "cyclone iii ls") || (intended_device_family == "CycloneIIILS") || (intended_device_family == "CYCLONEIIILS") || (intended_device_family == "cycloneiiils") || (intended_device_family == "Cyclone III LPS") || (intended_device_family == "CYCLONE III LPS") || (intended_device_family == "cyclone iii lps") || (intended_device_family == "Cyclone LPS") || (intended_device_family == "CYCLONE LPS") || (intended_device_family == "cyclone lps") || (intended_device_family == "CycloneLPS") || (intended_device_family == "CYCLONELPS") || (intended_device_family == "cyclonelps") || (intended_device_family == "Tarpon") || (intended_device_family == "TARPON") || (intended_device_family == "tarpon") || (intended_device_family == "Cyclone IIIE") || (intended_device_family == "CYCLONE IIIE") || (intended_device_family == "cyclone iiie")
-    || (intended_device_family == "Cyclone IV E") || (intended_device_family == "CYCLONE IV E") || (intended_device_family == "cyclone iv e") || (intended_device_family == "CycloneIV E") || (intended_device_family == "CYCLONEIV E") || (intended_device_family == "cycloneiv e") || (intended_device_family == "Cyclone IVE") || (intended_device_family == "CYCLONE IVE") || (intended_device_family == "cyclone ive") || (intended_device_family == "CycloneIVE") || (intended_device_family == "CYCLONEIVE") || (intended_device_family == "cycloneive"))
+    || (intended_device_family == "Cyclone IV E") || (intended_device_family == "CYCLONE IV E") || (intended_device_family == "cyclone iv e") || (intended_device_family == "CycloneIV E") || (intended_device_family == "CYCLONEIV E") || (intended_device_family == "cycloneiv e") || (intended_device_family == "Cyclone IVE") || (intended_device_family == "CYCLONE IVE") || (intended_device_family == "cyclone ive") || (intended_device_family == "CycloneIVE") || (intended_device_family == "CYCLONEIVE") || (intended_device_family == "cycloneive") || (intended_device_family == "Cyclone 10 LP") || (intended_device_family == "CYCLONE 10 LP") || (intended_device_family == "cyclone 10 lp") || (intended_device_family == "Cyclone10 LP") || (intended_device_family == "CYCLONE10 LP") || (intended_device_family == "cyclone10 lp") || (intended_device_family == "Cyclone 10LP") || (intended_device_family == "CYCLONE 10LP") || (intended_device_family == "cyclone 10lp") || (intended_device_family == "Cyclone10LP") || (intended_device_family == "CYCLONE10LP") || (intended_device_family == "cyclone10lp")
+    || (intended_device_family == "MAX 10") || (intended_device_family == "MAX 10 FPGA") || (intended_device_family == "MAX10") || (intended_device_family == "max 10 fpga") || (intended_device_family == "MAX10FPGA") || (intended_device_family == "max10fpga") || (intended_device_family == "Max 10 FPGA") || (intended_device_family == "Max10FPGA"))
 begin : cycloneiii_pll
 
 MF_cycloneiii_pll
@@ -23299,7 +23621,7 @@ pll4
 
 end
 endgenerate
-            
+
 pll_iobuf iobuf1
 (
     .i (stratix3_fbout),
@@ -23629,6 +23951,8 @@ module altlvds_rx (
     parameter dpa_initial_phase_value = 0;
     parameter pll_self_reset_on_loss_lock = "OFF";
     parameter refclk_frequency = "UNUSED";
+
+parameter enable_clock_pin_mode = "UNUSED";
     parameter data_rate = "UNUSED";
     parameter lpm_hint = "UNUSED";
     parameter lpm_type = "altlvds_rx";
@@ -23666,7 +23990,7 @@ module altlvds_rx (
                                 ? 1 : 0;
 
     // A Cyclone II type of LVDS?
-    parameter CYCLONEII_RX_STYLE = ((((intended_device_family == "Cyclone II") || (intended_device_family == "CYCLONE II") || (intended_device_family == "cyclone ii") || (intended_device_family == "Cycloneii") || (intended_device_family == "CYCLONEII") || (intended_device_family == "cycloneii") || (intended_device_family == "Magellan") || (intended_device_family == "MAGELLAN") || (intended_device_family == "magellan"))
+    parameter CYCLONEII_RX_STYLE = ((((intended_device_family == "Cyclone II") || (intended_device_family == "CYCLONE II") || (intended_device_family == "cyclone ii") || (intended_device_family == "Cycloneii") || (intended_device_family == "CYCLONEII") || (intended_device_family == "cycloneii") || (intended_device_family == "Magellan") || (intended_device_family == "MAGELLAN") || (intended_device_family == "magellan") || (intended_device_family == "CycloneII") || (intended_device_family == "CYCLONEII") || (intended_device_family == "cycloneii"))
                                 ))
                                 ? 1 : 0;
 
@@ -23674,10 +23998,20 @@ module altlvds_rx (
     parameter STRATIXIII_RX_STYLE = ((((intended_device_family == "Stratix III") || (intended_device_family == "STRATIX III") || (intended_device_family == "stratix iii") || (intended_device_family == "StratixIII") || (intended_device_family == "STRATIXIII") || (intended_device_family == "stratixiii") || (intended_device_family == "Titan") || (intended_device_family == "TITAN") || (intended_device_family == "titan") || (intended_device_family == "SIII") || (intended_device_family == "siii"))
                                 || (((intended_device_family == "Stratix IV") || (intended_device_family == "STRATIX IV") || (intended_device_family == "stratix iv") || (intended_device_family == "TGX") || (intended_device_family == "tgx") || (intended_device_family == "StratixIV") || (intended_device_family == "STRATIXIV") || (intended_device_family == "stratixiv") || (intended_device_family == "Stratix IV (GT)") || (intended_device_family == "STRATIX IV (GT)") || (intended_device_family == "stratix iv (gt)") || (intended_device_family == "Stratix IV (GX)") || (intended_device_family == "STRATIX IV (GX)") || (intended_device_family == "stratix iv (gx)") || (intended_device_family == "Stratix IV (E)") || (intended_device_family == "STRATIX IV (E)") || (intended_device_family == "stratix iv (e)") || (intended_device_family == "StratixIV(GT)") || (intended_device_family == "STRATIXIV(GT)") || (intended_device_family == "stratixiv(gt)") || (intended_device_family == "StratixIV(GX)") || (intended_device_family == "STRATIXIV(GX)") || (intended_device_family == "stratixiv(gx)") || (intended_device_family == "StratixIV(E)") || (intended_device_family == "STRATIXIV(E)") || (intended_device_family == "stratixiv(e)") || (intended_device_family == "StratixIIIGX") || (intended_device_family == "STRATIXIIIGX") || (intended_device_family == "stratixiiigx") || (intended_device_family == "Stratix IV (GT/GX/E)") || (intended_device_family == "STRATIX IV (GT/GX/E)") || (intended_device_family == "stratix iv (gt/gx/e)") || (intended_device_family == "Stratix IV (GT/E/GX)") || (intended_device_family == "STRATIX IV (GT/E/GX)") || (intended_device_family == "stratix iv (gt/e/gx)") || (intended_device_family == "Stratix IV (E/GT/GX)") || (intended_device_family == "STRATIX IV (E/GT/GX)") || (intended_device_family == "stratix iv (e/gt/gx)") || (intended_device_family == "Stratix IV (E/GX/GT)") || (intended_device_family == "STRATIX IV (E/GX/GT)") || (intended_device_family == "stratix iv (e/gx/gt)") || (intended_device_family == "StratixIV(GT/GX/E)") || (intended_device_family == "STRATIXIV(GT/GX/E)") || (intended_device_family == "stratixiv(gt/gx/e)") || (intended_device_family == "StratixIV(GT/E/GX)") || (intended_device_family == "STRATIXIV(GT/E/GX)") || (intended_device_family == "stratixiv(gt/e/gx)") || (intended_device_family == "StratixIV(E/GX/GT)") || (intended_device_family == "STRATIXIV(E/GX/GT)") || (intended_device_family == "stratixiv(e/gx/gt)") || (intended_device_family == "StratixIV(E/GT/GX)") || (intended_device_family == "STRATIXIV(E/GT/GX)") || (intended_device_family == "stratixiv(e/gt/gx)") || (intended_device_family == "Stratix IV (GX/E)") || (intended_device_family == "STRATIX IV (GX/E)") || (intended_device_family == "stratix iv (gx/e)") || (intended_device_family == "StratixIV(GX/E)") || (intended_device_family == "STRATIXIV(GX/E)") || (intended_device_family == "stratixiv(gx/e)"))
                                 || ((intended_device_family == "Arria II GX") || (intended_device_family == "ARRIA II GX") || (intended_device_family == "arria ii gx") || (intended_device_family == "ArriaIIGX") || (intended_device_family == "ARRIAIIGX") || (intended_device_family == "arriaiigx") || (intended_device_family == "Arria IIGX") || (intended_device_family == "ARRIA IIGX") || (intended_device_family == "arria iigx") || (intended_device_family == "ArriaII GX") || (intended_device_family == "ARRIAII GX") || (intended_device_family == "arriaii gx") || (intended_device_family == "Arria II") || (intended_device_family == "ARRIA II") || (intended_device_family == "arria ii") || (intended_device_family == "ArriaII") || (intended_device_family == "ARRIAII") || (intended_device_family == "arriaii") || (intended_device_family == "Arria II (GX/E)") || (intended_device_family == "ARRIA II (GX/E)") || (intended_device_family == "arria ii (gx/e)") || (intended_device_family == "ArriaII(GX/E)") || (intended_device_family == "ARRIAII(GX/E)") || (intended_device_family == "arriaii(gx/e)") || (intended_device_family == "PIRANHA") || (intended_device_family == "piranha"))
+                                || (((intended_device_family == "HardCopy IV") || (intended_device_family == "HARDCOPY IV") || (intended_device_family == "hardcopy iv") || (intended_device_family == "HardCopyIV") || (intended_device_family == "HARDCOPYIV") || (intended_device_family == "hardcopyiv") || (intended_device_family == "HardCopy IV (GX)") || (intended_device_family == "HARDCOPY IV (GX)") || (intended_device_family == "hardcopy iv (gx)") || (intended_device_family == "HardCopy IV (E)") || (intended_device_family == "HARDCOPY IV (E)") || (intended_device_family == "hardcopy iv (e)") || (intended_device_family == "HardCopyIV(GX)") || (intended_device_family == "HARDCOPYIV(GX)") || (intended_device_family == "hardcopyiv(gx)") || (intended_device_family == "HardCopyIV(E)") || (intended_device_family == "HARDCOPYIV(E)") || (intended_device_family == "hardcopyiv(e)") || (intended_device_family == "HCXIV") || (intended_device_family == "hcxiv") || (intended_device_family == "HardCopy IV (GX/E)") || (intended_device_family == "HARDCOPY IV (GX/E)") || (intended_device_family == "hardcopy iv (gx/e)") || (intended_device_family == "HardCopy IV (E/GX)") || (intended_device_family == "HARDCOPY IV (E/GX)") || (intended_device_family == "hardcopy iv (e/gx)") || (intended_device_family == "HardCopyIV(GX/E)") || (intended_device_family == "HARDCOPYIV(GX/E)") || (intended_device_family == "hardcopyiv(gx/e)") || (intended_device_family == "HardCopyIV(E/GX)") || (intended_device_family == "HARDCOPYIV(E/GX)") || (intended_device_family == "hardcopyiv(e/gx)"))
                                 || ((intended_device_family == "HardCopy IV") || (intended_device_family == "HARDCOPY IV") || (intended_device_family == "hardcopy iv") || (intended_device_family == "HardCopyIV") || (intended_device_family == "HARDCOPYIV") || (intended_device_family == "hardcopyiv") || (intended_device_family == "HardCopy IV (GX)") || (intended_device_family == "HARDCOPY IV (GX)") || (intended_device_family == "hardcopy iv (gx)") || (intended_device_family == "HardCopy IV (E)") || (intended_device_family == "HARDCOPY IV (E)") || (intended_device_family == "hardcopy iv (e)") || (intended_device_family == "HardCopyIV(GX)") || (intended_device_family == "HARDCOPYIV(GX)") || (intended_device_family == "hardcopyiv(gx)") || (intended_device_family == "HardCopyIV(E)") || (intended_device_family == "HARDCOPYIV(E)") || (intended_device_family == "hardcopyiv(e)") || (intended_device_family == "HCXIV") || (intended_device_family == "hcxiv") || (intended_device_family == "HardCopy IV (GX/E)") || (intended_device_family == "HARDCOPY IV (GX/E)") || (intended_device_family == "hardcopy iv (gx/e)") || (intended_device_family == "HardCopy IV (E/GX)") || (intended_device_family == "HARDCOPY IV (E/GX)") || (intended_device_family == "hardcopy iv (e/gx)") || (intended_device_family == "HardCopyIV(GX/E)") || (intended_device_family == "HARDCOPYIV(GX/E)") || (intended_device_family == "hardcopyiv(gx/e)") || (intended_device_family == "HardCopyIV(E/GX)") || (intended_device_family == "HARDCOPYIV(E/GX)") || (intended_device_family == "hardcopyiv(e/gx)"))
-                                || (((intended_device_family == "Stratix V") || (intended_device_family == "STRATIX V") || (intended_device_family == "stratix v") || (intended_device_family == "StratixV") || (intended_device_family == "STRATIXV") || (intended_device_family == "stratixv") || (intended_device_family == "Stratix V (GS)") || (intended_device_family == "STRATIX V (GS)") || (intended_device_family == "stratix v (gs)") || (intended_device_family == "StratixV(GS)") || (intended_device_family == "STRATIXV(GS)") || (intended_device_family == "stratixv(gs)") || (intended_device_family == "Stratix V (GT)") || (intended_device_family == "STRATIX V (GT)") || (intended_device_family == "stratix v (gt)") || (intended_device_family == "StratixV(GT)") || (intended_device_family == "STRATIXV(GT)") || (intended_device_family == "stratixv(gt)") || (intended_device_family == "Stratix V (GX)") || (intended_device_family == "STRATIX V (GX)") || (intended_device_family == "stratix v (gx)") || (intended_device_family == "StratixV(GX)") || (intended_device_family == "STRATIXV(GX)") || (intended_device_family == "stratixv(gx)") || (intended_device_family == "Stratix V (GS/GX)") || (intended_device_family == "STRATIX V (GS/GX)") || (intended_device_family == "stratix v (gs/gx)") || (intended_device_family == "StratixV(GS/GX)") || (intended_device_family == "STRATIXV(GS/GX)") || (intended_device_family == "stratixv(gs/gx)") || (intended_device_family == "Stratix V (GS/GT)") || (intended_device_family == "STRATIX V (GS/GT)") || (intended_device_family == "stratix v (gs/gt)") || (intended_device_family == "StratixV(GS/GT)") || (intended_device_family == "STRATIXV(GS/GT)") || (intended_device_family == "stratixv(gs/gt)") || (intended_device_family == "Stratix V (GT/GX)") || (intended_device_family == "STRATIX V (GT/GX)") || (intended_device_family == "stratix v (gt/gx)") || (intended_device_family == "StratixV(GT/GX)") || (intended_device_family == "STRATIXV(GT/GX)") || (intended_device_family == "stratixv(gt/gx)") || (intended_device_family == "Stratix V (GX/GS)") || (intended_device_family == "STRATIX V (GX/GS)") || (intended_device_family == "stratix v (gx/gs)") || (intended_device_family == "StratixV(GX/GS)") || (intended_device_family == "STRATIXV(GX/GS)") || (intended_device_family == "stratixv(gx/gs)") || (intended_device_family == "Stratix V (GT/GS)") || (intended_device_family == "STRATIX V (GT/GS)") || (intended_device_family == "stratix v (gt/gs)") || (intended_device_family == "StratixV(GT/GS)") || (intended_device_family == "STRATIXV(GT/GS)") || (intended_device_family == "stratixv(gt/gs)") || (intended_device_family == "Stratix V (GX/GT)") || (intended_device_family == "STRATIX V (GX/GT)") || (intended_device_family == "stratix v (gx/gt)") || (intended_device_family == "StratixV(GX/GT)") || (intended_device_family == "STRATIXV(GX/GT)") || (intended_device_family == "stratixv(gx/gt)") || (intended_device_family == "Stratix V (GS/GT/GX)") || (intended_device_family == "STRATIX V (GS/GT/GX)") || (intended_device_family == "stratix v (gs/gt/gx)") || (intended_device_family == "Stratix V (GS/GX/GT)") || (intended_device_family == "STRATIX V (GS/GX/GT)") || (intended_device_family == "stratix v (gs/gx/gt)") || (intended_device_family == "Stratix V (GT/GS/GX)") || (intended_device_family == "STRATIX V (GT/GS/GX)") || (intended_device_family == "stratix v (gt/gs/gx)") || (intended_device_family == "Stratix V (GT/GX/GS)") || (intended_device_family == "STRATIX V (GT/GX/GS)") || (intended_device_family == "stratix v (gt/gx/gs)") || (intended_device_family == "Stratix V (GX/GS/GT)") || (intended_device_family == "STRATIX V (GX/GS/GT)") || (intended_device_family == "stratix v (gx/gs/gt)") || (intended_device_family == "Stratix V (GX/GT/GS)") || (intended_device_family == "STRATIX V (GX/GT/GS)") || (intended_device_family == "stratix v (gx/gt/gs)") || (intended_device_family == "StratixV(GS/GT/GX)") || (intended_device_family == "STRATIXV(GS/GT/GX)") || (intended_device_family == "stratixv(gs/gt/gx)") || (intended_device_family == "StratixV(GS/GX/GT)") || (intended_device_family == "STRATIXV(GS/GX/GT)") || (intended_device_family == "stratixv(gs/gx/gt)") || (intended_device_family == "StratixV(GT/GS/GX)") || (intended_device_family == "STRATIXV(GT/GS/GX)") || (intended_device_family == "stratixv(gt/gs/gx)") || (intended_device_family == "StratixV(GT/GX/GS)") || (intended_device_family == "STRATIXV(GT/GX/GS)") || (intended_device_family == "stratixv(gt/gx/gs)") || (intended_device_family == "StratixV(GX/GS/GT)") || (intended_device_family == "STRATIXV(GX/GS/GT)") || (intended_device_family == "stratixv(gx/gs/gt)") || (intended_device_family == "StratixV(GX/GT/GS)") || (intended_device_family == "STRATIXV(GX/GT/GS)") || (intended_device_family == "stratixv(gx/gt/gs)"))
-                                ) || (((intended_device_family == "Arria V") || (intended_device_family == "ARRIA V") || (intended_device_family == "arria v") || (intended_device_family == "ArriaV") || (intended_device_family == "ARRIAV") || (intended_device_family == "arriav"))
-                                ) || (((intended_device_family == "Arria II GZ") || (intended_device_family == "ARRIA II GZ") || (intended_device_family == "arria ii gz") || (intended_device_family == "ArriaII GZ") || (intended_device_family == "ARRIAII GZ") || (intended_device_family == "arriaii gz") || (intended_device_family == "Arria IIGZ") || (intended_device_family == "ARRIA IIGZ") || (intended_device_family == "arria iigz") || (intended_device_family == "ArriaIIGZ") || (intended_device_family == "ARRIAIIGZ") || (intended_device_family == "arriaiigz"))
+                                ) || (((intended_device_family == "Stratix V") || (intended_device_family == "STRATIX V") || (intended_device_family == "stratix v") || (intended_device_family == "StratixV") || (intended_device_family == "STRATIXV") || (intended_device_family == "stratixv") || (intended_device_family == "Stratix V (GS)") || (intended_device_family == "STRATIX V (GS)") || (intended_device_family == "stratix v (gs)") || (intended_device_family == "StratixV(GS)") || (intended_device_family == "STRATIXV(GS)") || (intended_device_family == "stratixv(gs)") || (intended_device_family == "Stratix V (GT)") || (intended_device_family == "STRATIX V (GT)") || (intended_device_family == "stratix v (gt)") || (intended_device_family == "StratixV(GT)") || (intended_device_family == "STRATIXV(GT)") || (intended_device_family == "stratixv(gt)") || (intended_device_family == "Stratix V (GX)") || (intended_device_family == "STRATIX V (GX)") || (intended_device_family == "stratix v (gx)") || (intended_device_family == "StratixV(GX)") || (intended_device_family == "STRATIXV(GX)") || (intended_device_family == "stratixv(gx)") || (intended_device_family == "Stratix V (GS/GX)") || (intended_device_family == "STRATIX V (GS/GX)") || (intended_device_family == "stratix v (gs/gx)") || (intended_device_family == "StratixV(GS/GX)") || (intended_device_family == "STRATIXV(GS/GX)") || (intended_device_family == "stratixv(gs/gx)") || (intended_device_family == "Stratix V (GS/GT)") || (intended_device_family == "STRATIX V (GS/GT)") || (intended_device_family == "stratix v (gs/gt)") || (intended_device_family == "StratixV(GS/GT)") || (intended_device_family == "STRATIXV(GS/GT)") || (intended_device_family == "stratixv(gs/gt)") || (intended_device_family == "Stratix V (GT/GX)") || (intended_device_family == "STRATIX V (GT/GX)") || (intended_device_family == "stratix v (gt/gx)") || (intended_device_family == "StratixV(GT/GX)") || (intended_device_family == "STRATIXV(GT/GX)") || (intended_device_family == "stratixv(gt/gx)") || (intended_device_family == "Stratix V (GX/GS)") || (intended_device_family == "STRATIX V (GX/GS)") || (intended_device_family == "stratix v (gx/gs)") || (intended_device_family == "StratixV(GX/GS)") || (intended_device_family == "STRATIXV(GX/GS)") || (intended_device_family == "stratixv(gx/gs)") || (intended_device_family == "Stratix V (GT/GS)") || (intended_device_family == "STRATIX V (GT/GS)") || (intended_device_family == "stratix v (gt/gs)") || (intended_device_family == "StratixV(GT/GS)") || (intended_device_family == "STRATIXV(GT/GS)") || (intended_device_family == "stratixv(gt/gs)") || (intended_device_family == "Stratix V (GX/GT)") || (intended_device_family == "STRATIX V (GX/GT)") || (intended_device_family == "stratix v (gx/gt)") || (intended_device_family == "StratixV(GX/GT)") || (intended_device_family == "STRATIXV(GX/GT)") || (intended_device_family == "stratixv(gx/gt)") || (intended_device_family == "Stratix V (GS/GT/GX)") || (intended_device_family == "STRATIX V (GS/GT/GX)") || (intended_device_family == "stratix v (gs/gt/gx)") || (intended_device_family == "Stratix V (GS/GX/GT)") || (intended_device_family == "STRATIX V (GS/GX/GT)") || (intended_device_family == "stratix v (gs/gx/gt)") || (intended_device_family == "Stratix V (GT/GS/GX)") || (intended_device_family == "STRATIX V (GT/GS/GX)") || (intended_device_family == "stratix v (gt/gs/gx)") || (intended_device_family == "Stratix V (GT/GX/GS)") || (intended_device_family == "STRATIX V (GT/GX/GS)") || (intended_device_family == "stratix v (gt/gx/gs)") || (intended_device_family == "Stratix V (GX/GS/GT)") || (intended_device_family == "STRATIX V (GX/GS/GT)") || (intended_device_family == "stratix v (gx/gs/gt)") || (intended_device_family == "Stratix V (GX/GT/GS)") || (intended_device_family == "STRATIX V (GX/GT/GS)") || (intended_device_family == "stratix v (gx/gt/gs)") || (intended_device_family == "StratixV(GS/GT/GX)") || (intended_device_family == "STRATIXV(GS/GT/GX)") || (intended_device_family == "stratixv(gs/gt/gx)") || (intended_device_family == "StratixV(GS/GX/GT)") || (intended_device_family == "STRATIXV(GS/GX/GT)") || (intended_device_family == "stratixv(gs/gx/gt)") || (intended_device_family == "StratixV(GT/GS/GX)") || (intended_device_family == "STRATIXV(GT/GS/GX)") || (intended_device_family == "stratixv(gt/gs/gx)") || (intended_device_family == "StratixV(GT/GX/GS)") || (intended_device_family == "STRATIXV(GT/GX/GS)") || (intended_device_family == "stratixv(gt/gx/gs)") || (intended_device_family == "StratixV(GX/GS/GT)") || (intended_device_family == "STRATIXV(GX/GS/GT)") || (intended_device_family == "stratixv(gx/gs/gt)") || (intended_device_family == "StratixV(GX/GT/GS)") || (intended_device_family == "STRATIXV(GX/GT/GS)") || (intended_device_family == "stratixv(gx/gt/gs)") || (intended_device_family == "Stratix V (GS/GT/GX/E)") || (intended_device_family == "STRATIX V (GS/GT/GX/E)") || (intended_device_family == "stratix v (gs/gt/gx/e)") || (intended_device_family == "StratixV(GS/GT/GX/E)") || (intended_device_family == "STRATIXV(GS/GT/GX/E)") || (intended_device_family == "stratixv(gs/gt/gx/e)") || (intended_device_family == "Stratix V (E)") || (intended_device_family == "STRATIX V (E)") || (intended_device_family == "stratix v (e)") || (intended_device_family == "StratixV(E)") || (intended_device_family == "STRATIXV(E)") || (intended_device_family == "stratixv(e)"))
+                                || (((intended_device_family == "Arria V GZ") || (intended_device_family == "ARRIA V GZ") || (intended_device_family == "arria v gz") || (intended_device_family == "ArriaVGZ") || (intended_device_family == "ARRIAVGZ") || (intended_device_family == "arriavgz"))
+                                ) ) || (((intended_device_family == "Arria V") || (intended_device_family == "ARRIA V") || (intended_device_family == "arria v") || (intended_device_family == "Arria V (GT/GX)") || (intended_device_family == "ARRIA V (GT/GX)") || (intended_device_family == "arria v (gt/gx)") || (intended_device_family == "ArriaV(GT/GX)") || (intended_device_family == "ARRIAV(GT/GX)") || (intended_device_family == "arriav(gt/gx)") || (intended_device_family == "ArriaV") || (intended_device_family == "ARRIAV") || (intended_device_family == "arriav") || (intended_device_family == "Arria V (GT/GX/ST/SX)") || (intended_device_family == "ARRIA V (GT/GX/ST/SX)") || (intended_device_family == "arria v (gt/gx/st/sx)") || (intended_device_family == "ArriaV(GT/GX/ST/SX)") || (intended_device_family == "ARRIAV(GT/GX/ST/SX)") || (intended_device_family == "arriav(gt/gx/st/sx)") || (intended_device_family == "Arria V (GT)") || (intended_device_family == "ARRIA V (GT)") || (intended_device_family == "arria v (gt)") || (intended_device_family == "ArriaV(GT)") || (intended_device_family == "ARRIAV(GT)") || (intended_device_family == "arriav(gt)") || (intended_device_family == "Arria V (GX)") || (intended_device_family == "ARRIA V (GX)") || (intended_device_family == "arria v (gx)") || (intended_device_family == "ArriaV(GX)") || (intended_device_family == "ARRIAV(GX)") || (intended_device_family == "arriav(gx)") || (intended_device_family == "Arria V (ST)") || (intended_device_family == "ARRIA V (ST)") || (intended_device_family == "arria v (st)") || (intended_device_family == "ArriaV(ST)") || (intended_device_family == "ARRIAV(ST)") || (intended_device_family == "arriav(st)") || (intended_device_family == "Arria V (SX)") || (intended_device_family == "ARRIA V (SX)") || (intended_device_family == "arria v (sx)") || (intended_device_family == "ArriaV(SX)") || (intended_device_family == "ARRIAV(SX)") || (intended_device_family == "arriav(sx)"))
+                                || (((intended_device_family == "Cyclone V") || (intended_device_family == "CYCLONE V") || (intended_device_family == "cyclone v") || (intended_device_family == "CycloneV") || (intended_device_family == "CYCLONEV") || (intended_device_family == "cyclonev") || (intended_device_family == "Cyclone V (GT/GX/E/SX)") || (intended_device_family == "CYCLONE V (GT/GX/E/SX)") || (intended_device_family == "cyclone v (gt/gx/e/sx)") || (intended_device_family == "CycloneV(GT/GX/E/SX)") || (intended_device_family == "CYCLONEV(GT/GX/E/SX)") || (intended_device_family == "cyclonev(gt/gx/e/sx)") || (intended_device_family == "Cyclone V (E/GX/GT/SX/SE/ST)") || (intended_device_family == "CYCLONE V (E/GX/GT/SX/SE/ST)") || (intended_device_family == "cyclone v (e/gx/gt/sx/se/st)") || (intended_device_family == "CycloneV(E/GX/GT/SX/SE/ST)") || (intended_device_family == "CYCLONEV(E/GX/GT/SX/SE/ST)") || (intended_device_family == "cyclonev(e/gx/gt/sx/se/st)") || (intended_device_family == "Cyclone V (E)") || (intended_device_family == "CYCLONE V (E)") || (intended_device_family == "cyclone v (e)") || (intended_device_family == "CycloneV(E)") || (intended_device_family == "CYCLONEV(E)") || (intended_device_family == "cyclonev(e)") || (intended_device_family == "Cyclone V (GX)") || (intended_device_family == "CYCLONE V (GX)") || (intended_device_family == "cyclone v (gx)") || (intended_device_family == "CycloneV(GX)") || (intended_device_family == "CYCLONEV(GX)") || (intended_device_family == "cyclonev(gx)") || (intended_device_family == "Cyclone V (GT)") || (intended_device_family == "CYCLONE V (GT)") || (intended_device_family == "cyclone v (gt)") || (intended_device_family == "CycloneV(GT)") || (intended_device_family == "CYCLONEV(GT)") || (intended_device_family == "cyclonev(gt)") || (intended_device_family == "Cyclone V (SX)") || (intended_device_family == "CYCLONE V (SX)") || (intended_device_family == "cyclone v (sx)") || (intended_device_family == "CycloneV(SX)") || (intended_device_family == "CYCLONEV(SX)") || (intended_device_family == "cyclonev(sx)") || (intended_device_family == "Cyclone V (SE)") || (intended_device_family == "CYCLONE V (SE)") || (intended_device_family == "cyclone v (se)") || (intended_device_family == "CycloneV(SE)") || (intended_device_family == "CYCLONEV(SE)") || (intended_device_family == "cyclonev(se)") || (intended_device_family == "Cyclone V (ST)") || (intended_device_family == "CYCLONE V (ST)") || (intended_device_family == "cyclone v (st)") || (intended_device_family == "CycloneV(ST)") || (intended_device_family == "CYCLONEV(ST)") || (intended_device_family == "cyclonev(st)"))
+                                ) ) || (((intended_device_family == "Arria II GZ") || (intended_device_family == "ARRIA II GZ") || (intended_device_family == "arria ii gz") || (intended_device_family == "ArriaII GZ") || (intended_device_family == "ARRIAII GZ") || (intended_device_family == "arriaii gz") || (intended_device_family == "Arria IIGZ") || (intended_device_family == "ARRIA IIGZ") || (intended_device_family == "arria iigz") || (intended_device_family == "ArriaIIGZ") || (intended_device_family == "ARRIAIIGZ") || (intended_device_family == "arriaiigz"))
+                                ) || (((intended_device_family == "Arria 10") || (intended_device_family == "ARRIA 10") || (intended_device_family == "arria 10") || (intended_device_family == "Arria10") || (intended_device_family == "ARRIA10") || (intended_device_family == "arria10") || (intended_device_family == "Arria VI") || (intended_device_family == "ARRIA VI") || (intended_device_family == "arria vi") || (intended_device_family == "ArriaVI") || (intended_device_family == "ARRIAVI") || (intended_device_family == "arriavi") || (intended_device_family == "Night Fury") || (intended_device_family == "NIGHT FURY") || (intended_device_family == "night fury") || (intended_device_family == "nightfury") || (intended_device_family == "NIGHTFURY") || (intended_device_family == "Arria 10 (GX/SX/GT)") || (intended_device_family == "ARRIA 10 (GX/SX/GT)") || (intended_device_family == "arria 10 (gx/sx/gt)") || (intended_device_family == "Arria10(GX/SX/GT)") || (intended_device_family == "ARRIA10(GX/SX/GT)") || (intended_device_family == "arria10(gx/sx/gt)") || (intended_device_family == "Arria 10 (GX)") || (intended_device_family == "ARRIA 10 (GX)") || (intended_device_family == "arria 10 (gx)") || (intended_device_family == "Arria10(GX)") || (intended_device_family == "ARRIA10(GX)") || (intended_device_family == "arria10(gx)") || (intended_device_family == "Arria 10 (SX)") || (intended_device_family == "ARRIA 10 (SX)") || (intended_device_family == "arria 10 (sx)") || (intended_device_family == "Arria10(SX)") || (intended_device_family == "ARRIA10(SX)") || (intended_device_family == "arria10(sx)") || (intended_device_family == "Arria 10 (GT)") || (intended_device_family == "ARRIA 10 (GT)") || (intended_device_family == "arria 10 (gt)") || (intended_device_family == "Arria10(GT)") || (intended_device_family == "ARRIA10(GT)") || (intended_device_family == "arria10(gt)"))
+                                || ((intended_device_family == "Arria 10") || (intended_device_family == "ARRIA 10") || (intended_device_family == "arria 10") || (intended_device_family == "Arria10") || (intended_device_family == "ARRIA10") || (intended_device_family == "arria10") || (intended_device_family == "Arria VI") || (intended_device_family == "ARRIA VI") || (intended_device_family == "arria vi") || (intended_device_family == "ArriaVI") || (intended_device_family == "ARRIAVI") || (intended_device_family == "arriavi") || (intended_device_family == "Night Fury") || (intended_device_family == "NIGHT FURY") || (intended_device_family == "night fury") || (intended_device_family == "nightfury") || (intended_device_family == "NIGHTFURY") || (intended_device_family == "Arria 10 (GX/SX/GT)") || (intended_device_family == "ARRIA 10 (GX/SX/GT)") || (intended_device_family == "arria 10 (gx/sx/gt)") || (intended_device_family == "Arria10(GX/SX/GT)") || (intended_device_family == "ARRIA10(GX/SX/GT)") || (intended_device_family == "arria10(gx/sx/gt)") || (intended_device_family == "Arria 10 (GX)") || (intended_device_family == "ARRIA 10 (GX)") || (intended_device_family == "arria 10 (gx)") || (intended_device_family == "Arria10(GX)") || (intended_device_family == "ARRIA10(GX)") || (intended_device_family == "arria10(gx)") || (intended_device_family == "Arria 10 (SX)") || (intended_device_family == "ARRIA 10 (SX)") || (intended_device_family == "arria 10 (sx)") || (intended_device_family == "Arria10(SX)") || (intended_device_family == "ARRIA10(SX)") || (intended_device_family == "arria10(sx)") || (intended_device_family == "Arria 10 (GT)") || (intended_device_family == "ARRIA 10 (GT)") || (intended_device_family == "arria 10 (gt)") || (intended_device_family == "Arria10(GT)") || (intended_device_family == "ARRIA10(GT)") || (intended_device_family == "arria10(gt)"))
+                                ) || (((intended_device_family == "Cyclone 10 GX") || (intended_device_family == "CYCLONE 10 GX") || (intended_device_family == "cyclone 10 gx") || (intended_device_family == "Cyclone10GX") || (intended_device_family == "CYCLONE10GX") || (intended_device_family == "cyclone10gx"))
+                                || ((intended_device_family == "Cyclone 10 GX") || (intended_device_family == "CYCLONE 10 GX") || (intended_device_family == "cyclone 10 gx") || (intended_device_family == "Cyclone10GX") || (intended_device_family == "CYCLONE10GX") || (intended_device_family == "cyclone10gx"))
+                                ) || (((intended_device_family == "Stratix 10") || (intended_device_family == "STRATIX 10") || (intended_device_family == "stratix 10") || (intended_device_family == "Stratix10") || (intended_device_family == "STRATIX10") || (intended_device_family == "stratix10") || (intended_device_family == "nadder") || (intended_device_family == "NADDER") || (intended_device_family == "Stratix 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "stratix 10 (gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix10(GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX10(GX/SX/MX/TX/DX)") || (intended_device_family == "stratix10(gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix 10 (GX)") || (intended_device_family == "STRATIX 10 (GX)") || (intended_device_family == "stratix 10 (gx)") || (intended_device_family == "Stratix10(GX)") || (intended_device_family == "STRATIX10(GX)") || (intended_device_family == "stratix10(gx)") || (intended_device_family == "Stratix 10 (SX)") || (intended_device_family == "STRATIX 10 (SX)") || (intended_device_family == "stratix 10 (sx)") || (intended_device_family == "Stratix10(SX)") || (intended_device_family == "STRATIX10(SX)") || (intended_device_family == "stratix10(sx)") || (intended_device_family == "Stratix 10 (MX)") || (intended_device_family == "STRATIX 10 (MX)") || (intended_device_family == "stratix 10 (mx)") || (intended_device_family == "Stratix10(MX)") || (intended_device_family == "STRATIX10(MX)") || (intended_device_family == "stratix10(mx)") || (intended_device_family == "Stratix 10 (TX)") || (intended_device_family == "STRATIX 10 (TX)") || (intended_device_family == "stratix 10 (tx)") || (intended_device_family == "Stratix10(TX)") || (intended_device_family == "STRATIX10(TX)") || (intended_device_family == "stratix10(tx)") || (intended_device_family == "Stratix 10 (DX)") || (intended_device_family == "STRATIX 10 (DX)") || (intended_device_family == "stratix 10 (dx)") || (intended_device_family == "Stratix10(DX)") || (intended_device_family == "STRATIX10(DX)") || (intended_device_family == "stratix10(dx)"))
+                                || ((intended_device_family == "Stratix 10") || (intended_device_family == "STRATIX 10") || (intended_device_family == "stratix 10") || (intended_device_family == "Stratix10") || (intended_device_family == "STRATIX10") || (intended_device_family == "stratix10") || (intended_device_family == "nadder") || (intended_device_family == "NADDER") || (intended_device_family == "Stratix 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "stratix 10 (gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix10(GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX10(GX/SX/MX/TX/DX)") || (intended_device_family == "stratix10(gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix 10 (GX)") || (intended_device_family == "STRATIX 10 (GX)") || (intended_device_family == "stratix 10 (gx)") || (intended_device_family == "Stratix10(GX)") || (intended_device_family == "STRATIX10(GX)") || (intended_device_family == "stratix10(gx)") || (intended_device_family == "Stratix 10 (SX)") || (intended_device_family == "STRATIX 10 (SX)") || (intended_device_family == "stratix 10 (sx)") || (intended_device_family == "Stratix10(SX)") || (intended_device_family == "STRATIX10(SX)") || (intended_device_family == "stratix10(sx)") || (intended_device_family == "Stratix 10 (MX)") || (intended_device_family == "STRATIX 10 (MX)") || (intended_device_family == "stratix 10 (mx)") || (intended_device_family == "Stratix10(MX)") || (intended_device_family == "STRATIX10(MX)") || (intended_device_family == "stratix10(mx)") || (intended_device_family == "Stratix 10 (TX)") || (intended_device_family == "STRATIX 10 (TX)") || (intended_device_family == "stratix 10 (tx)") || (intended_device_family == "Stratix10(TX)") || (intended_device_family == "STRATIX10(TX)") || (intended_device_family == "stratix10(tx)") || (intended_device_family == "Stratix 10 (DX)") || (intended_device_family == "STRATIX 10 (DX)") || (intended_device_family == "stratix 10 (dx)") || (intended_device_family == "Stratix10(DX)") || (intended_device_family == "STRATIX10(DX)") || (intended_device_family == "stratix10(dx)"))
+                                ) || (((intended_device_family == "Agilex") || (intended_device_family == "AGILEX") || (intended_device_family == "agilex") || (intended_device_family == "AGILEX") || (intended_device_family == "agilex") || (intended_device_family == "Falcon Mesa") || (intended_device_family == "FALCON MESA") || (intended_device_family == "falcon mesa") || (intended_device_family == "FALCONMESA") || (intended_device_family == "falconmesa") || (intended_device_family == "falconmesa") || (intended_device_family == "FALCONMESA") || (intended_device_family == "Stratix 20") || (intended_device_family == "STRATIX 20") || (intended_device_family == "stratix 20") || (intended_device_family == "Stratix20") || (intended_device_family == "STRATIX20") || (intended_device_family == "stratix20") || (intended_device_family == "stratix 20") || (intended_device_family == "STRATIX 20") || (intended_device_family == "stratix20") || (intended_device_family == "STRATIX20") || (intended_device_family == "STRATIX 20") || (intended_device_family == "stratix 20") || (intended_device_family == "STRATIX20") || (intended_device_family == "stratix20") || (intended_device_family == "Agilex (F-Series/I-Series)") || (intended_device_family == "AGILEX (F-SERIES/I-SERIES)") || (intended_device_family == "agilex (f-series/i-series)") || (intended_device_family == "Agilex(F-Series/I-Series)") || (intended_device_family == "AGILEX(F-SERIES/I-SERIES)") || (intended_device_family == "agilex(f-series/i-series)") || (intended_device_family == "Agilex (F-Series)") || (intended_device_family == "AGILEX (F-SERIES)") || (intended_device_family == "agilex (f-series)") || (intended_device_family == "Agilex(F-Series)") || (intended_device_family == "AGILEX(F-SERIES)") || (intended_device_family == "agilex(f-series)") || (intended_device_family == "Agilex (I-Series)") || (intended_device_family == "AGILEX (I-SERIES)") || (intended_device_family == "agilex (i-series)") || (intended_device_family == "Agilex(I-Series)") || (intended_device_family == "AGILEX(I-SERIES)") || (intended_device_family == "agilex(i-series)"))
                                 ) ) || ((intended_device_family == "HardCopy III") || (intended_device_family == "HARDCOPY III") || (intended_device_family == "hardcopy iii") || (intended_device_family == "HardCopyIII") || (intended_device_family == "HARDCOPYIII") || (intended_device_family == "hardcopyiii") || (intended_device_family == "HCX") || (intended_device_family == "hcx"))
                                 ))
                                 ? 1 : 0;
@@ -23688,8 +24022,9 @@ module altlvds_rx (
                                 ? 1 : 0;
                                 
     // A Stratix V type of LVDS?
-    parameter STRATIXV_RX_STYLE = ((((intended_device_family == "Stratix V") || (intended_device_family == "STRATIX V") || (intended_device_family == "stratix v") || (intended_device_family == "StratixV") || (intended_device_family == "STRATIXV") || (intended_device_family == "stratixv") || (intended_device_family == "Stratix V (GS)") || (intended_device_family == "STRATIX V (GS)") || (intended_device_family == "stratix v (gs)") || (intended_device_family == "StratixV(GS)") || (intended_device_family == "STRATIXV(GS)") || (intended_device_family == "stratixv(gs)") || (intended_device_family == "Stratix V (GT)") || (intended_device_family == "STRATIX V (GT)") || (intended_device_family == "stratix v (gt)") || (intended_device_family == "StratixV(GT)") || (intended_device_family == "STRATIXV(GT)") || (intended_device_family == "stratixv(gt)") || (intended_device_family == "Stratix V (GX)") || (intended_device_family == "STRATIX V (GX)") || (intended_device_family == "stratix v (gx)") || (intended_device_family == "StratixV(GX)") || (intended_device_family == "STRATIXV(GX)") || (intended_device_family == "stratixv(gx)") || (intended_device_family == "Stratix V (GS/GX)") || (intended_device_family == "STRATIX V (GS/GX)") || (intended_device_family == "stratix v (gs/gx)") || (intended_device_family == "StratixV(GS/GX)") || (intended_device_family == "STRATIXV(GS/GX)") || (intended_device_family == "stratixv(gs/gx)") || (intended_device_family == "Stratix V (GS/GT)") || (intended_device_family == "STRATIX V (GS/GT)") || (intended_device_family == "stratix v (gs/gt)") || (intended_device_family == "StratixV(GS/GT)") || (intended_device_family == "STRATIXV(GS/GT)") || (intended_device_family == "stratixv(gs/gt)") || (intended_device_family == "Stratix V (GT/GX)") || (intended_device_family == "STRATIX V (GT/GX)") || (intended_device_family == "stratix v (gt/gx)") || (intended_device_family == "StratixV(GT/GX)") || (intended_device_family == "STRATIXV(GT/GX)") || (intended_device_family == "stratixv(gt/gx)") || (intended_device_family == "Stratix V (GX/GS)") || (intended_device_family == "STRATIX V (GX/GS)") || (intended_device_family == "stratix v (gx/gs)") || (intended_device_family == "StratixV(GX/GS)") || (intended_device_family == "STRATIXV(GX/GS)") || (intended_device_family == "stratixv(gx/gs)") || (intended_device_family == "Stratix V (GT/GS)") || (intended_device_family == "STRATIX V (GT/GS)") || (intended_device_family == "stratix v (gt/gs)") || (intended_device_family == "StratixV(GT/GS)") || (intended_device_family == "STRATIXV(GT/GS)") || (intended_device_family == "stratixv(gt/gs)") || (intended_device_family == "Stratix V (GX/GT)") || (intended_device_family == "STRATIX V (GX/GT)") || (intended_device_family == "stratix v (gx/gt)") || (intended_device_family == "StratixV(GX/GT)") || (intended_device_family == "STRATIXV(GX/GT)") || (intended_device_family == "stratixv(gx/gt)") || (intended_device_family == "Stratix V (GS/GT/GX)") || (intended_device_family == "STRATIX V (GS/GT/GX)") || (intended_device_family == "stratix v (gs/gt/gx)") || (intended_device_family == "Stratix V (GS/GX/GT)") || (intended_device_family == "STRATIX V (GS/GX/GT)") || (intended_device_family == "stratix v (gs/gx/gt)") || (intended_device_family == "Stratix V (GT/GS/GX)") || (intended_device_family == "STRATIX V (GT/GS/GX)") || (intended_device_family == "stratix v (gt/gs/gx)") || (intended_device_family == "Stratix V (GT/GX/GS)") || (intended_device_family == "STRATIX V (GT/GX/GS)") || (intended_device_family == "stratix v (gt/gx/gs)") || (intended_device_family == "Stratix V (GX/GS/GT)") || (intended_device_family == "STRATIX V (GX/GS/GT)") || (intended_device_family == "stratix v (gx/gs/gt)") || (intended_device_family == "Stratix V (GX/GT/GS)") || (intended_device_family == "STRATIX V (GX/GT/GS)") || (intended_device_family == "stratix v (gx/gt/gs)") || (intended_device_family == "StratixV(GS/GT/GX)") || (intended_device_family == "STRATIXV(GS/GT/GX)") || (intended_device_family == "stratixv(gs/gt/gx)") || (intended_device_family == "StratixV(GS/GX/GT)") || (intended_device_family == "STRATIXV(GS/GX/GT)") || (intended_device_family == "stratixv(gs/gx/gt)") || (intended_device_family == "StratixV(GT/GS/GX)") || (intended_device_family == "STRATIXV(GT/GS/GX)") || (intended_device_family == "stratixv(gt/gs/gx)") || (intended_device_family == "StratixV(GT/GX/GS)") || (intended_device_family == "STRATIXV(GT/GX/GS)") || (intended_device_family == "stratixv(gt/gx/gs)") || (intended_device_family == "StratixV(GX/GS/GT)") || (intended_device_family == "STRATIXV(GX/GS/GT)") || (intended_device_family == "stratixv(gx/gs/gt)") || (intended_device_family == "StratixV(GX/GT/GS)") || (intended_device_family == "STRATIXV(GX/GT/GS)") || (intended_device_family == "stratixv(gx/gt/gs)"))
-                                ))
+    parameter STRATIXV_RX_STYLE = ((((intended_device_family == "Stratix V") || (intended_device_family == "STRATIX V") || (intended_device_family == "stratix v") || (intended_device_family == "StratixV") || (intended_device_family == "STRATIXV") || (intended_device_family == "stratixv") || (intended_device_family == "Stratix V (GS)") || (intended_device_family == "STRATIX V (GS)") || (intended_device_family == "stratix v (gs)") || (intended_device_family == "StratixV(GS)") || (intended_device_family == "STRATIXV(GS)") || (intended_device_family == "stratixv(gs)") || (intended_device_family == "Stratix V (GT)") || (intended_device_family == "STRATIX V (GT)") || (intended_device_family == "stratix v (gt)") || (intended_device_family == "StratixV(GT)") || (intended_device_family == "STRATIXV(GT)") || (intended_device_family == "stratixv(gt)") || (intended_device_family == "Stratix V (GX)") || (intended_device_family == "STRATIX V (GX)") || (intended_device_family == "stratix v (gx)") || (intended_device_family == "StratixV(GX)") || (intended_device_family == "STRATIXV(GX)") || (intended_device_family == "stratixv(gx)") || (intended_device_family == "Stratix V (GS/GX)") || (intended_device_family == "STRATIX V (GS/GX)") || (intended_device_family == "stratix v (gs/gx)") || (intended_device_family == "StratixV(GS/GX)") || (intended_device_family == "STRATIXV(GS/GX)") || (intended_device_family == "stratixv(gs/gx)") || (intended_device_family == "Stratix V (GS/GT)") || (intended_device_family == "STRATIX V (GS/GT)") || (intended_device_family == "stratix v (gs/gt)") || (intended_device_family == "StratixV(GS/GT)") || (intended_device_family == "STRATIXV(GS/GT)") || (intended_device_family == "stratixv(gs/gt)") || (intended_device_family == "Stratix V (GT/GX)") || (intended_device_family == "STRATIX V (GT/GX)") || (intended_device_family == "stratix v (gt/gx)") || (intended_device_family == "StratixV(GT/GX)") || (intended_device_family == "STRATIXV(GT/GX)") || (intended_device_family == "stratixv(gt/gx)") || (intended_device_family == "Stratix V (GX/GS)") || (intended_device_family == "STRATIX V (GX/GS)") || (intended_device_family == "stratix v (gx/gs)") || (intended_device_family == "StratixV(GX/GS)") || (intended_device_family == "STRATIXV(GX/GS)") || (intended_device_family == "stratixv(gx/gs)") || (intended_device_family == "Stratix V (GT/GS)") || (intended_device_family == "STRATIX V (GT/GS)") || (intended_device_family == "stratix v (gt/gs)") || (intended_device_family == "StratixV(GT/GS)") || (intended_device_family == "STRATIXV(GT/GS)") || (intended_device_family == "stratixv(gt/gs)") || (intended_device_family == "Stratix V (GX/GT)") || (intended_device_family == "STRATIX V (GX/GT)") || (intended_device_family == "stratix v (gx/gt)") || (intended_device_family == "StratixV(GX/GT)") || (intended_device_family == "STRATIXV(GX/GT)") || (intended_device_family == "stratixv(gx/gt)") || (intended_device_family == "Stratix V (GS/GT/GX)") || (intended_device_family == "STRATIX V (GS/GT/GX)") || (intended_device_family == "stratix v (gs/gt/gx)") || (intended_device_family == "Stratix V (GS/GX/GT)") || (intended_device_family == "STRATIX V (GS/GX/GT)") || (intended_device_family == "stratix v (gs/gx/gt)") || (intended_device_family == "Stratix V (GT/GS/GX)") || (intended_device_family == "STRATIX V (GT/GS/GX)") || (intended_device_family == "stratix v (gt/gs/gx)") || (intended_device_family == "Stratix V (GT/GX/GS)") || (intended_device_family == "STRATIX V (GT/GX/GS)") || (intended_device_family == "stratix v (gt/gx/gs)") || (intended_device_family == "Stratix V (GX/GS/GT)") || (intended_device_family == "STRATIX V (GX/GS/GT)") || (intended_device_family == "stratix v (gx/gs/gt)") || (intended_device_family == "Stratix V (GX/GT/GS)") || (intended_device_family == "STRATIX V (GX/GT/GS)") || (intended_device_family == "stratix v (gx/gt/gs)") || (intended_device_family == "StratixV(GS/GT/GX)") || (intended_device_family == "STRATIXV(GS/GT/GX)") || (intended_device_family == "stratixv(gs/gt/gx)") || (intended_device_family == "StratixV(GS/GX/GT)") || (intended_device_family == "STRATIXV(GS/GX/GT)") || (intended_device_family == "stratixv(gs/gx/gt)") || (intended_device_family == "StratixV(GT/GS/GX)") || (intended_device_family == "STRATIXV(GT/GS/GX)") || (intended_device_family == "stratixv(gt/gs/gx)") || (intended_device_family == "StratixV(GT/GX/GS)") || (intended_device_family == "STRATIXV(GT/GX/GS)") || (intended_device_family == "stratixv(gt/gx/gs)") || (intended_device_family == "StratixV(GX/GS/GT)") || (intended_device_family == "STRATIXV(GX/GS/GT)") || (intended_device_family == "stratixv(gx/gs/gt)") || (intended_device_family == "StratixV(GX/GT/GS)") || (intended_device_family == "STRATIXV(GX/GT/GS)") || (intended_device_family == "stratixv(gx/gt/gs)") || (intended_device_family == "Stratix V (GS/GT/GX/E)") || (intended_device_family == "STRATIX V (GS/GT/GX/E)") || (intended_device_family == "stratix v (gs/gt/gx/e)") || (intended_device_family == "StratixV(GS/GT/GX/E)") || (intended_device_family == "STRATIXV(GS/GT/GX/E)") || (intended_device_family == "stratixv(gs/gt/gx/e)") || (intended_device_family == "Stratix V (E)") || (intended_device_family == "STRATIX V (E)") || (intended_device_family == "stratix v (e)") || (intended_device_family == "StratixV(E)") || (intended_device_family == "STRATIXV(E)") || (intended_device_family == "stratixv(e)"))
+                                || (((intended_device_family == "Arria V GZ") || (intended_device_family == "ARRIA V GZ") || (intended_device_family == "arria v gz") || (intended_device_family == "ArriaVGZ") || (intended_device_family == "ARRIAVGZ") || (intended_device_family == "arriavgz"))
+                                ) ))
                                 ? 1 : 0;
 // cycloneiii_msg
     // A Cyclone III type of LVDS?
@@ -23697,6 +24032,7 @@ module altlvds_rx (
                                 || ((intended_device_family == "Cyclone III LS") || (intended_device_family == "CYCLONE III LS") || (intended_device_family == "cyclone iii ls") || (intended_device_family == "CycloneIIILS") || (intended_device_family == "CYCLONEIIILS") || (intended_device_family == "cycloneiiils") || (intended_device_family == "Cyclone III LPS") || (intended_device_family == "CYCLONE III LPS") || (intended_device_family == "cyclone iii lps") || (intended_device_family == "Cyclone LPS") || (intended_device_family == "CYCLONE LPS") || (intended_device_family == "cyclone lps") || (intended_device_family == "CycloneLPS") || (intended_device_family == "CYCLONELPS") || (intended_device_family == "cyclonelps") || (intended_device_family == "Tarpon") || (intended_device_family == "TARPON") || (intended_device_family == "tarpon") || (intended_device_family == "Cyclone IIIE") || (intended_device_family == "CYCLONE IIIE") || (intended_device_family == "cyclone iiie"))
                                 || ((intended_device_family == "Cyclone IV GX") || (intended_device_family == "CYCLONE IV GX") || (intended_device_family == "cyclone iv gx") || (intended_device_family == "Cyclone IVGX") || (intended_device_family == "CYCLONE IVGX") || (intended_device_family == "cyclone ivgx") || (intended_device_family == "CycloneIV GX") || (intended_device_family == "CYCLONEIV GX") || (intended_device_family == "cycloneiv gx") || (intended_device_family == "CycloneIVGX") || (intended_device_family == "CYCLONEIVGX") || (intended_device_family == "cycloneivgx") || (intended_device_family == "Cyclone IV") || (intended_device_family == "CYCLONE IV") || (intended_device_family == "cyclone iv") || (intended_device_family == "CycloneIV") || (intended_device_family == "CYCLONEIV") || (intended_device_family == "cycloneiv") || (intended_device_family == "Cyclone IV (GX)") || (intended_device_family == "CYCLONE IV (GX)") || (intended_device_family == "cyclone iv (gx)") || (intended_device_family == "CycloneIV(GX)") || (intended_device_family == "CYCLONEIV(GX)") || (intended_device_family == "cycloneiv(gx)") || (intended_device_family == "Cyclone III GX") || (intended_device_family == "CYCLONE III GX") || (intended_device_family == "cyclone iii gx") || (intended_device_family == "CycloneIII GX") || (intended_device_family == "CYCLONEIII GX") || (intended_device_family == "cycloneiii gx") || (intended_device_family == "Cyclone IIIGX") || (intended_device_family == "CYCLONE IIIGX") || (intended_device_family == "cyclone iiigx") || (intended_device_family == "CycloneIIIGX") || (intended_device_family == "CYCLONEIIIGX") || (intended_device_family == "cycloneiiigx") || (intended_device_family == "Cyclone III GL") || (intended_device_family == "CYCLONE III GL") || (intended_device_family == "cyclone iii gl") || (intended_device_family == "CycloneIII GL") || (intended_device_family == "CYCLONEIII GL") || (intended_device_family == "cycloneiii gl") || (intended_device_family == "Cyclone IIIGL") || (intended_device_family == "CYCLONE IIIGL") || (intended_device_family == "cyclone iiigl") || (intended_device_family == "CycloneIIIGL") || (intended_device_family == "CYCLONEIIIGL") || (intended_device_family == "cycloneiiigl") || (intended_device_family == "Stingray") || (intended_device_family == "STINGRAY") || (intended_device_family == "stingray"))
                                 || (((intended_device_family == "Cyclone IV E") || (intended_device_family == "CYCLONE IV E") || (intended_device_family == "cyclone iv e") || (intended_device_family == "CycloneIV E") || (intended_device_family == "CYCLONEIV E") || (intended_device_family == "cycloneiv e") || (intended_device_family == "Cyclone IVE") || (intended_device_family == "CYCLONE IVE") || (intended_device_family == "cyclone ive") || (intended_device_family == "CycloneIVE") || (intended_device_family == "CYCLONEIVE") || (intended_device_family == "cycloneive"))
+                                ) || (((intended_device_family == "MAX 10") || (intended_device_family == "max 10") || (intended_device_family == "MAX 10 FPGA") || (intended_device_family == "max 10 fpga") || (intended_device_family == "Zippleback") || (intended_device_family == "ZIPPLEBACK") || (intended_device_family == "zippleback") || (intended_device_family == "MAX10") || (intended_device_family == "max10") || (intended_device_family == "MAX 10 (DA/DF/DC/SA/SC)") || (intended_device_family == "max 10 (da/df/dc/sa/sc)") || (intended_device_family == "MAX10(DA/DF/DC/SA/SC)") || (intended_device_family == "max10(da/df/dc/sa/sc)") || (intended_device_family == "MAX 10 (DA)") || (intended_device_family == "max 10 (da)") || (intended_device_family == "MAX10(DA)") || (intended_device_family == "max10(da)") || (intended_device_family == "MAX 10 (DF)") || (intended_device_family == "max 10 (df)") || (intended_device_family == "MAX10(DF)") || (intended_device_family == "max10(df)") || (intended_device_family == "MAX 10 (DC)") || (intended_device_family == "max 10 (dc)") || (intended_device_family == "MAX10(DC)") || (intended_device_family == "max10(dc)") || (intended_device_family == "MAX 10 (SA)") || (intended_device_family == "max 10 (sa)") || (intended_device_family == "MAX10(SA)") || (intended_device_family == "max10(sa)") || (intended_device_family == "MAX 10 (SC)") || (intended_device_family == "max 10 (sc)") || (intended_device_family == "MAX10(SC)") || (intended_device_family == "max10(sc)"))
                                 ) ))
                                 ? 1 : 0;
 // cycloneiii_msg
@@ -23743,6 +24079,14 @@ module altlvds_rx (
                                     : 1)
                                 : 1;
 
+
+    //28 NM families, to override the inclock_data_alignment parameter. 
+    parameter VSERIES_FAMILY = ((((intended_device_family == "Stratix V") || (intended_device_family == "STRATIX V") || (intended_device_family == "stratix v") || (intended_device_family == "StratixV") || (intended_device_family == "STRATIXV") || (intended_device_family == "stratixv") || (intended_device_family == "Stratix V (GS)") || (intended_device_family == "STRATIX V (GS)") || (intended_device_family == "stratix v (gs)") || (intended_device_family == "StratixV(GS)") || (intended_device_family == "STRATIXV(GS)") || (intended_device_family == "stratixv(gs)") || (intended_device_family == "Stratix V (GT)") || (intended_device_family == "STRATIX V (GT)") || (intended_device_family == "stratix v (gt)") || (intended_device_family == "StratixV(GT)") || (intended_device_family == "STRATIXV(GT)") || (intended_device_family == "stratixv(gt)") || (intended_device_family == "Stratix V (GX)") || (intended_device_family == "STRATIX V (GX)") || (intended_device_family == "stratix v (gx)") || (intended_device_family == "StratixV(GX)") || (intended_device_family == "STRATIXV(GX)") || (intended_device_family == "stratixv(gx)") || (intended_device_family == "Stratix V (GS/GX)") || (intended_device_family == "STRATIX V (GS/GX)") || (intended_device_family == "stratix v (gs/gx)") || (intended_device_family == "StratixV(GS/GX)") || (intended_device_family == "STRATIXV(GS/GX)") || (intended_device_family == "stratixv(gs/gx)") || (intended_device_family == "Stratix V (GS/GT)") || (intended_device_family == "STRATIX V (GS/GT)") || (intended_device_family == "stratix v (gs/gt)") || (intended_device_family == "StratixV(GS/GT)") || (intended_device_family == "STRATIXV(GS/GT)") || (intended_device_family == "stratixv(gs/gt)") || (intended_device_family == "Stratix V (GT/GX)") || (intended_device_family == "STRATIX V (GT/GX)") || (intended_device_family == "stratix v (gt/gx)") || (intended_device_family == "StratixV(GT/GX)") || (intended_device_family == "STRATIXV(GT/GX)") || (intended_device_family == "stratixv(gt/gx)") || (intended_device_family == "Stratix V (GX/GS)") || (intended_device_family == "STRATIX V (GX/GS)") || (intended_device_family == "stratix v (gx/gs)") || (intended_device_family == "StratixV(GX/GS)") || (intended_device_family == "STRATIXV(GX/GS)") || (intended_device_family == "stratixv(gx/gs)") || (intended_device_family == "Stratix V (GT/GS)") || (intended_device_family == "STRATIX V (GT/GS)") || (intended_device_family == "stratix v (gt/gs)") || (intended_device_family == "StratixV(GT/GS)") || (intended_device_family == "STRATIXV(GT/GS)") || (intended_device_family == "stratixv(gt/gs)") || (intended_device_family == "Stratix V (GX/GT)") || (intended_device_family == "STRATIX V (GX/GT)") || (intended_device_family == "stratix v (gx/gt)") || (intended_device_family == "StratixV(GX/GT)") || (intended_device_family == "STRATIXV(GX/GT)") || (intended_device_family == "stratixv(gx/gt)") || (intended_device_family == "Stratix V (GS/GT/GX)") || (intended_device_family == "STRATIX V (GS/GT/GX)") || (intended_device_family == "stratix v (gs/gt/gx)") || (intended_device_family == "Stratix V (GS/GX/GT)") || (intended_device_family == "STRATIX V (GS/GX/GT)") || (intended_device_family == "stratix v (gs/gx/gt)") || (intended_device_family == "Stratix V (GT/GS/GX)") || (intended_device_family == "STRATIX V (GT/GS/GX)") || (intended_device_family == "stratix v (gt/gs/gx)") || (intended_device_family == "Stratix V (GT/GX/GS)") || (intended_device_family == "STRATIX V (GT/GX/GS)") || (intended_device_family == "stratix v (gt/gx/gs)") || (intended_device_family == "Stratix V (GX/GS/GT)") || (intended_device_family == "STRATIX V (GX/GS/GT)") || (intended_device_family == "stratix v (gx/gs/gt)") || (intended_device_family == "Stratix V (GX/GT/GS)") || (intended_device_family == "STRATIX V (GX/GT/GS)") || (intended_device_family == "stratix v (gx/gt/gs)") || (intended_device_family == "StratixV(GS/GT/GX)") || (intended_device_family == "STRATIXV(GS/GT/GX)") || (intended_device_family == "stratixv(gs/gt/gx)") || (intended_device_family == "StratixV(GS/GX/GT)") || (intended_device_family == "STRATIXV(GS/GX/GT)") || (intended_device_family == "stratixv(gs/gx/gt)") || (intended_device_family == "StratixV(GT/GS/GX)") || (intended_device_family == "STRATIXV(GT/GS/GX)") || (intended_device_family == "stratixv(gt/gs/gx)") || (intended_device_family == "StratixV(GT/GX/GS)") || (intended_device_family == "STRATIXV(GT/GX/GS)") || (intended_device_family == "stratixv(gt/gx/gs)") || (intended_device_family == "StratixV(GX/GS/GT)") || (intended_device_family == "STRATIXV(GX/GS/GT)") || (intended_device_family == "stratixv(gx/gs/gt)") || (intended_device_family == "StratixV(GX/GT/GS)") || (intended_device_family == "STRATIXV(GX/GT/GS)") || (intended_device_family == "stratixv(gx/gt/gs)") || (intended_device_family == "Stratix V (GS/GT/GX/E)") || (intended_device_family == "STRATIX V (GS/GT/GX/E)") || (intended_device_family == "stratix v (gs/gt/gx/e)") || (intended_device_family == "StratixV(GS/GT/GX/E)") || (intended_device_family == "STRATIXV(GS/GT/GX/E)") || (intended_device_family == "stratixv(gs/gt/gx/e)") || (intended_device_family == "Stratix V (E)") || (intended_device_family == "STRATIX V (E)") || (intended_device_family == "stratix v (e)") || (intended_device_family == "StratixV(E)") || (intended_device_family == "STRATIXV(E)") || (intended_device_family == "stratixv(e)"))
+                                || (((intended_device_family == "Arria V GZ") || (intended_device_family == "ARRIA V GZ") || (intended_device_family == "arria v gz") || (intended_device_family == "ArriaVGZ") || (intended_device_family == "ARRIAVGZ") || (intended_device_family == "arriavgz"))
+                                ) ) || (((intended_device_family == "Arria V") || (intended_device_family == "ARRIA V") || (intended_device_family == "arria v") || (intended_device_family == "Arria V (GT/GX)") || (intended_device_family == "ARRIA V (GT/GX)") || (intended_device_family == "arria v (gt/gx)") || (intended_device_family == "ArriaV(GT/GX)") || (intended_device_family == "ARRIAV(GT/GX)") || (intended_device_family == "arriav(gt/gx)") || (intended_device_family == "ArriaV") || (intended_device_family == "ARRIAV") || (intended_device_family == "arriav") || (intended_device_family == "Arria V (GT/GX/ST/SX)") || (intended_device_family == "ARRIA V (GT/GX/ST/SX)") || (intended_device_family == "arria v (gt/gx/st/sx)") || (intended_device_family == "ArriaV(GT/GX/ST/SX)") || (intended_device_family == "ARRIAV(GT/GX/ST/SX)") || (intended_device_family == "arriav(gt/gx/st/sx)") || (intended_device_family == "Arria V (GT)") || (intended_device_family == "ARRIA V (GT)") || (intended_device_family == "arria v (gt)") || (intended_device_family == "ArriaV(GT)") || (intended_device_family == "ARRIAV(GT)") || (intended_device_family == "arriav(gt)") || (intended_device_family == "Arria V (GX)") || (intended_device_family == "ARRIA V (GX)") || (intended_device_family == "arria v (gx)") || (intended_device_family == "ArriaV(GX)") || (intended_device_family == "ARRIAV(GX)") || (intended_device_family == "arriav(gx)") || (intended_device_family == "Arria V (ST)") || (intended_device_family == "ARRIA V (ST)") || (intended_device_family == "arria v (st)") || (intended_device_family == "ArriaV(ST)") || (intended_device_family == "ARRIAV(ST)") || (intended_device_family == "arriav(st)") || (intended_device_family == "Arria V (SX)") || (intended_device_family == "ARRIA V (SX)") || (intended_device_family == "arria v (sx)") || (intended_device_family == "ArriaV(SX)") || (intended_device_family == "ARRIAV(SX)") || (intended_device_family == "arriav(sx)"))
+                                || (((intended_device_family == "Cyclone V") || (intended_device_family == "CYCLONE V") || (intended_device_family == "cyclone v") || (intended_device_family == "CycloneV") || (intended_device_family == "CYCLONEV") || (intended_device_family == "cyclonev") || (intended_device_family == "Cyclone V (GT/GX/E/SX)") || (intended_device_family == "CYCLONE V (GT/GX/E/SX)") || (intended_device_family == "cyclone v (gt/gx/e/sx)") || (intended_device_family == "CycloneV(GT/GX/E/SX)") || (intended_device_family == "CYCLONEV(GT/GX/E/SX)") || (intended_device_family == "cyclonev(gt/gx/e/sx)") || (intended_device_family == "Cyclone V (E/GX/GT/SX/SE/ST)") || (intended_device_family == "CYCLONE V (E/GX/GT/SX/SE/ST)") || (intended_device_family == "cyclone v (e/gx/gt/sx/se/st)") || (intended_device_family == "CycloneV(E/GX/GT/SX/SE/ST)") || (intended_device_family == "CYCLONEV(E/GX/GT/SX/SE/ST)") || (intended_device_family == "cyclonev(e/gx/gt/sx/se/st)") || (intended_device_family == "Cyclone V (E)") || (intended_device_family == "CYCLONE V (E)") || (intended_device_family == "cyclone v (e)") || (intended_device_family == "CycloneV(E)") || (intended_device_family == "CYCLONEV(E)") || (intended_device_family == "cyclonev(e)") || (intended_device_family == "Cyclone V (GX)") || (intended_device_family == "CYCLONE V (GX)") || (intended_device_family == "cyclone v (gx)") || (intended_device_family == "CycloneV(GX)") || (intended_device_family == "CYCLONEV(GX)") || (intended_device_family == "cyclonev(gx)") || (intended_device_family == "Cyclone V (GT)") || (intended_device_family == "CYCLONE V (GT)") || (intended_device_family == "cyclone v (gt)") || (intended_device_family == "CycloneV(GT)") || (intended_device_family == "CYCLONEV(GT)") || (intended_device_family == "cyclonev(gt)") || (intended_device_family == "Cyclone V (SX)") || (intended_device_family == "CYCLONE V (SX)") || (intended_device_family == "cyclone v (sx)") || (intended_device_family == "CycloneV(SX)") || (intended_device_family == "CYCLONEV(SX)") || (intended_device_family == "cyclonev(sx)") || (intended_device_family == "Cyclone V (SE)") || (intended_device_family == "CYCLONE V (SE)") || (intended_device_family == "cyclone v (se)") || (intended_device_family == "CycloneV(SE)") || (intended_device_family == "CYCLONEV(SE)") || (intended_device_family == "cyclonev(se)") || (intended_device_family == "Cyclone V (ST)") || (intended_device_family == "CYCLONE V (ST)") || (intended_device_family == "cyclone v (st)") || (intended_device_family == "CycloneV(ST)") || (intended_device_family == "CYCLONEV(ST)") || (intended_device_family == "cyclonev(st)"))
+                                ) )) ? 1 : 0;
+
     // calculate clock boost for STRATIX, STRATIX GX, STRATIX II and Stratix III
     parameter STRATIX_INCLOCK_BOOST = ((input_data_rate !=0) &&
                                         (inclock_period !=0))
@@ -23754,7 +24098,7 @@ module altlvds_rx (
     // phase_shift delay. Add 0.5 to the calculated result to round up result to
     // the nearest integer.
     parameter PHASE_SHIFT =
-                (inclock_data_alignment == "UNUSED")
+                (inclock_data_alignment == "UNUSED" || VSERIES_FAMILY)
                     ? inclock_phase_shift :
                 (inclock_data_alignment == "EDGE_ALIGNED")
                     ? 0 :
@@ -24409,6 +24753,7 @@ module altlvds_rx (
         u7.use_external_pll = use_external_pll,
         u7.registered_output = registered_output,
         u7.use_dpa_calibration = use_dpa_calibration,
+        u7.enable_clock_pin_mode = enable_clock_pin_mode,
         u7.ARRIAII_RX_STYLE = ARRIAII_RX_STYLE,
         u7.STRATIXV_RX_STYLE = STRATIXV_RX_STYLE;
     end
@@ -24637,17 +24982,17 @@ module altlvds_rx (
                             : 1'b0;
     assign stratixiii_fastclk = (STRATIXIII_RX_STYLE == 0) && (implement_in_les == "OFF")
                             ? 1'b0 :
-                        (use_external_pll == "ON")
+                        ((use_external_pll == "ON") || ((STRATIXV_RX_STYLE == 1) && (enable_clock_pin_mode == "ON")))
                             ? rx_inclock
                             : stratixiii_pll_outclock[0];
                             
-    assign stratixiii_slowclk = (STRATIXIII_RX_STYLE == 0) && (implement_in_les == "OFF")
+    assign stratixiii_slowclk = (((STRATIXIII_RX_STYLE == 0) && (implement_in_les == "OFF")) || ((STRATIXV_RX_STYLE == 1) && (enable_clock_pin_mode == "ON"))) 
                             ? 1'b0
                             : (use_external_pll == "ON")
                             ? rx_syncclock
                             : stratixiii_pll_outclock[2];
 
-    assign stratixiii_enable = (STRATIXIII_RX_STYLE == 0) && (implement_in_les == "OFF")
+    assign stratixiii_enable = (((STRATIXIII_RX_STYLE == 0) && (implement_in_les == "OFF")) || ((STRATIXV_RX_STYLE == 1) && (enable_clock_pin_mode == "ON")))
                             ? 1'b0 :
                         (use_external_pll == "ON")
                             ? rx_enable
@@ -25905,10 +26250,23 @@ module flexible_lvds_rx (
                         rx_shift_reg1[i * deserialization_factor] <= datain_h_reg[i];
                         rx_shift_reg1[(i * deserialization_factor)+1] <= datain_l_reg[i];
                     end
+
+                    else if (bitslip_count[i] == 1)
+                    begin
+                        rx_shift_reg1[i * deserialization_factor] <= datain_l_reg[i];
+                        rx_shift_reg1[(i * deserialization_factor)+1] <= h_int_reg[i*deserialization_factor];
+                    end
+
+                    else if (bitslip_count[i] % 2 ==0)
+                    begin
+                        rx_shift_reg1[i * deserialization_factor] <= h_int_reg[bitslip_count[i]/2 -1 + (i * deserialization_factor)];
+                        rx_shift_reg1[(i * deserialization_factor)+1] <= l_int_reg[bitslip_count[i]/2 -1 + (i * deserialization_factor)];
+                    end
+
                     else
                     begin
-                        rx_shift_reg1[i * deserialization_factor] <= h_int_reg[bitslip_count[i] -1 + (i * deserialization_factor)];
-                        rx_shift_reg1[(i * deserialization_factor)+1] <= l_int_reg[bitslip_count[i] -1 + (i * deserialization_factor)];
+                        rx_shift_reg1[i * deserialization_factor] <= l_int_reg[bitslip_count[i]/2 -1 + (i * deserialization_factor)];
+                        rx_shift_reg1[(i * deserialization_factor)+1] <= h_int_reg[bitslip_count[i]/2 + (i * deserialization_factor)];
                     end
 
                     rx_shift_reg2[i * deserialization_factor] <=  rx_shift_reg1[((i+1)* deserialization_factor)-2];
@@ -26078,6 +26436,7 @@ module stratixiii_lvds_rx (
     parameter registered_output = "ON";
     parameter use_external_pll = "OFF";
     parameter use_dpa_calibration = 0;
+    parameter enable_clock_pin_mode = "UNUSED";
     parameter ARRIAII_RX_STYLE = 0;
     parameter STRATIXV_RX_STYLE = 0;
 
@@ -26170,6 +26529,7 @@ module stratixiii_lvds_rx (
         chnl.use_external_pll = use_external_pll,
         chnl.registered_output = registered_output,
         chnl.use_dpa_calibration = use_dpa_calibration,
+        chnl.enable_clock_pin_mode = enable_clock_pin_mode,
         chnl.ARRIAII_RX_STYLE = ARRIAII_RX_STYLE,
         chnl.STRATIXV_RX_STYLE = STRATIXV_RX_STYLE;
     end
@@ -26257,6 +26617,8 @@ module stratixiii_lvds_rx_channel (
     parameter registered_output = "ON";
     parameter use_external_pll = "OFF";
     parameter use_dpa_calibration = 0;
+    parameter enable_clock_pin_mode = "UNUSED";
+
     parameter ARRIAII_RX_STYLE = 0;
 
 parameter STRATIXV_RX_STYLE = 0;
@@ -26354,6 +26716,8 @@ parameter STRATIXV_RX_STYLE = 0;
     wire fifo_reset_regr;
     wire rx_in_wire;
     wire rx_dpaclock_wire;
+    wire local_clk_div_lloaden;
+    wire local_loaden;
 
 // INTERNAL TRI DECLARATION
     tri0 rx_reset;
@@ -26440,6 +26804,21 @@ parameter STRATIXV_RX_STYLE = 0;
     end
     endgenerate
 
+
+    // This module produces lloaden clock from local clock divider.
+    generate
+    if ((STRATIXV_RX_STYLE == 1) && (enable_clock_pin_mode == "ON") && (deserialization_factor > 2)) 
+    begin: stratixv_local_clk_divider
+    stratixv_local_clk_divider rx_local_clk_divider (
+        .clkin(rx_fastclk),
+        .lloaden(local_clk_div_lloaden));
+
+    defparam
+        rx_local_clk_divider.clk_divide_by = deserialization_factor;
+    end
+    endgenerate
+
+
 // ALWAYS CONSTRUCT BLOCK
 
    
@@ -26502,9 +26881,9 @@ parameter STRATIXV_RX_STYLE = 0;
     end
 
     // add delta delay to rx_enable
-    always @ (rx_enable)
+    always @ (local_loaden)
     begin
-        rx_enable_dly <= rx_enable;
+        rx_enable_dly <= local_loaden;
     end
 
 
@@ -26791,6 +27170,7 @@ parameter STRATIXV_RX_STYLE = 0;
     assign fifo_reset_regr = ((use_dpa_calibration == 1) ?  (((~ lock_state_mc[0]) & lock_state_mc[1]) & (lock_out_regr ^ lock_out_reg_dly)) : (lock_out_regr ^ lock_out_reg_dly)) || reset_fifo || rx_fifo_reset;
     assign rx_in_wire = (use_dpa_calibration == 1) ? (dpaswitch == 1'b1) ? rx_in_int : rx_in : rx_in;
     assign rx_dpaclock_wire = (use_external_pll == "ON" && STRATIXV_RX_STYLE == 1'b1 && enable_dpa_mode == "ON") ? rx_dpaclock : rx_fastclk_dly3;
+    assign local_loaden = ((STRATIXV_RX_STYLE == 1) && (enable_clock_pin_mode == "ON")) ?  local_clk_div_lloaden : rx_enable;
 endmodule // stratixiii_lvds_rx_channel
 // END OF MODULE
 
@@ -27155,9 +27535,12 @@ module altlvds_tx (
     parameter use_no_phase_shift = "ON";
     parameter pll_self_reset_on_loss_lock = "OFF";
     parameter refclk_frequency = "UNUSED";
+
+parameter enable_clock_pin_mode = "UNUSED";
     parameter data_rate = "UNUSED";
     parameter lpm_type = "altlvds_tx";
     parameter lpm_hint = "UNUSED";
+    parameter pll_compensation_mode = "AUTO";
 
 // LOCAL_PARAMETERS_BEGIN
 
@@ -27184,7 +27567,7 @@ module altlvds_tx (
                                 ? 1 : 0;
 
     // A Cyclone II type of LVDS?
-    parameter CYCLONEII_TX_STYLE = ((((intended_device_family == "Cyclone II") || (intended_device_family == "CYCLONE II") || (intended_device_family == "cyclone ii") || (intended_device_family == "Cycloneii") || (intended_device_family == "CYCLONEII") || (intended_device_family == "cycloneii") || (intended_device_family == "Magellan") || (intended_device_family == "MAGELLAN") || (intended_device_family == "magellan"))
+    parameter CYCLONEII_TX_STYLE = ((((intended_device_family == "Cyclone II") || (intended_device_family == "CYCLONE II") || (intended_device_family == "cyclone ii") || (intended_device_family == "Cycloneii") || (intended_device_family == "CYCLONEII") || (intended_device_family == "cycloneii") || (intended_device_family == "Magellan") || (intended_device_family == "MAGELLAN") || (intended_device_family == "magellan") || (intended_device_family == "CycloneII") || (intended_device_family == "CYCLONEII") || (intended_device_family == "cycloneii"))
                                 ))
                                 ? 1 : 0;
 
@@ -27192,10 +27575,20 @@ module altlvds_tx (
     parameter STRATIXIII_TX_STYLE = ((((intended_device_family == "Stratix III") || (intended_device_family == "STRATIX III") || (intended_device_family == "stratix iii") || (intended_device_family == "StratixIII") || (intended_device_family == "STRATIXIII") || (intended_device_family == "stratixiii") || (intended_device_family == "Titan") || (intended_device_family == "TITAN") || (intended_device_family == "titan") || (intended_device_family == "SIII") || (intended_device_family == "siii"))
                                 || (((intended_device_family == "Stratix IV") || (intended_device_family == "STRATIX IV") || (intended_device_family == "stratix iv") || (intended_device_family == "TGX") || (intended_device_family == "tgx") || (intended_device_family == "StratixIV") || (intended_device_family == "STRATIXIV") || (intended_device_family == "stratixiv") || (intended_device_family == "Stratix IV (GT)") || (intended_device_family == "STRATIX IV (GT)") || (intended_device_family == "stratix iv (gt)") || (intended_device_family == "Stratix IV (GX)") || (intended_device_family == "STRATIX IV (GX)") || (intended_device_family == "stratix iv (gx)") || (intended_device_family == "Stratix IV (E)") || (intended_device_family == "STRATIX IV (E)") || (intended_device_family == "stratix iv (e)") || (intended_device_family == "StratixIV(GT)") || (intended_device_family == "STRATIXIV(GT)") || (intended_device_family == "stratixiv(gt)") || (intended_device_family == "StratixIV(GX)") || (intended_device_family == "STRATIXIV(GX)") || (intended_device_family == "stratixiv(gx)") || (intended_device_family == "StratixIV(E)") || (intended_device_family == "STRATIXIV(E)") || (intended_device_family == "stratixiv(e)") || (intended_device_family == "StratixIIIGX") || (intended_device_family == "STRATIXIIIGX") || (intended_device_family == "stratixiiigx") || (intended_device_family == "Stratix IV (GT/GX/E)") || (intended_device_family == "STRATIX IV (GT/GX/E)") || (intended_device_family == "stratix iv (gt/gx/e)") || (intended_device_family == "Stratix IV (GT/E/GX)") || (intended_device_family == "STRATIX IV (GT/E/GX)") || (intended_device_family == "stratix iv (gt/e/gx)") || (intended_device_family == "Stratix IV (E/GT/GX)") || (intended_device_family == "STRATIX IV (E/GT/GX)") || (intended_device_family == "stratix iv (e/gt/gx)") || (intended_device_family == "Stratix IV (E/GX/GT)") || (intended_device_family == "STRATIX IV (E/GX/GT)") || (intended_device_family == "stratix iv (e/gx/gt)") || (intended_device_family == "StratixIV(GT/GX/E)") || (intended_device_family == "STRATIXIV(GT/GX/E)") || (intended_device_family == "stratixiv(gt/gx/e)") || (intended_device_family == "StratixIV(GT/E/GX)") || (intended_device_family == "STRATIXIV(GT/E/GX)") || (intended_device_family == "stratixiv(gt/e/gx)") || (intended_device_family == "StratixIV(E/GX/GT)") || (intended_device_family == "STRATIXIV(E/GX/GT)") || (intended_device_family == "stratixiv(e/gx/gt)") || (intended_device_family == "StratixIV(E/GT/GX)") || (intended_device_family == "STRATIXIV(E/GT/GX)") || (intended_device_family == "stratixiv(e/gt/gx)") || (intended_device_family == "Stratix IV (GX/E)") || (intended_device_family == "STRATIX IV (GX/E)") || (intended_device_family == "stratix iv (gx/e)") || (intended_device_family == "StratixIV(GX/E)") || (intended_device_family == "STRATIXIV(GX/E)") || (intended_device_family == "stratixiv(gx/e)"))
                                 || ((intended_device_family == "Arria II GX") || (intended_device_family == "ARRIA II GX") || (intended_device_family == "arria ii gx") || (intended_device_family == "ArriaIIGX") || (intended_device_family == "ARRIAIIGX") || (intended_device_family == "arriaiigx") || (intended_device_family == "Arria IIGX") || (intended_device_family == "ARRIA IIGX") || (intended_device_family == "arria iigx") || (intended_device_family == "ArriaII GX") || (intended_device_family == "ARRIAII GX") || (intended_device_family == "arriaii gx") || (intended_device_family == "Arria II") || (intended_device_family == "ARRIA II") || (intended_device_family == "arria ii") || (intended_device_family == "ArriaII") || (intended_device_family == "ARRIAII") || (intended_device_family == "arriaii") || (intended_device_family == "Arria II (GX/E)") || (intended_device_family == "ARRIA II (GX/E)") || (intended_device_family == "arria ii (gx/e)") || (intended_device_family == "ArriaII(GX/E)") || (intended_device_family == "ARRIAII(GX/E)") || (intended_device_family == "arriaii(gx/e)") || (intended_device_family == "PIRANHA") || (intended_device_family == "piranha"))
+                                || (((intended_device_family == "HardCopy IV") || (intended_device_family == "HARDCOPY IV") || (intended_device_family == "hardcopy iv") || (intended_device_family == "HardCopyIV") || (intended_device_family == "HARDCOPYIV") || (intended_device_family == "hardcopyiv") || (intended_device_family == "HardCopy IV (GX)") || (intended_device_family == "HARDCOPY IV (GX)") || (intended_device_family == "hardcopy iv (gx)") || (intended_device_family == "HardCopy IV (E)") || (intended_device_family == "HARDCOPY IV (E)") || (intended_device_family == "hardcopy iv (e)") || (intended_device_family == "HardCopyIV(GX)") || (intended_device_family == "HARDCOPYIV(GX)") || (intended_device_family == "hardcopyiv(gx)") || (intended_device_family == "HardCopyIV(E)") || (intended_device_family == "HARDCOPYIV(E)") || (intended_device_family == "hardcopyiv(e)") || (intended_device_family == "HCXIV") || (intended_device_family == "hcxiv") || (intended_device_family == "HardCopy IV (GX/E)") || (intended_device_family == "HARDCOPY IV (GX/E)") || (intended_device_family == "hardcopy iv (gx/e)") || (intended_device_family == "HardCopy IV (E/GX)") || (intended_device_family == "HARDCOPY IV (E/GX)") || (intended_device_family == "hardcopy iv (e/gx)") || (intended_device_family == "HardCopyIV(GX/E)") || (intended_device_family == "HARDCOPYIV(GX/E)") || (intended_device_family == "hardcopyiv(gx/e)") || (intended_device_family == "HardCopyIV(E/GX)") || (intended_device_family == "HARDCOPYIV(E/GX)") || (intended_device_family == "hardcopyiv(e/gx)"))
                                 || ((intended_device_family == "HardCopy IV") || (intended_device_family == "HARDCOPY IV") || (intended_device_family == "hardcopy iv") || (intended_device_family == "HardCopyIV") || (intended_device_family == "HARDCOPYIV") || (intended_device_family == "hardcopyiv") || (intended_device_family == "HardCopy IV (GX)") || (intended_device_family == "HARDCOPY IV (GX)") || (intended_device_family == "hardcopy iv (gx)") || (intended_device_family == "HardCopy IV (E)") || (intended_device_family == "HARDCOPY IV (E)") || (intended_device_family == "hardcopy iv (e)") || (intended_device_family == "HardCopyIV(GX)") || (intended_device_family == "HARDCOPYIV(GX)") || (intended_device_family == "hardcopyiv(gx)") || (intended_device_family == "HardCopyIV(E)") || (intended_device_family == "HARDCOPYIV(E)") || (intended_device_family == "hardcopyiv(e)") || (intended_device_family == "HCXIV") || (intended_device_family == "hcxiv") || (intended_device_family == "HardCopy IV (GX/E)") || (intended_device_family == "HARDCOPY IV (GX/E)") || (intended_device_family == "hardcopy iv (gx/e)") || (intended_device_family == "HardCopy IV (E/GX)") || (intended_device_family == "HARDCOPY IV (E/GX)") || (intended_device_family == "hardcopy iv (e/gx)") || (intended_device_family == "HardCopyIV(GX/E)") || (intended_device_family == "HARDCOPYIV(GX/E)") || (intended_device_family == "hardcopyiv(gx/e)") || (intended_device_family == "HardCopyIV(E/GX)") || (intended_device_family == "HARDCOPYIV(E/GX)") || (intended_device_family == "hardcopyiv(e/gx)"))
-                                || (((intended_device_family == "Stratix V") || (intended_device_family == "STRATIX V") || (intended_device_family == "stratix v") || (intended_device_family == "StratixV") || (intended_device_family == "STRATIXV") || (intended_device_family == "stratixv") || (intended_device_family == "Stratix V (GS)") || (intended_device_family == "STRATIX V (GS)") || (intended_device_family == "stratix v (gs)") || (intended_device_family == "StratixV(GS)") || (intended_device_family == "STRATIXV(GS)") || (intended_device_family == "stratixv(gs)") || (intended_device_family == "Stratix V (GT)") || (intended_device_family == "STRATIX V (GT)") || (intended_device_family == "stratix v (gt)") || (intended_device_family == "StratixV(GT)") || (intended_device_family == "STRATIXV(GT)") || (intended_device_family == "stratixv(gt)") || (intended_device_family == "Stratix V (GX)") || (intended_device_family == "STRATIX V (GX)") || (intended_device_family == "stratix v (gx)") || (intended_device_family == "StratixV(GX)") || (intended_device_family == "STRATIXV(GX)") || (intended_device_family == "stratixv(gx)") || (intended_device_family == "Stratix V (GS/GX)") || (intended_device_family == "STRATIX V (GS/GX)") || (intended_device_family == "stratix v (gs/gx)") || (intended_device_family == "StratixV(GS/GX)") || (intended_device_family == "STRATIXV(GS/GX)") || (intended_device_family == "stratixv(gs/gx)") || (intended_device_family == "Stratix V (GS/GT)") || (intended_device_family == "STRATIX V (GS/GT)") || (intended_device_family == "stratix v (gs/gt)") || (intended_device_family == "StratixV(GS/GT)") || (intended_device_family == "STRATIXV(GS/GT)") || (intended_device_family == "stratixv(gs/gt)") || (intended_device_family == "Stratix V (GT/GX)") || (intended_device_family == "STRATIX V (GT/GX)") || (intended_device_family == "stratix v (gt/gx)") || (intended_device_family == "StratixV(GT/GX)") || (intended_device_family == "STRATIXV(GT/GX)") || (intended_device_family == "stratixv(gt/gx)") || (intended_device_family == "Stratix V (GX/GS)") || (intended_device_family == "STRATIX V (GX/GS)") || (intended_device_family == "stratix v (gx/gs)") || (intended_device_family == "StratixV(GX/GS)") || (intended_device_family == "STRATIXV(GX/GS)") || (intended_device_family == "stratixv(gx/gs)") || (intended_device_family == "Stratix V (GT/GS)") || (intended_device_family == "STRATIX V (GT/GS)") || (intended_device_family == "stratix v (gt/gs)") || (intended_device_family == "StratixV(GT/GS)") || (intended_device_family == "STRATIXV(GT/GS)") || (intended_device_family == "stratixv(gt/gs)") || (intended_device_family == "Stratix V (GX/GT)") || (intended_device_family == "STRATIX V (GX/GT)") || (intended_device_family == "stratix v (gx/gt)") || (intended_device_family == "StratixV(GX/GT)") || (intended_device_family == "STRATIXV(GX/GT)") || (intended_device_family == "stratixv(gx/gt)") || (intended_device_family == "Stratix V (GS/GT/GX)") || (intended_device_family == "STRATIX V (GS/GT/GX)") || (intended_device_family == "stratix v (gs/gt/gx)") || (intended_device_family == "Stratix V (GS/GX/GT)") || (intended_device_family == "STRATIX V (GS/GX/GT)") || (intended_device_family == "stratix v (gs/gx/gt)") || (intended_device_family == "Stratix V (GT/GS/GX)") || (intended_device_family == "STRATIX V (GT/GS/GX)") || (intended_device_family == "stratix v (gt/gs/gx)") || (intended_device_family == "Stratix V (GT/GX/GS)") || (intended_device_family == "STRATIX V (GT/GX/GS)") || (intended_device_family == "stratix v (gt/gx/gs)") || (intended_device_family == "Stratix V (GX/GS/GT)") || (intended_device_family == "STRATIX V (GX/GS/GT)") || (intended_device_family == "stratix v (gx/gs/gt)") || (intended_device_family == "Stratix V (GX/GT/GS)") || (intended_device_family == "STRATIX V (GX/GT/GS)") || (intended_device_family == "stratix v (gx/gt/gs)") || (intended_device_family == "StratixV(GS/GT/GX)") || (intended_device_family == "STRATIXV(GS/GT/GX)") || (intended_device_family == "stratixv(gs/gt/gx)") || (intended_device_family == "StratixV(GS/GX/GT)") || (intended_device_family == "STRATIXV(GS/GX/GT)") || (intended_device_family == "stratixv(gs/gx/gt)") || (intended_device_family == "StratixV(GT/GS/GX)") || (intended_device_family == "STRATIXV(GT/GS/GX)") || (intended_device_family == "stratixv(gt/gs/gx)") || (intended_device_family == "StratixV(GT/GX/GS)") || (intended_device_family == "STRATIXV(GT/GX/GS)") || (intended_device_family == "stratixv(gt/gx/gs)") || (intended_device_family == "StratixV(GX/GS/GT)") || (intended_device_family == "STRATIXV(GX/GS/GT)") || (intended_device_family == "stratixv(gx/gs/gt)") || (intended_device_family == "StratixV(GX/GT/GS)") || (intended_device_family == "STRATIXV(GX/GT/GS)") || (intended_device_family == "stratixv(gx/gt/gs)"))
-                                ) || (((intended_device_family == "Arria V") || (intended_device_family == "ARRIA V") || (intended_device_family == "arria v") || (intended_device_family == "ArriaV") || (intended_device_family == "ARRIAV") || (intended_device_family == "arriav"))
-                                ) || (((intended_device_family == "Arria II GZ") || (intended_device_family == "ARRIA II GZ") || (intended_device_family == "arria ii gz") || (intended_device_family == "ArriaII GZ") || (intended_device_family == "ARRIAII GZ") || (intended_device_family == "arriaii gz") || (intended_device_family == "Arria IIGZ") || (intended_device_family == "ARRIA IIGZ") || (intended_device_family == "arria iigz") || (intended_device_family == "ArriaIIGZ") || (intended_device_family == "ARRIAIIGZ") || (intended_device_family == "arriaiigz"))
+                                ) || (((intended_device_family == "Stratix V") || (intended_device_family == "STRATIX V") || (intended_device_family == "stratix v") || (intended_device_family == "StratixV") || (intended_device_family == "STRATIXV") || (intended_device_family == "stratixv") || (intended_device_family == "Stratix V (GS)") || (intended_device_family == "STRATIX V (GS)") || (intended_device_family == "stratix v (gs)") || (intended_device_family == "StratixV(GS)") || (intended_device_family == "STRATIXV(GS)") || (intended_device_family == "stratixv(gs)") || (intended_device_family == "Stratix V (GT)") || (intended_device_family == "STRATIX V (GT)") || (intended_device_family == "stratix v (gt)") || (intended_device_family == "StratixV(GT)") || (intended_device_family == "STRATIXV(GT)") || (intended_device_family == "stratixv(gt)") || (intended_device_family == "Stratix V (GX)") || (intended_device_family == "STRATIX V (GX)") || (intended_device_family == "stratix v (gx)") || (intended_device_family == "StratixV(GX)") || (intended_device_family == "STRATIXV(GX)") || (intended_device_family == "stratixv(gx)") || (intended_device_family == "Stratix V (GS/GX)") || (intended_device_family == "STRATIX V (GS/GX)") || (intended_device_family == "stratix v (gs/gx)") || (intended_device_family == "StratixV(GS/GX)") || (intended_device_family == "STRATIXV(GS/GX)") || (intended_device_family == "stratixv(gs/gx)") || (intended_device_family == "Stratix V (GS/GT)") || (intended_device_family == "STRATIX V (GS/GT)") || (intended_device_family == "stratix v (gs/gt)") || (intended_device_family == "StratixV(GS/GT)") || (intended_device_family == "STRATIXV(GS/GT)") || (intended_device_family == "stratixv(gs/gt)") || (intended_device_family == "Stratix V (GT/GX)") || (intended_device_family == "STRATIX V (GT/GX)") || (intended_device_family == "stratix v (gt/gx)") || (intended_device_family == "StratixV(GT/GX)") || (intended_device_family == "STRATIXV(GT/GX)") || (intended_device_family == "stratixv(gt/gx)") || (intended_device_family == "Stratix V (GX/GS)") || (intended_device_family == "STRATIX V (GX/GS)") || (intended_device_family == "stratix v (gx/gs)") || (intended_device_family == "StratixV(GX/GS)") || (intended_device_family == "STRATIXV(GX/GS)") || (intended_device_family == "stratixv(gx/gs)") || (intended_device_family == "Stratix V (GT/GS)") || (intended_device_family == "STRATIX V (GT/GS)") || (intended_device_family == "stratix v (gt/gs)") || (intended_device_family == "StratixV(GT/GS)") || (intended_device_family == "STRATIXV(GT/GS)") || (intended_device_family == "stratixv(gt/gs)") || (intended_device_family == "Stratix V (GX/GT)") || (intended_device_family == "STRATIX V (GX/GT)") || (intended_device_family == "stratix v (gx/gt)") || (intended_device_family == "StratixV(GX/GT)") || (intended_device_family == "STRATIXV(GX/GT)") || (intended_device_family == "stratixv(gx/gt)") || (intended_device_family == "Stratix V (GS/GT/GX)") || (intended_device_family == "STRATIX V (GS/GT/GX)") || (intended_device_family == "stratix v (gs/gt/gx)") || (intended_device_family == "Stratix V (GS/GX/GT)") || (intended_device_family == "STRATIX V (GS/GX/GT)") || (intended_device_family == "stratix v (gs/gx/gt)") || (intended_device_family == "Stratix V (GT/GS/GX)") || (intended_device_family == "STRATIX V (GT/GS/GX)") || (intended_device_family == "stratix v (gt/gs/gx)") || (intended_device_family == "Stratix V (GT/GX/GS)") || (intended_device_family == "STRATIX V (GT/GX/GS)") || (intended_device_family == "stratix v (gt/gx/gs)") || (intended_device_family == "Stratix V (GX/GS/GT)") || (intended_device_family == "STRATIX V (GX/GS/GT)") || (intended_device_family == "stratix v (gx/gs/gt)") || (intended_device_family == "Stratix V (GX/GT/GS)") || (intended_device_family == "STRATIX V (GX/GT/GS)") || (intended_device_family == "stratix v (gx/gt/gs)") || (intended_device_family == "StratixV(GS/GT/GX)") || (intended_device_family == "STRATIXV(GS/GT/GX)") || (intended_device_family == "stratixv(gs/gt/gx)") || (intended_device_family == "StratixV(GS/GX/GT)") || (intended_device_family == "STRATIXV(GS/GX/GT)") || (intended_device_family == "stratixv(gs/gx/gt)") || (intended_device_family == "StratixV(GT/GS/GX)") || (intended_device_family == "STRATIXV(GT/GS/GX)") || (intended_device_family == "stratixv(gt/gs/gx)") || (intended_device_family == "StratixV(GT/GX/GS)") || (intended_device_family == "STRATIXV(GT/GX/GS)") || (intended_device_family == "stratixv(gt/gx/gs)") || (intended_device_family == "StratixV(GX/GS/GT)") || (intended_device_family == "STRATIXV(GX/GS/GT)") || (intended_device_family == "stratixv(gx/gs/gt)") || (intended_device_family == "StratixV(GX/GT/GS)") || (intended_device_family == "STRATIXV(GX/GT/GS)") || (intended_device_family == "stratixv(gx/gt/gs)") || (intended_device_family == "Stratix V (GS/GT/GX/E)") || (intended_device_family == "STRATIX V (GS/GT/GX/E)") || (intended_device_family == "stratix v (gs/gt/gx/e)") || (intended_device_family == "StratixV(GS/GT/GX/E)") || (intended_device_family == "STRATIXV(GS/GT/GX/E)") || (intended_device_family == "stratixv(gs/gt/gx/e)") || (intended_device_family == "Stratix V (E)") || (intended_device_family == "STRATIX V (E)") || (intended_device_family == "stratix v (e)") || (intended_device_family == "StratixV(E)") || (intended_device_family == "STRATIXV(E)") || (intended_device_family == "stratixv(e)"))
+                                || (((intended_device_family == "Arria V GZ") || (intended_device_family == "ARRIA V GZ") || (intended_device_family == "arria v gz") || (intended_device_family == "ArriaVGZ") || (intended_device_family == "ARRIAVGZ") || (intended_device_family == "arriavgz"))
+                                ) ) || (((intended_device_family == "Arria V") || (intended_device_family == "ARRIA V") || (intended_device_family == "arria v") || (intended_device_family == "Arria V (GT/GX)") || (intended_device_family == "ARRIA V (GT/GX)") || (intended_device_family == "arria v (gt/gx)") || (intended_device_family == "ArriaV(GT/GX)") || (intended_device_family == "ARRIAV(GT/GX)") || (intended_device_family == "arriav(gt/gx)") || (intended_device_family == "ArriaV") || (intended_device_family == "ARRIAV") || (intended_device_family == "arriav") || (intended_device_family == "Arria V (GT/GX/ST/SX)") || (intended_device_family == "ARRIA V (GT/GX/ST/SX)") || (intended_device_family == "arria v (gt/gx/st/sx)") || (intended_device_family == "ArriaV(GT/GX/ST/SX)") || (intended_device_family == "ARRIAV(GT/GX/ST/SX)") || (intended_device_family == "arriav(gt/gx/st/sx)") || (intended_device_family == "Arria V (GT)") || (intended_device_family == "ARRIA V (GT)") || (intended_device_family == "arria v (gt)") || (intended_device_family == "ArriaV(GT)") || (intended_device_family == "ARRIAV(GT)") || (intended_device_family == "arriav(gt)") || (intended_device_family == "Arria V (GX)") || (intended_device_family == "ARRIA V (GX)") || (intended_device_family == "arria v (gx)") || (intended_device_family == "ArriaV(GX)") || (intended_device_family == "ARRIAV(GX)") || (intended_device_family == "arriav(gx)") || (intended_device_family == "Arria V (ST)") || (intended_device_family == "ARRIA V (ST)") || (intended_device_family == "arria v (st)") || (intended_device_family == "ArriaV(ST)") || (intended_device_family == "ARRIAV(ST)") || (intended_device_family == "arriav(st)") || (intended_device_family == "Arria V (SX)") || (intended_device_family == "ARRIA V (SX)") || (intended_device_family == "arria v (sx)") || (intended_device_family == "ArriaV(SX)") || (intended_device_family == "ARRIAV(SX)") || (intended_device_family == "arriav(sx)"))
+                                || (((intended_device_family == "Cyclone V") || (intended_device_family == "CYCLONE V") || (intended_device_family == "cyclone v") || (intended_device_family == "CycloneV") || (intended_device_family == "CYCLONEV") || (intended_device_family == "cyclonev") || (intended_device_family == "Cyclone V (GT/GX/E/SX)") || (intended_device_family == "CYCLONE V (GT/GX/E/SX)") || (intended_device_family == "cyclone v (gt/gx/e/sx)") || (intended_device_family == "CycloneV(GT/GX/E/SX)") || (intended_device_family == "CYCLONEV(GT/GX/E/SX)") || (intended_device_family == "cyclonev(gt/gx/e/sx)") || (intended_device_family == "Cyclone V (E/GX/GT/SX/SE/ST)") || (intended_device_family == "CYCLONE V (E/GX/GT/SX/SE/ST)") || (intended_device_family == "cyclone v (e/gx/gt/sx/se/st)") || (intended_device_family == "CycloneV(E/GX/GT/SX/SE/ST)") || (intended_device_family == "CYCLONEV(E/GX/GT/SX/SE/ST)") || (intended_device_family == "cyclonev(e/gx/gt/sx/se/st)") || (intended_device_family == "Cyclone V (E)") || (intended_device_family == "CYCLONE V (E)") || (intended_device_family == "cyclone v (e)") || (intended_device_family == "CycloneV(E)") || (intended_device_family == "CYCLONEV(E)") || (intended_device_family == "cyclonev(e)") || (intended_device_family == "Cyclone V (GX)") || (intended_device_family == "CYCLONE V (GX)") || (intended_device_family == "cyclone v (gx)") || (intended_device_family == "CycloneV(GX)") || (intended_device_family == "CYCLONEV(GX)") || (intended_device_family == "cyclonev(gx)") || (intended_device_family == "Cyclone V (GT)") || (intended_device_family == "CYCLONE V (GT)") || (intended_device_family == "cyclone v (gt)") || (intended_device_family == "CycloneV(GT)") || (intended_device_family == "CYCLONEV(GT)") || (intended_device_family == "cyclonev(gt)") || (intended_device_family == "Cyclone V (SX)") || (intended_device_family == "CYCLONE V (SX)") || (intended_device_family == "cyclone v (sx)") || (intended_device_family == "CycloneV(SX)") || (intended_device_family == "CYCLONEV(SX)") || (intended_device_family == "cyclonev(sx)") || (intended_device_family == "Cyclone V (SE)") || (intended_device_family == "CYCLONE V (SE)") || (intended_device_family == "cyclone v (se)") || (intended_device_family == "CycloneV(SE)") || (intended_device_family == "CYCLONEV(SE)") || (intended_device_family == "cyclonev(se)") || (intended_device_family == "Cyclone V (ST)") || (intended_device_family == "CYCLONE V (ST)") || (intended_device_family == "cyclone v (st)") || (intended_device_family == "CycloneV(ST)") || (intended_device_family == "CYCLONEV(ST)") || (intended_device_family == "cyclonev(st)"))
+                                ) ) || (((intended_device_family == "Arria II GZ") || (intended_device_family == "ARRIA II GZ") || (intended_device_family == "arria ii gz") || (intended_device_family == "ArriaII GZ") || (intended_device_family == "ARRIAII GZ") || (intended_device_family == "arriaii gz") || (intended_device_family == "Arria IIGZ") || (intended_device_family == "ARRIA IIGZ") || (intended_device_family == "arria iigz") || (intended_device_family == "ArriaIIGZ") || (intended_device_family == "ARRIAIIGZ") || (intended_device_family == "arriaiigz"))
+                                ) || (((intended_device_family == "Arria 10") || (intended_device_family == "ARRIA 10") || (intended_device_family == "arria 10") || (intended_device_family == "Arria10") || (intended_device_family == "ARRIA10") || (intended_device_family == "arria10") || (intended_device_family == "Arria VI") || (intended_device_family == "ARRIA VI") || (intended_device_family == "arria vi") || (intended_device_family == "ArriaVI") || (intended_device_family == "ARRIAVI") || (intended_device_family == "arriavi") || (intended_device_family == "Night Fury") || (intended_device_family == "NIGHT FURY") || (intended_device_family == "night fury") || (intended_device_family == "nightfury") || (intended_device_family == "NIGHTFURY") || (intended_device_family == "Arria 10 (GX/SX/GT)") || (intended_device_family == "ARRIA 10 (GX/SX/GT)") || (intended_device_family == "arria 10 (gx/sx/gt)") || (intended_device_family == "Arria10(GX/SX/GT)") || (intended_device_family == "ARRIA10(GX/SX/GT)") || (intended_device_family == "arria10(gx/sx/gt)") || (intended_device_family == "Arria 10 (GX)") || (intended_device_family == "ARRIA 10 (GX)") || (intended_device_family == "arria 10 (gx)") || (intended_device_family == "Arria10(GX)") || (intended_device_family == "ARRIA10(GX)") || (intended_device_family == "arria10(gx)") || (intended_device_family == "Arria 10 (SX)") || (intended_device_family == "ARRIA 10 (SX)") || (intended_device_family == "arria 10 (sx)") || (intended_device_family == "Arria10(SX)") || (intended_device_family == "ARRIA10(SX)") || (intended_device_family == "arria10(sx)") || (intended_device_family == "Arria 10 (GT)") || (intended_device_family == "ARRIA 10 (GT)") || (intended_device_family == "arria 10 (gt)") || (intended_device_family == "Arria10(GT)") || (intended_device_family == "ARRIA10(GT)") || (intended_device_family == "arria10(gt)"))
+                                || ((intended_device_family == "Arria 10") || (intended_device_family == "ARRIA 10") || (intended_device_family == "arria 10") || (intended_device_family == "Arria10") || (intended_device_family == "ARRIA10") || (intended_device_family == "arria10") || (intended_device_family == "Arria VI") || (intended_device_family == "ARRIA VI") || (intended_device_family == "arria vi") || (intended_device_family == "ArriaVI") || (intended_device_family == "ARRIAVI") || (intended_device_family == "arriavi") || (intended_device_family == "Night Fury") || (intended_device_family == "NIGHT FURY") || (intended_device_family == "night fury") || (intended_device_family == "nightfury") || (intended_device_family == "NIGHTFURY") || (intended_device_family == "Arria 10 (GX/SX/GT)") || (intended_device_family == "ARRIA 10 (GX/SX/GT)") || (intended_device_family == "arria 10 (gx/sx/gt)") || (intended_device_family == "Arria10(GX/SX/GT)") || (intended_device_family == "ARRIA10(GX/SX/GT)") || (intended_device_family == "arria10(gx/sx/gt)") || (intended_device_family == "Arria 10 (GX)") || (intended_device_family == "ARRIA 10 (GX)") || (intended_device_family == "arria 10 (gx)") || (intended_device_family == "Arria10(GX)") || (intended_device_family == "ARRIA10(GX)") || (intended_device_family == "arria10(gx)") || (intended_device_family == "Arria 10 (SX)") || (intended_device_family == "ARRIA 10 (SX)") || (intended_device_family == "arria 10 (sx)") || (intended_device_family == "Arria10(SX)") || (intended_device_family == "ARRIA10(SX)") || (intended_device_family == "arria10(sx)") || (intended_device_family == "Arria 10 (GT)") || (intended_device_family == "ARRIA 10 (GT)") || (intended_device_family == "arria 10 (gt)") || (intended_device_family == "Arria10(GT)") || (intended_device_family == "ARRIA10(GT)") || (intended_device_family == "arria10(gt)"))
+                                ) || (((intended_device_family == "Cyclone 10 GX") || (intended_device_family == "CYCLONE 10 GX") || (intended_device_family == "cyclone 10 gx") || (intended_device_family == "Cyclone10GX") || (intended_device_family == "CYCLONE10GX") || (intended_device_family == "cyclone10gx"))
+                                || ((intended_device_family == "Cyclone 10 GX") || (intended_device_family == "CYCLONE 10 GX") || (intended_device_family == "cyclone 10 gx") || (intended_device_family == "Cyclone10GX") || (intended_device_family == "CYCLONE10GX") || (intended_device_family == "cyclone10gx"))
+                                ) || (((intended_device_family == "Stratix 10") || (intended_device_family == "STRATIX 10") || (intended_device_family == "stratix 10") || (intended_device_family == "Stratix10") || (intended_device_family == "STRATIX10") || (intended_device_family == "stratix10") || (intended_device_family == "nadder") || (intended_device_family == "NADDER") || (intended_device_family == "Stratix 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "stratix 10 (gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix10(GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX10(GX/SX/MX/TX/DX)") || (intended_device_family == "stratix10(gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix 10 (GX)") || (intended_device_family == "STRATIX 10 (GX)") || (intended_device_family == "stratix 10 (gx)") || (intended_device_family == "Stratix10(GX)") || (intended_device_family == "STRATIX10(GX)") || (intended_device_family == "stratix10(gx)") || (intended_device_family == "Stratix 10 (SX)") || (intended_device_family == "STRATIX 10 (SX)") || (intended_device_family == "stratix 10 (sx)") || (intended_device_family == "Stratix10(SX)") || (intended_device_family == "STRATIX10(SX)") || (intended_device_family == "stratix10(sx)") || (intended_device_family == "Stratix 10 (MX)") || (intended_device_family == "STRATIX 10 (MX)") || (intended_device_family == "stratix 10 (mx)") || (intended_device_family == "Stratix10(MX)") || (intended_device_family == "STRATIX10(MX)") || (intended_device_family == "stratix10(mx)") || (intended_device_family == "Stratix 10 (TX)") || (intended_device_family == "STRATIX 10 (TX)") || (intended_device_family == "stratix 10 (tx)") || (intended_device_family == "Stratix10(TX)") || (intended_device_family == "STRATIX10(TX)") || (intended_device_family == "stratix10(tx)") || (intended_device_family == "Stratix 10 (DX)") || (intended_device_family == "STRATIX 10 (DX)") || (intended_device_family == "stratix 10 (dx)") || (intended_device_family == "Stratix10(DX)") || (intended_device_family == "STRATIX10(DX)") || (intended_device_family == "stratix10(dx)"))
+                                || ((intended_device_family == "Stratix 10") || (intended_device_family == "STRATIX 10") || (intended_device_family == "stratix 10") || (intended_device_family == "Stratix10") || (intended_device_family == "STRATIX10") || (intended_device_family == "stratix10") || (intended_device_family == "nadder") || (intended_device_family == "NADDER") || (intended_device_family == "Stratix 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "stratix 10 (gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix10(GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX10(GX/SX/MX/TX/DX)") || (intended_device_family == "stratix10(gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix 10 (GX)") || (intended_device_family == "STRATIX 10 (GX)") || (intended_device_family == "stratix 10 (gx)") || (intended_device_family == "Stratix10(GX)") || (intended_device_family == "STRATIX10(GX)") || (intended_device_family == "stratix10(gx)") || (intended_device_family == "Stratix 10 (SX)") || (intended_device_family == "STRATIX 10 (SX)") || (intended_device_family == "stratix 10 (sx)") || (intended_device_family == "Stratix10(SX)") || (intended_device_family == "STRATIX10(SX)") || (intended_device_family == "stratix10(sx)") || (intended_device_family == "Stratix 10 (MX)") || (intended_device_family == "STRATIX 10 (MX)") || (intended_device_family == "stratix 10 (mx)") || (intended_device_family == "Stratix10(MX)") || (intended_device_family == "STRATIX10(MX)") || (intended_device_family == "stratix10(mx)") || (intended_device_family == "Stratix 10 (TX)") || (intended_device_family == "STRATIX 10 (TX)") || (intended_device_family == "stratix 10 (tx)") || (intended_device_family == "Stratix10(TX)") || (intended_device_family == "STRATIX10(TX)") || (intended_device_family == "stratix10(tx)") || (intended_device_family == "Stratix 10 (DX)") || (intended_device_family == "STRATIX 10 (DX)") || (intended_device_family == "stratix 10 (dx)") || (intended_device_family == "Stratix10(DX)") || (intended_device_family == "STRATIX10(DX)") || (intended_device_family == "stratix10(dx)"))
+                                ) || (((intended_device_family == "Agilex") || (intended_device_family == "AGILEX") || (intended_device_family == "agilex") || (intended_device_family == "AGILEX") || (intended_device_family == "agilex") || (intended_device_family == "Falcon Mesa") || (intended_device_family == "FALCON MESA") || (intended_device_family == "falcon mesa") || (intended_device_family == "FALCONMESA") || (intended_device_family == "falconmesa") || (intended_device_family == "falconmesa") || (intended_device_family == "FALCONMESA") || (intended_device_family == "Stratix 20") || (intended_device_family == "STRATIX 20") || (intended_device_family == "stratix 20") || (intended_device_family == "Stratix20") || (intended_device_family == "STRATIX20") || (intended_device_family == "stratix20") || (intended_device_family == "stratix 20") || (intended_device_family == "STRATIX 20") || (intended_device_family == "stratix20") || (intended_device_family == "STRATIX20") || (intended_device_family == "STRATIX 20") || (intended_device_family == "stratix 20") || (intended_device_family == "STRATIX20") || (intended_device_family == "stratix20") || (intended_device_family == "Agilex (F-Series/I-Series)") || (intended_device_family == "AGILEX (F-SERIES/I-SERIES)") || (intended_device_family == "agilex (f-series/i-series)") || (intended_device_family == "Agilex(F-Series/I-Series)") || (intended_device_family == "AGILEX(F-SERIES/I-SERIES)") || (intended_device_family == "agilex(f-series/i-series)") || (intended_device_family == "Agilex (F-Series)") || (intended_device_family == "AGILEX (F-SERIES)") || (intended_device_family == "agilex (f-series)") || (intended_device_family == "Agilex(F-Series)") || (intended_device_family == "AGILEX(F-SERIES)") || (intended_device_family == "agilex(f-series)") || (intended_device_family == "Agilex (I-Series)") || (intended_device_family == "AGILEX (I-SERIES)") || (intended_device_family == "agilex (i-series)") || (intended_device_family == "Agilex(I-Series)") || (intended_device_family == "AGILEX(I-SERIES)") || (intended_device_family == "agilex(i-series)"))
                                 ) ) || ((intended_device_family == "HardCopy III") || (intended_device_family == "HARDCOPY III") || (intended_device_family == "hardcopy iii") || (intended_device_family == "HardCopyIII") || (intended_device_family == "HARDCOPYIII") || (intended_device_family == "hardcopyiii") || (intended_device_family == "HCX") || (intended_device_family == "hcx"))
                                 ))
                                 ? 1 : 0;
@@ -27206,6 +27599,7 @@ module altlvds_tx (
                                 || ((intended_device_family == "Cyclone III LS") || (intended_device_family == "CYCLONE III LS") || (intended_device_family == "cyclone iii ls") || (intended_device_family == "CycloneIIILS") || (intended_device_family == "CYCLONEIIILS") || (intended_device_family == "cycloneiiils") || (intended_device_family == "Cyclone III LPS") || (intended_device_family == "CYCLONE III LPS") || (intended_device_family == "cyclone iii lps") || (intended_device_family == "Cyclone LPS") || (intended_device_family == "CYCLONE LPS") || (intended_device_family == "cyclone lps") || (intended_device_family == "CycloneLPS") || (intended_device_family == "CYCLONELPS") || (intended_device_family == "cyclonelps") || (intended_device_family == "Tarpon") || (intended_device_family == "TARPON") || (intended_device_family == "tarpon") || (intended_device_family == "Cyclone IIIE") || (intended_device_family == "CYCLONE IIIE") || (intended_device_family == "cyclone iiie"))
                                 || ((intended_device_family == "Cyclone IV GX") || (intended_device_family == "CYCLONE IV GX") || (intended_device_family == "cyclone iv gx") || (intended_device_family == "Cyclone IVGX") || (intended_device_family == "CYCLONE IVGX") || (intended_device_family == "cyclone ivgx") || (intended_device_family == "CycloneIV GX") || (intended_device_family == "CYCLONEIV GX") || (intended_device_family == "cycloneiv gx") || (intended_device_family == "CycloneIVGX") || (intended_device_family == "CYCLONEIVGX") || (intended_device_family == "cycloneivgx") || (intended_device_family == "Cyclone IV") || (intended_device_family == "CYCLONE IV") || (intended_device_family == "cyclone iv") || (intended_device_family == "CycloneIV") || (intended_device_family == "CYCLONEIV") || (intended_device_family == "cycloneiv") || (intended_device_family == "Cyclone IV (GX)") || (intended_device_family == "CYCLONE IV (GX)") || (intended_device_family == "cyclone iv (gx)") || (intended_device_family == "CycloneIV(GX)") || (intended_device_family == "CYCLONEIV(GX)") || (intended_device_family == "cycloneiv(gx)") || (intended_device_family == "Cyclone III GX") || (intended_device_family == "CYCLONE III GX") || (intended_device_family == "cyclone iii gx") || (intended_device_family == "CycloneIII GX") || (intended_device_family == "CYCLONEIII GX") || (intended_device_family == "cycloneiii gx") || (intended_device_family == "Cyclone IIIGX") || (intended_device_family == "CYCLONE IIIGX") || (intended_device_family == "cyclone iiigx") || (intended_device_family == "CycloneIIIGX") || (intended_device_family == "CYCLONEIIIGX") || (intended_device_family == "cycloneiiigx") || (intended_device_family == "Cyclone III GL") || (intended_device_family == "CYCLONE III GL") || (intended_device_family == "cyclone iii gl") || (intended_device_family == "CycloneIII GL") || (intended_device_family == "CYCLONEIII GL") || (intended_device_family == "cycloneiii gl") || (intended_device_family == "Cyclone IIIGL") || (intended_device_family == "CYCLONE IIIGL") || (intended_device_family == "cyclone iiigl") || (intended_device_family == "CycloneIIIGL") || (intended_device_family == "CYCLONEIIIGL") || (intended_device_family == "cycloneiiigl") || (intended_device_family == "Stingray") || (intended_device_family == "STINGRAY") || (intended_device_family == "stingray"))
                                 || (((intended_device_family == "Cyclone IV E") || (intended_device_family == "CYCLONE IV E") || (intended_device_family == "cyclone iv e") || (intended_device_family == "CycloneIV E") || (intended_device_family == "CYCLONEIV E") || (intended_device_family == "cycloneiv e") || (intended_device_family == "Cyclone IVE") || (intended_device_family == "CYCLONE IVE") || (intended_device_family == "cyclone ive") || (intended_device_family == "CycloneIVE") || (intended_device_family == "CYCLONEIVE") || (intended_device_family == "cycloneive"))
+                                ) || (((intended_device_family == "MAX 10") || (intended_device_family == "max 10") || (intended_device_family == "MAX 10 FPGA") || (intended_device_family == "max 10 fpga") || (intended_device_family == "Zippleback") || (intended_device_family == "ZIPPLEBACK") || (intended_device_family == "zippleback") || (intended_device_family == "MAX10") || (intended_device_family == "max10") || (intended_device_family == "MAX 10 (DA/DF/DC/SA/SC)") || (intended_device_family == "max 10 (da/df/dc/sa/sc)") || (intended_device_family == "MAX10(DA/DF/DC/SA/SC)") || (intended_device_family == "max10(da/df/dc/sa/sc)") || (intended_device_family == "MAX 10 (DA)") || (intended_device_family == "max 10 (da)") || (intended_device_family == "MAX10(DA)") || (intended_device_family == "max10(da)") || (intended_device_family == "MAX 10 (DF)") || (intended_device_family == "max 10 (df)") || (intended_device_family == "MAX10(DF)") || (intended_device_family == "max10(df)") || (intended_device_family == "MAX 10 (DC)") || (intended_device_family == "max 10 (dc)") || (intended_device_family == "MAX10(DC)") || (intended_device_family == "max10(dc)") || (intended_device_family == "MAX 10 (SA)") || (intended_device_family == "max 10 (sa)") || (intended_device_family == "MAX10(SA)") || (intended_device_family == "max10(sa)") || (intended_device_family == "MAX 10 (SC)") || (intended_device_family == "max 10 (sc)") || (intended_device_family == "MAX10(SC)") || (intended_device_family == "max10(sc)"))
                                 ) ))
                                 ? 1 : 0;
 // maxv_msg
@@ -27476,6 +27870,7 @@ module altlvds_tx (
     wire flvds_pll_outclock;
     wire flvds_outclock;
     wire[number_of_channels-1 :0] flvds_dataout;
+    wire local_clk_div_lloaden;
 
 // INTERNAL TRI DECLARATION
 
@@ -28105,6 +28500,20 @@ module altlvds_tx (
     end
     endgenerate
 
+    // This module produces lloaden clock from local clock divider.
+    generate
+    if ((STRATIXIII_TX_STYLE == 1) && (enable_clock_pin_mode == "ON") &&
+            (implement_in_les == "OFF") && (deserialization_factor > 2)) 
+    begin: stratixv_local_clk_divider
+    stratixv_local_clk_divider u6 (
+        .clkin(tx_fastclk),
+        .lloaden(local_clk_div_lloaden));
+
+    defparam
+        u6.clk_divide_by = deserialization_factor;
+    end
+    endgenerate
+
 // ALWAYS CONSTRUCT BLOCK
 
     // For x2 mode. For each data channel, input data are separated into 2 data
@@ -28290,7 +28699,7 @@ module altlvds_tx (
     assign tx_fastclk  =    ((deserialization_factor < 3) ||
                             (FAMILY_HAS_FLEXIBLE_LVDS == 1))
                                 ? 1'b0 :
-                            (use_external_pll == "ON")
+                            ((use_external_pll == "ON") || (enable_clock_pin_mode == "ON"))
                                 ? tx_inclock :
                             (STRATIX_TX_STYLE == 1)
                                 ? stratix_pll_outclock[0] :
@@ -28360,7 +28769,7 @@ module altlvds_tx (
                                     : stratixii_sclkout1) :
                                 ((STRATIXIII_TX_STYLE == 1) &&
                                 (implement_in_les == "OFF"))
-                                ? ((use_external_pll == "ON")
+                                ? (((use_external_pll == "ON") || (enable_clock_pin_mode == "ON"))
                                     ? tx_inclock
                                     : stratixiii_pll_outclock[3])
                                 : 1'b0;
@@ -28379,12 +28788,16 @@ module altlvds_tx (
 
     assign stratixiii_enable0 = ((STRATIXIII_TX_STYLE == 1) &&
                                 (implement_in_les == "OFF"))
-                                ? stratixiii_pll_outclock[1]
+                                ?((enable_clock_pin_mode == "ON")
+                                ?local_clk_div_lloaden:
+                                stratixiii_pll_outclock[1]) 
                                 : 1'b0;
 
     assign stratixiii_enable1 = ((STRATIXIII_TX_STYLE == 1) &&
                                 (implement_in_les == "OFF"))
-                                ? stratixiii_pll_outclock[4]
+                                ?((enable_clock_pin_mode == "ON") 
+                                ?local_clk_div_lloaden:
+                                stratixiii_pll_outclock[4])
                                 : 1'b0;
 
     assign flvds_fastclk = ((FAMILY_HAS_FLEXIBLE_LVDS == 1) &&
@@ -28430,6 +28843,99 @@ module altlvds_tx (
                             : 1'b0;
 
 endmodule // altlvds_tx
+// END OF MODULE
+
+
+//START_MODULE_NAME--------------------------------------------------------------
+//
+// Module Name     :  stratixv_local_clk_divider
+
+// Description     :  This module is used to generate the local loaden signal from fast clock for StratixV
+//                    family. To mimic local clock divider block.
+
+// Limitation      :  Only available STRATIX V family.
+//
+// Results expected:  Loaden signal
+//
+//END_MODULE_NAME----------------------------------------------------------------
+
+// BEGINNING OF MODULE
+`timescale 1 ps / 1 ps
+module stratixv_local_clk_divider (
+                            clkin,
+                            lloaden
+                          );
+parameter clk_divide_by =1;
+
+input clkin;
+output lloaden;
+
+reg[4:0] cnt;
+reg lloaden_tmp;
+reg count;
+
+initial
+begin
+    cnt = 5'b00000;
+
+count = 1'b0;
+    lloaden_tmp = 1'b0;
+end
+
+assign lloaden = lloaden_tmp;
+
+
+always@(posedge clkin)
+begin
+
+count = 1'b1;
+end
+
+
+
+always@(negedge clkin)
+
+begin
+         if(count == 1'b1)
+
+
+ begin
+
+
+ 
+if(cnt < clk_divide_by-1)
+
+
+
+
+cnt = cnt + 1;
+
+
+
+else
+
+
+
+
+cnt = 0;
+
+
+ end
+
+end
+
+
+
+
+always@( cnt )
+    begin
+        if( cnt == clk_divide_by-1)
+            lloaden_tmp = 1'b1;
+        else
+            lloaden_tmp = 1'b0;
+    end
+
+endmodule
 // END OF MODULE
 
 
@@ -28539,6 +29045,7 @@ module stratix_tx_outclk (
 
 endmodule // stratix_tx_outclk
 // END OF MODULE
+
 
 //START_MODULE_NAME--------------------------------------------------------------
 //
@@ -29258,7 +29765,7 @@ module dcfifo_dffpipe ( d, clock, aclr,
         end
         else
         begin
-            if ((lpm_delay > 0) && ($time > 0))
+            if (lpm_delay > 0)
             begin
                 if (lpm_delay > 1)
                 begin
@@ -29367,7 +29874,7 @@ module dcfifo_fefifo  ( usedw_in, wreq, rreq, clock, aclr,
         else
             lrreq <= rreq && ~i_empty;
 
-        if (~aclr && $time > 0)
+        if (~aclr)
         begin
             if (lpm_mode == "READ")
             begin
@@ -29412,11 +29919,11 @@ module dcfifo_fefifo  ( usedw_in, wreq, rreq, clock, aclr,
                 endcase
             end // if (lpm_mode == "WRITE")
 
-            if (~aclr && (usedw_in >= almostfull) && ($time > 0))
+            if (~aclr && (usedw_in >= almostfull))
                 i_full <= 1'b1;
             else
                 i_full <= 1'b0;
-        end // if (~aclr && $time > 0)
+        end
     end // @(posedge clock)
 
     always @(sm_empty)
@@ -29462,6 +29969,8 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
     parameter lpm_showahead = "OFF";
     parameter underflow_checking = "ON";
     parameter overflow_checking = "ON";
+    parameter read_aclr_synch = "OFF";
+    parameter write_aclr_synch = "OFF";
     parameter use_eab = "ON";
     parameter add_ram_output_register = "OFF";
 
@@ -29504,6 +30013,10 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
     reg [lpm_width-1:0] i_q_tmp;
     reg feature_family_base_stratix;
     reg feature_family_base_cyclone;
+    reg sync_rdaclr_pre;
+    reg sync_rdaclr;
+    reg sync_wraclr_pre;
+    reg sync_wraclr;
 
 // INTERNAL WIRE DECLARATION
     wire i_rden;
@@ -29522,7 +30035,13 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
     wire [lpm_widthu-1:0] w_wr_dbuw;
     wire [lpm_widthu-1:0] w_rdusedw;
     wire [lpm_widthu-1:0] w_wrusedw;
-
+    wire w_rdaclr;
+    wire w_wraclr;
+    wire r_on;
+    wire r_off;
+    wire w_on;
+    wire w_off;
+    
 // INTERNAL TRI DECLARATION
     tri0 aclr;
 
@@ -29537,10 +30056,10 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
 // INITIAL CONSTRUCT BLOCK
     initial
     begin
-    
+
     feature_family_base_stratix = dev.FEATURE_FAMILY_BASE_STRATIX(intended_device_family);
     feature_family_base_cyclone = dev.FEATURE_FAMILY_BASE_CYCLONE(intended_device_family);
-    
+
         if((lpm_showahead != "ON") && (lpm_showahead != "OFF"))
             $display ("Error! lpm_showahead must be ON or OFF.");
         if((underflow_checking != "ON") && (underflow_checking != "OFF"))
@@ -29561,7 +30080,7 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
             data_ready[i] <= 1'b0;
             data_delay_count[i] <= 0;
         end
-        
+
         if ((add_ram_output_register == "OFF") &&
             ((feature_family_base_stratix == 1) || (feature_family_base_cyclone == 1)))
         begin
@@ -29575,9 +30094,9 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
             for (i = 0; i < (1 << lpm_widthu); i = i + 1)
             begin
                 mem_data2[i] <= 0;
-            end            
+            end
         end
-        
+
         i_data_tmp <= 0;
         i_rdptr <= 0;
         i_wrptr <= 0;
@@ -29588,6 +30107,10 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
         i_rdusedw <= 0;
         i_wrusedw <= 0;
         i_q_tmp <= 0;
+        sync_rdaclr_pre <= 1'b1;
+        sync_wraclr_pre <= 1'b1;
+        sync_rdaclr <= 1'b1;
+        sync_wraclr <= 1'b1;
     end
 
 // COMPONENT INSTANTIATIONS
@@ -29595,12 +30118,12 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
     dcfifo_dffpipe DP_RDPTR_D (
         .d (i_rdptr),
         .clock (i_rdenclock),
-        .aclr (aclr),
+        .aclr (w_rdaclr),
         .q (w_rdptrrg));
     dcfifo_dffpipe DP_WRPTR_D (
         .d (i_wrptr),
         .clock (wrclk),
-        .aclr (aclr),
+        .aclr (w_wraclr),
         .q (w_wrdelaycycle));
     defparam
         DP_RDPTR_D.lpm_delay = 0,
@@ -29611,22 +30134,22 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
     dcfifo_dffpipe DP_WS_NBRP (
         .d (w_rdptrrg),
         .clock (wrclk),
-        .aclr (aclr),
+        .aclr (w_wraclr),
         .q (w_ws_nbrp));
     dcfifo_dffpipe DP_RS_NBWP (
         .d (w_wrdelaycycle),
         .clock (rdclk),
-        .aclr (aclr),
+        .aclr (w_rdaclr),
         .q (w_rs_nbwp));
     dcfifo_dffpipe DP_WS_DBRP (
         .d (w_ws_nbrp),
         .clock (wrclk),
-        .aclr (aclr),
+        .aclr (w_wraclr),
         .q (w_ws_dbrp));
     dcfifo_dffpipe DP_RS_DBWP (
         .d (w_rs_nbwp),
         .clock (rdclk),
-        .aclr (aclr),
+        .aclr (w_rdaclr),
         .q (w_rs_dbwp));
     defparam
         DP_WS_NBRP.lpm_delay = wrsync_delaypipe,
@@ -29641,22 +30164,22 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
     dcfifo_dffpipe DP_WRUSEDW (
         .d (i_wr_udwn),
         .clock (wrclk),
-        .aclr (aclr),
+        .aclr (w_wraclr),
         .q (w_wrusedw));
     dcfifo_dffpipe DP_RDUSEDW (
         .d (i_rd_udwn),
         .clock (rdclk),
-        .aclr (aclr),
+        .aclr (w_rdaclr),
         .q (w_rdusedw));
     dcfifo_dffpipe DP_WR_DBUW (
         .d (i_wr_udwn),
         .clock (wrclk),
-        .aclr (aclr),
+        .aclr (w_wraclr),
         .q (w_wr_dbuw));
     dcfifo_dffpipe DP_RD_DBUW (
         .d (i_rd_udwn),
         .clock (rdclk),
-        .aclr (aclr),
+        .aclr (w_rdaclr),
         .q (w_rd_dbuw));
     defparam
         DP_WRUSEDW.lpm_delay = delay_wrusedw,
@@ -29674,7 +30197,7 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
         .wreq (wrreq),
         .rreq (rdreq),
         .clock (wrclk),
-        .aclr (aclr),
+        .aclr (w_wraclr),
         .empty (w_wrempty),
         .full (w_wrfull));
     dcfifo_fefifo RD_FE (
@@ -29682,7 +30205,7 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
         .rreq (rdreq),
         .wreq(wrreq),
         .clock (rdclk),
-        .aclr (aclr),
+        .aclr (w_rdaclr),
         .empty (w_rdempty),
         .full (w_rdfull));
     defparam
@@ -29698,6 +30221,34 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
         RD_FE.lpm_mode = "READ";
 
 // ALWAYS CONSTRUCT BLOCK
+    always @(posedge rdclk or posedge aclr)
+    begin
+        if (aclr)
+        begin
+            sync_rdaclr <= 1'b1;
+            sync_rdaclr_pre <= 1'b1;
+        end
+        else
+        begin
+            sync_rdaclr <= sync_rdaclr_pre;
+            sync_rdaclr_pre <= 1'b0;
+        end
+    end
+
+    always @(posedge wrclk or posedge aclr)
+    begin
+        if (aclr)
+        begin
+            sync_wraclr <= 1'b1;
+            sync_wraclr_pre <= 1'b1;
+        end
+        else
+        begin
+            sync_wraclr <= sync_wraclr_pre;
+            sync_wraclr_pre <= 1'b0;
+        end
+    end
+    
     always @(posedge aclr)
     begin
         i_rdptr <= 0;
@@ -29740,7 +30291,7 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
             i_wrptr_tmp <= 0;
             i_wren_tmp <= 0;
         end
-        else if (wrclk && ($time > 0))
+        else if (wrclk)
         begin
             i_data_tmp <= data;
             i_wrptr_tmp <= i_wrptr;
@@ -29766,7 +30317,7 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
 
     always @(negedge wrclk)
     begin
-        if ((~wrclk && (use_eab == "ON")) && ($time > 0))
+        if (~wrclk && (use_eab == "ON"))
         begin
             if (i_wren_tmp)
             begin
@@ -29783,8 +30334,8 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
 
     always @(posedge rdclk)
     begin
-    
-        if (rdclk && ($time > 0))
+
+        if (rdclk)
         begin
             if ((lpm_showahead == "ON") && (add_ram_output_register == "ON") &&
                 ((feature_family_base_stratix == 1) ||
@@ -29801,7 +30352,7 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
                         data_delay_count[k] <= 0;
                     end
                 end
-                
+
                 if (~aclr)
                 begin
                     i_showahead_flag3 <= 1'b1;
@@ -29828,7 +30379,7 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
             else
                 i_q_tmp <= 0;
         end
-        else if (rdclk && i_rden && ($time > 0))
+        else if (rdclk && i_rden)
         begin
             if (~aclr && ((i_rdptr < (1<<lpm_widthu)-1) || (underflow_checking == "OFF")))
                 i_rdptr <= i_rdptr + 1;
@@ -29841,23 +30392,23 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
                 i_q_tmp <= mem_data[i_rdptr];
         end
     end // @(posedge rdclk)
-    
+
     always @(i_showahead_flag3)
     begin
         i_showahead_flag2 <= i_showahead_flag3;
     end
-    
+
     always @(i_showahead_flag2)
     begin
         i_showahead_flag1 <= i_showahead_flag2;
     end
-    
+
     always @(i_showahead_flag1)
     begin
         i_showahead_flag <= i_showahead_flag1;
     end
-    
-    
+
+
     always @(posedge i_showahead_flag)
     begin
         if ((lpm_showahead == "ON") && (add_ram_output_register == "ON") &&
@@ -29904,15 +30455,21 @@ module dcfifo_async (data, rdclk, wrclk, aclr, rdreq, wrreq,
 
 
 // CONTINOUS ASSIGNMENT
-    assign i_rden = (underflow_checking == "OFF") ? rdreq : (rdreq && !w_rdempty);
-    assign i_wren = (overflow_checking == "OFF")  ? wrreq : (wrreq && !w_wrfull);
+    assign r_off = (read_aclr_synch == "ON") ? rdreq && !sync_rdaclr : rdreq;
+    assign r_on  = (read_aclr_synch == "ON") ? rdreq && !(w_rdempty || sync_rdaclr) : (rdreq && !w_rdempty);
+    assign i_rden = (underflow_checking == "OFF") ? r_off: r_on;
+    assign w_off = (write_aclr_synch == "ON") ? wrreq && !sync_wraclr : wrreq;
+    assign w_on  = (write_aclr_synch == "ON") ? wrreq && !(w_wrfull || sync_wraclr) : (wrreq && !w_wrfull);
+    assign i_wren = (overflow_checking == "OFF") ? w_off: w_on;
     assign q = i_q_tmp;
-    assign wrfull = w_wrfull;
+    assign wrfull = (write_aclr_synch == "OFF") ? w_wrfull : (w_wrfull || sync_wraclr) ;
     assign rdfull = w_rdfull;
     assign wrempty = w_wrempty;
     assign rdempty = w_rdempty;
     assign wrusedw = w_wrusedw;
     assign rdusedw = w_rdusedw;
+    assign w_rdaclr = (read_aclr_synch == "ON") ? sync_rdaclr : aclr ;
+    assign w_wraclr = (write_aclr_synch == "ON") ? sync_wraclr : aclr ;
 
 endmodule // dcfifo_async
 // END OF MODULE
@@ -29980,6 +30537,8 @@ module dcfifo_sync (data, rdclk, wrclk, aclr, rdreq, wrreq,
     reg feature_family_base_cyclone;
     reg feature_family_stratixii;
     reg feature_family_cycloneii;
+    reg feature_family_stratixiii;
+    reg feature_family_cycloneiii;
 
 // INTERNAL WIRE DECLARATION
     wire [lpm_widthu:0] w_rdptr_s;
@@ -30002,12 +30561,14 @@ module dcfifo_sync (data, rdclk, wrclk, aclr, rdreq, wrreq,
 // INITIAL CONSTRUCT BLOCK
     initial
     begin
-    
+
     feature_family_base_stratix = dev.FEATURE_FAMILY_BASE_STRATIX(intended_device_family);
     feature_family_base_cyclone = dev.FEATURE_FAMILY_BASE_CYCLONE(intended_device_family);
     feature_family_stratixii = dev.FEATURE_FAMILY_STRATIXII(intended_device_family);
     feature_family_cycloneii = dev.FEATURE_FAMILY_CYCLONEII(intended_device_family);
-    
+    feature_family_stratixiii = dev.FEATURE_FAMILY_STRATIXIII(intended_device_family);
+    feature_family_cycloneiii = dev.FEATURE_FAMILY_CYCLONEIII(intended_device_family);
+
         if ((lpm_showahead != "ON") && (lpm_showahead != "OFF"))
             $display ("Error! LPM_SHOWAHEAD must be ON or OFF.");
         if ((underflow_checking != "ON") && (underflow_checking != "OFF"))
@@ -30095,7 +30656,7 @@ module dcfifo_sync (data, rdclk, wrclk, aclr, rdreq, wrreq,
             i_wrptr_tmp <= 0;
             i_wren_tmp <= 0;
         end
-        else if (wrclk && ($time > 0))
+        else if (wrclk)
         begin
             i_data_tmp <= data;
             i_wrptr_tmp <= i_wrptr[lpm_widthu-1:0];
@@ -30121,7 +30682,7 @@ module dcfifo_sync (data, rdclk, wrclk, aclr, rdreq, wrreq,
 
     always @(negedge wrclk)
     begin
-        if ((~wrclk && (use_eab == "ON")) && ($time > 0))
+        if (~wrclk && (use_eab == "ON"))
         begin
             if (i_wren_tmp)
             begin
@@ -30152,7 +30713,7 @@ module dcfifo_sync (data, rdclk, wrclk, aclr, rdreq, wrreq,
             else
                 i_q_tmp <= 0;
         end
-        else if (rdclk && i_rden && ($time > 0))
+        else if (rdclk && i_rden)
         begin
             if (~aclr && (i_rdptr < cnt_mod - 1))
                 i_rdptr <= i_rdptr + 1;
@@ -30178,7 +30739,7 @@ module dcfifo_sync (data, rdclk, wrclk, aclr, rdreq, wrreq,
     begin
         i_showahead_flag <= i_showahead_flag2;
     end // @(i_showahead_flag2)
-    
+
     // Usedw, Empty, Full
     always @(i_rdptr or w_wrptr_s or cnt_mod)
     begin
@@ -30256,6 +30817,7 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
     parameter underflow_checking = "ON";
     parameter overflow_checking = "ON";
     parameter add_usedw_msb_bit = "OFF";
+    parameter read_aclr_synch = "OFF";
     parameter write_aclr_synch = "OFF";
     parameter use_eab = "ON";
     parameter clocks_are_synchronized = "FALSE";
@@ -30286,16 +30848,12 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
 
 // INTERNAL REGISTERS DECLARATION
     reg [lpm_width_r-1:0] mem_data [(1<<FIFO_DEPTH) + WIDTH_RATIO : 0];
-    reg [lpm_width-1:0] i_data_tmp;
-    reg [lpm_width-1:0] i_temp_reg;
     reg [lpm_widthu_r:0] i_rdptr_g;
     reg [lpm_widthu:0] i_wrptr_g;
-    reg [lpm_widthu:0] i_wrptr_g_tmp;
     reg [lpm_widthu:0] i_wrptr_g1;
     reg [lpm_widthu_r:0] i_rdptr_g1p;
     reg [lpm_widthu:0] i_delayed_wrptr_g;
 
-    reg i_wren_tmp;
     reg i_rdempty;
     reg i_wrempty_area;
     reg i_wrempty_speed;
@@ -30310,8 +30868,10 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
     reg i_q_is_registered;
     reg use_wrempty_speed;
     reg use_rdfull_speed;
-    reg sync_aclr_pre;
-    reg sync_aclr;
+    reg sync_rdaclr_pre;
+    reg sync_rdaclr;
+    reg sync_wraclr_pre;
+    reg sync_wraclr;
     reg is_underflow;
     reg is_overflow;
     reg no_warn;
@@ -30319,6 +30879,8 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
     reg feature_family_has_stratixii_style_ram;
     reg feature_family_stratixii;
     reg feature_family_cycloneii;
+    reg feature_family_stratixiii;
+    reg feature_family_cycloneiii;
     reg feature_family_stratix;
 
 // INTERNAL WIRE DECLARATION
@@ -30328,6 +30890,7 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
     wire [lpm_widthu:0] i_wrusedw;
     wire i_rden;
     wire i_wren;
+    wire read_aclr;
     wire write_aclr;
 
 // INTERNAL TRI DECLARATION
@@ -30348,37 +30911,39 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
 // FUNCTION DELCRARATION
     // Convert string to integer
     function integer str_to_int;
-        input [8*16:1] s; 
+        input [8*16:1] s;
 
         reg [8*16:1] reg_s;
         reg [8:1] digit;
         reg [8:1] tmp;
         integer m, ivalue;
-        
+
         begin
             ivalue = 0;
             reg_s = s;
             for (m=1; m<=16; m=m+1)
-            begin 
+            begin
                 tmp = reg_s[128:121];
                 digit = tmp & 8'b00001111;
-                reg_s = reg_s << 8; 
-                ivalue = ivalue * 10 + digit; 
+                reg_s = reg_s << 8;
+                ivalue = ivalue * 10 + digit;
             end
             str_to_int = ivalue;
         end
     endfunction
-    
+
 // INITIAL CONSTRUCT BLOCK
     initial
     begin
-    
+
     feature_family_has_stratixiii_style_ram = dev.FEATURE_FAMILY_HAS_STRATIXIII_STYLE_RAM(intended_device_family);
     feature_family_has_stratixii_style_ram = dev.FEATURE_FAMILY_HAS_STRATIXII_STYLE_RAM(intended_device_family);
+    feature_family_stratixiii = dev.FEATURE_FAMILY_STRATIXIII(intended_device_family);
+    feature_family_cycloneiii = dev.FEATURE_FAMILY_CYCLONEIII(intended_device_family);
     feature_family_stratixii = dev.FEATURE_FAMILY_STRATIXII(intended_device_family);
     feature_family_cycloneii = dev.FEATURE_FAMILY_CYCLONEII(intended_device_family);
     feature_family_stratix = dev.FEATURE_FAMILY_STRATIX(intended_device_family);
-    
+
         if ((lpm_showahead != "ON") && (lpm_showahead != "OFF"))
             $display ("Error! LPM_SHOWAHEAD must be ON or OFF.");
         if ((underflow_checking != "ON") && (underflow_checking != "OFF"))
@@ -30392,13 +30957,9 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
 
         for (i = 0; i < (1 << lpm_widthu_r) + WIDTH_RATIO; i = i + 1)
             mem_data[i] <= {lpm_width_r{1'b0}};
-        i_data_tmp <= 0;
-        i_temp_reg <= 0;
-        i_wren_tmp <= 0;
         i_rdptr_g <= 0;
         i_rdptr_g1p <= 1;
         i_wrptr_g <= 0;
-        i_wrptr_g_tmp <= 0;
         i_wrptr_g1 <= 1;
         i_delayed_wrptr_g <= 0;
         i_rdempty <= 1;
@@ -30409,8 +30970,10 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
         i_rdfull_area  <= 0;
         i_wrfull <= 0;
         i_wrfull_wreg <= 0;
-        sync_aclr_pre <= 1'b1;
-        sync_aclr <= 1'b1;
+        sync_rdaclr_pre <= 1'b1;
+        sync_wraclr_pre <= 1'b1;
+        sync_rdaclr <= 1'b1;
+        sync_wraclr <= 1'b1;
         i_q <= {lpm_width_r{1'b0}};
         is_underflow <= 0;
         is_overflow <= 0;
@@ -30515,62 +31078,51 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
         DP_WRUSEDW.lpm_width = lpm_widthu + 1;
 
 // ALWAYS CONSTRUCT BLOCK
-    always @(posedge aclr)
+    always @(posedge rdclk or posedge aclr)
     begin
-        i_data_tmp <= 0;
-        i_wren_tmp <= 0;
-        i_rdptr_g <= 0;
-        i_rdptr_g1p <= 1;
-        i_wrptr_g <= 0;
-        i_wrptr_g_tmp <= 0;
-        i_wrptr_g1 <= 1;
-        i_delayed_wrptr_g <= 0;
-        i_rdempty <= 1;
-        i_wrempty_area <= 1;
-        i_wrempty_speed <= 1;
-        i_rdempty_rreg <= 1;
-        i_rdfull_speed <= 0;
-        i_rdfull_area <= 0;
-        i_wrfull <= 0;
-        i_wrfull_wreg <= 0;
-        is_underflow <= 0;
-        is_overflow <= 0;
-        no_warn <= 0;
-        i_mem_address <= 0;
-        i_first_bit_position <= 0;
-
-        if(i_q_is_registered)
-            i_q <= 0;
-        else if ((feature_family_stratixii == 1) ||
-        (feature_family_cycloneii == 1))
-            i_q <= {lpm_width_r{1'bx}};
-
-    end // @(posedge aclr)
-    
-    always @(posedge wrclk or posedge aclr)
-    begin
-        if ($time > 0)
+        if (aclr)
         begin
-            if (aclr)
-            begin
-                sync_aclr <= 1'b1;
-                sync_aclr_pre <= 1'b1;
-            end
-            else
-            begin
-                sync_aclr <= sync_aclr_pre;
-                sync_aclr_pre <= 1'b0;
-            end
+            sync_rdaclr <= 1'b1;
+            sync_rdaclr_pre <= 1'b1;
+        end
+        else
+        begin
+            sync_rdaclr <= sync_rdaclr_pre;
+            sync_rdaclr_pre <= 1'b0;
         end
     end
 
-    always @(posedge wrclk)
+    always @(posedge wrclk or posedge aclr)
     begin
-        i_data_tmp <= data;
-        i_wrptr_g_tmp <= i_wrptr_g;
-        i_wren_tmp <= i_wren;
+        if (aclr)
+        begin
+            sync_wraclr <= 1'b1;
+            sync_wraclr_pre <= 1'b1;
+        end
+        else
+        begin
+            sync_wraclr <= sync_wraclr_pre;
+            sync_wraclr_pre <= 1'b0;
+        end
+    end
 
-        if (~write_aclr && ($time > 0))
+    always @(posedge wrclk or posedge aclr)
+    begin
+        if (aclr)
+        begin
+            i_wrptr_g <= 0;
+            i_wrptr_g1 <= 1;
+            i_delayed_wrptr_g <= 0;
+            i_wrempty_area <= 1;
+            i_wrempty_speed <= 1;
+            i_wrfull <= 0;
+            i_wrfull_wreg <= 0;
+            is_overflow <= 0;
+            no_warn <= 0;
+            i_mem_address <= 0;
+            i_first_bit_position <= 0;
+        end
+        else if (~write_aclr)
         begin
             if (i_wren)
             begin
@@ -30598,9 +31150,9 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
                         i_wrptr_g1 <= i_wrptr_g1 + 1;
                     else
                         i_wrptr_g1 <= 0;
-    
+
                     i_wrptr_g <= i_wrptr_g1;
-                    
+
                     if (lpm_width > lpm_width_r)
                     begin
                         for (i = 0; i < WIDTH_RATIO; i = i+1)
@@ -30621,11 +31173,28 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
         end
     end // @(wrclk)
 
-    always @(posedge rdclk)
+    always @(posedge rdclk or posedge aclr)
     begin
-        if(~aclr)
+        if (aclr)
         begin
-            if (i_rden && ($time > 0))
+            i_rdptr_g <= 0;
+            i_rdptr_g1p <= 1;
+            i_rdempty <= 1;
+            i_rdempty_rreg <= 1;
+            i_rdfull_speed <= 0;
+            i_rdfull_area <= 0;
+            is_underflow <= 0;
+            no_warn <= 0;
+
+            if(i_q_is_registered)
+                i_q <= 0;
+            else if ((feature_family_stratixii == 1) || (feature_family_cycloneii == 1))
+                i_q <= {lpm_width_r{1'bx}};
+
+        end
+        else if (~read_aclr)
+        begin
+            if (i_rden)
             begin
                 if (i_rdempty && (underflow_checking == "OFF"))
                 begin
@@ -30651,7 +31220,7 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
                         i_rdptr_g1p <= i_rdptr_g1p + 1;
                     else
                         i_rdptr_g1p <= 0;
-    
+
                     i_rdptr_g <= i_rdptr_g1p;
                 end
             end
@@ -30664,7 +31233,7 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
             i_q <= {lpm_width_r{1'bx}};
         else
         begin
-            if ((! i_q_is_registered) && ($time > 0))
+            if (! i_q_is_registered)
             begin
                 if (aclr && ((feature_family_stratixii == 1) ||
                 (feature_family_cycloneii == 1)))
@@ -30677,7 +31246,7 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
                         i_q <= mem_data[i_rdptr_g1p];
                 end
             end
-            else if (~aclr && i_rden && ($time > 0))
+            else if (~aclr && i_rden)
                 i_q <= mem_data[i_rdptr_g];
         end
     end
@@ -30728,7 +31297,7 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
                 i_rdfull_speed <= 0;
         end
     end // @(i_wrptr_g or i_rs_dgwp)
-    
+
     always @(i_wrptr_g1 or i_ws_dgrp or cnt_mod)
     begin
         if (lpm_width < lpm_width_r)
@@ -30768,6 +31337,10 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
     always @(posedge rdclk)
     begin
         i_rdfull_area <= i_wrfull_wreg;
+        if ((~aclr) && (read_aclr_synch == "ON") && ((feature_family_stratixiii == 1) ||
+            (feature_family_cycloneiii == 1)))
+            i_rdempty_rreg <= (i_rdempty | read_aclr);
+        else
         i_rdempty_rreg <= i_rdempty;
     end // @(posedge rdclk)
 
@@ -30777,36 +31350,47 @@ module dcfifo_low_latency (data, rdclk, wrclk, aclr, rdreq, wrreq,
 
         if ((~aclr) && (write_aclr_synch == "ON") && ((feature_family_stratixii == 1) ||
             (feature_family_cycloneii == 1)))
-            i_wrfull_wreg <= (i_wrfull | write_aclr);            
+            i_wrfull_wreg <= (i_wrfull | write_aclr);
         else
             i_wrfull_wreg <= i_wrfull;
     end // @(posedge wrclk)
 
 // CONTINOUS ASSIGNMENT
-    assign i_rden = (underflow_checking == "OFF") ? rdreq : (rdreq && !i_rdempty);
+    assign i_rden = (((feature_family_stratixiii == 1) ||
+                      (feature_family_cycloneiii == 1)) &&
+                      (read_aclr_synch == "ON")) ?
+                     ((underflow_checking == "OFF") ?  rdreq && (!sync_rdaclr)
+                                                    : (rdreq && !(i_rdempty | sync_rdaclr))) :
+                      (underflow_checking == "OFF") ?  rdreq : (rdreq && !i_rdempty);
     assign i_wren = (((feature_family_stratixii == 1) ||
-                    (feature_family_cycloneii == 1)) &&
-                    (write_aclr_synch == "ON")) ?
-                        ((overflow_checking == "OFF")   ? wrreq && (!sync_aclr)
-                                                        : (wrreq && !(i_wrfull | sync_aclr))) :
-                    (overflow_checking == "OFF")  ? wrreq : (wrreq && !i_wrfull);     
-    assign rdempty = (is_underflow || is_overflow) ? 1'bx : i_rdempty;
+                      (feature_family_cycloneii == 1)) &&
+                      (write_aclr_synch == "ON")) ?
+                     ((overflow_checking == "OFF") ?  wrreq && (!sync_wraclr)
+                                                   : (wrreq && !(i_wrfull | sync_wraclr))) :
+                      (overflow_checking == "OFF") ?  wrreq : (wrreq && !i_wrfull);     
+    assign rdempty = (is_underflow || is_overflow) ? 1'bx :
+                     (((feature_family_stratixiii == 1) ||
+                       (feature_family_cycloneiii == 1)) &&
+                       (read_aclr_synch == "ON")) ? (i_rdempty | read_aclr) : i_rdempty;
     assign wrempty = (is_underflow || is_overflow) ? 1'bx :
-                        (use_wrempty_speed) ? i_wrempty_speed : i_wrempty_area;
+                     (use_wrempty_speed) ? i_wrempty_speed : i_wrempty_area;
     assign rdfull = (is_underflow || is_overflow) ? 1'bx :
-                        (use_rdfull_speed)  ? i_rdfull_speed : i_rdfull_area;
+                    (use_rdfull_speed)  ? i_rdfull_speed : i_rdfull_area;
     assign wrfull = (is_underflow || is_overflow) ? 1'bx :
-                        (((feature_family_stratixii == 1) ||
-                        (feature_family_cycloneii == 1)) &&
-                        (write_aclr_synch == "ON")) ? (i_wrfull | write_aclr) : i_wrfull;
+                     (((feature_family_stratixii == 1) ||
+                       (feature_family_cycloneii == 1)) &&
+                       (write_aclr_synch == "ON")) ? (i_wrfull | write_aclr) : i_wrfull;
     assign wrusedw = (is_underflow || is_overflow) ? {lpm_widthu{1'bx}} :
                         i_wrusedw[lpm_widthu-1:0];
     assign rdusedw = (is_underflow || is_overflow) ? {lpm_widthu_r{1'bx}} :
                         i_rdusedw[lpm_widthu_r-1:0];
     assign q = (is_underflow || is_overflow) ? {lpm_width_r{1'bx}} : i_q;
+    assign read_aclr = (((feature_family_stratixiii == 1) ||
+                         (feature_family_cycloneiii == 1)) &&
+                         (read_aclr_synch == "ON")) ? sync_rdaclr : aclr;
     assign write_aclr = (((feature_family_stratixii == 1) ||
-                        (feature_family_cycloneii == 1)) &&
-                        (write_aclr_synch == "ON")) ? sync_aclr : aclr;
+                          (feature_family_cycloneii == 1)) &&
+                          (write_aclr_synch == "ON")) ? sync_wraclr : aclr;
 
 endmodule // dcfifo_low_latency
 // END OF MODULE
@@ -30828,7 +31412,7 @@ endmodule // dcfifo_low_latency
 
 // MODULE DECLARATION
 module dcfifo_mixed_widths ( data, rdclk, wrclk, aclr, rdreq, wrreq,
-                rdfull, wrfull, rdempty, wrempty, rdusedw, wrusedw, q);
+                eccstatus, rdfull, wrfull, rdempty, wrempty, rdusedw, wrusedw, q);
 
 // GLOBAL PARAMETER DECLARATION
     parameter lpm_width = 1;
@@ -30850,7 +31434,9 @@ module dcfifo_mixed_widths ( data, rdclk, wrclk, aclr, rdreq, wrreq,
     parameter lpm_hint = "USE_EAB=ON";
     parameter lpm_type = "dcfifo_mixed_widths";
     parameter add_usedw_msb_bit = "OFF";
+    parameter read_aclr_synch = "OFF";
     parameter write_aclr_synch = "OFF";
+    parameter enable_ecc = "FALSE";
 
 // LOCAL_PARAMETERS_BEGIN
 
@@ -30864,33 +31450,57 @@ module dcfifo_mixed_widths ( data, rdclk, wrclk, aclr, rdreq, wrreq,
                                 ) || (((intended_device_family == "Stratix III") || (intended_device_family == "STRATIX III") || (intended_device_family == "stratix iii") || (intended_device_family == "StratixIII") || (intended_device_family == "STRATIXIII") || (intended_device_family == "stratixiii") || (intended_device_family == "Titan") || (intended_device_family == "TITAN") || (intended_device_family == "titan") || (intended_device_family == "SIII") || (intended_device_family == "siii"))
                                 || (((intended_device_family == "Stratix IV") || (intended_device_family == "STRATIX IV") || (intended_device_family == "stratix iv") || (intended_device_family == "TGX") || (intended_device_family == "tgx") || (intended_device_family == "StratixIV") || (intended_device_family == "STRATIXIV") || (intended_device_family == "stratixiv") || (intended_device_family == "Stratix IV (GT)") || (intended_device_family == "STRATIX IV (GT)") || (intended_device_family == "stratix iv (gt)") || (intended_device_family == "Stratix IV (GX)") || (intended_device_family == "STRATIX IV (GX)") || (intended_device_family == "stratix iv (gx)") || (intended_device_family == "Stratix IV (E)") || (intended_device_family == "STRATIX IV (E)") || (intended_device_family == "stratix iv (e)") || (intended_device_family == "StratixIV(GT)") || (intended_device_family == "STRATIXIV(GT)") || (intended_device_family == "stratixiv(gt)") || (intended_device_family == "StratixIV(GX)") || (intended_device_family == "STRATIXIV(GX)") || (intended_device_family == "stratixiv(gx)") || (intended_device_family == "StratixIV(E)") || (intended_device_family == "STRATIXIV(E)") || (intended_device_family == "stratixiv(e)") || (intended_device_family == "StratixIIIGX") || (intended_device_family == "STRATIXIIIGX") || (intended_device_family == "stratixiiigx") || (intended_device_family == "Stratix IV (GT/GX/E)") || (intended_device_family == "STRATIX IV (GT/GX/E)") || (intended_device_family == "stratix iv (gt/gx/e)") || (intended_device_family == "Stratix IV (GT/E/GX)") || (intended_device_family == "STRATIX IV (GT/E/GX)") || (intended_device_family == "stratix iv (gt/e/gx)") || (intended_device_family == "Stratix IV (E/GT/GX)") || (intended_device_family == "STRATIX IV (E/GT/GX)") || (intended_device_family == "stratix iv (e/gt/gx)") || (intended_device_family == "Stratix IV (E/GX/GT)") || (intended_device_family == "STRATIX IV (E/GX/GT)") || (intended_device_family == "stratix iv (e/gx/gt)") || (intended_device_family == "StratixIV(GT/GX/E)") || (intended_device_family == "STRATIXIV(GT/GX/E)") || (intended_device_family == "stratixiv(gt/gx/e)") || (intended_device_family == "StratixIV(GT/E/GX)") || (intended_device_family == "STRATIXIV(GT/E/GX)") || (intended_device_family == "stratixiv(gt/e/gx)") || (intended_device_family == "StratixIV(E/GX/GT)") || (intended_device_family == "STRATIXIV(E/GX/GT)") || (intended_device_family == "stratixiv(e/gx/gt)") || (intended_device_family == "StratixIV(E/GT/GX)") || (intended_device_family == "STRATIXIV(E/GT/GX)") || (intended_device_family == "stratixiv(e/gt/gx)") || (intended_device_family == "Stratix IV (GX/E)") || (intended_device_family == "STRATIX IV (GX/E)") || (intended_device_family == "stratix iv (gx/e)") || (intended_device_family == "StratixIV(GX/E)") || (intended_device_family == "STRATIXIV(GX/E)") || (intended_device_family == "stratixiv(gx/e)"))
                                 || ((intended_device_family == "Arria II GX") || (intended_device_family == "ARRIA II GX") || (intended_device_family == "arria ii gx") || (intended_device_family == "ArriaIIGX") || (intended_device_family == "ARRIAIIGX") || (intended_device_family == "arriaiigx") || (intended_device_family == "Arria IIGX") || (intended_device_family == "ARRIA IIGX") || (intended_device_family == "arria iigx") || (intended_device_family == "ArriaII GX") || (intended_device_family == "ARRIAII GX") || (intended_device_family == "arriaii gx") || (intended_device_family == "Arria II") || (intended_device_family == "ARRIA II") || (intended_device_family == "arria ii") || (intended_device_family == "ArriaII") || (intended_device_family == "ARRIAII") || (intended_device_family == "arriaii") || (intended_device_family == "Arria II (GX/E)") || (intended_device_family == "ARRIA II (GX/E)") || (intended_device_family == "arria ii (gx/e)") || (intended_device_family == "ArriaII(GX/E)") || (intended_device_family == "ARRIAII(GX/E)") || (intended_device_family == "arriaii(gx/e)") || (intended_device_family == "PIRANHA") || (intended_device_family == "piranha"))
+                                || (((intended_device_family == "HardCopy IV") || (intended_device_family == "HARDCOPY IV") || (intended_device_family == "hardcopy iv") || (intended_device_family == "HardCopyIV") || (intended_device_family == "HARDCOPYIV") || (intended_device_family == "hardcopyiv") || (intended_device_family == "HardCopy IV (GX)") || (intended_device_family == "HARDCOPY IV (GX)") || (intended_device_family == "hardcopy iv (gx)") || (intended_device_family == "HardCopy IV (E)") || (intended_device_family == "HARDCOPY IV (E)") || (intended_device_family == "hardcopy iv (e)") || (intended_device_family == "HardCopyIV(GX)") || (intended_device_family == "HARDCOPYIV(GX)") || (intended_device_family == "hardcopyiv(gx)") || (intended_device_family == "HardCopyIV(E)") || (intended_device_family == "HARDCOPYIV(E)") || (intended_device_family == "hardcopyiv(e)") || (intended_device_family == "HCXIV") || (intended_device_family == "hcxiv") || (intended_device_family == "HardCopy IV (GX/E)") || (intended_device_family == "HARDCOPY IV (GX/E)") || (intended_device_family == "hardcopy iv (gx/e)") || (intended_device_family == "HardCopy IV (E/GX)") || (intended_device_family == "HARDCOPY IV (E/GX)") || (intended_device_family == "hardcopy iv (e/gx)") || (intended_device_family == "HardCopyIV(GX/E)") || (intended_device_family == "HARDCOPYIV(GX/E)") || (intended_device_family == "hardcopyiv(gx/e)") || (intended_device_family == "HardCopyIV(E/GX)") || (intended_device_family == "HARDCOPYIV(E/GX)") || (intended_device_family == "hardcopyiv(e/gx)"))
                                 || ((intended_device_family == "HardCopy IV") || (intended_device_family == "HARDCOPY IV") || (intended_device_family == "hardcopy iv") || (intended_device_family == "HardCopyIV") || (intended_device_family == "HARDCOPYIV") || (intended_device_family == "hardcopyiv") || (intended_device_family == "HardCopy IV (GX)") || (intended_device_family == "HARDCOPY IV (GX)") || (intended_device_family == "hardcopy iv (gx)") || (intended_device_family == "HardCopy IV (E)") || (intended_device_family == "HARDCOPY IV (E)") || (intended_device_family == "hardcopy iv (e)") || (intended_device_family == "HardCopyIV(GX)") || (intended_device_family == "HARDCOPYIV(GX)") || (intended_device_family == "hardcopyiv(gx)") || (intended_device_family == "HardCopyIV(E)") || (intended_device_family == "HARDCOPYIV(E)") || (intended_device_family == "hardcopyiv(e)") || (intended_device_family == "HCXIV") || (intended_device_family == "hcxiv") || (intended_device_family == "HardCopy IV (GX/E)") || (intended_device_family == "HARDCOPY IV (GX/E)") || (intended_device_family == "hardcopy iv (gx/e)") || (intended_device_family == "HardCopy IV (E/GX)") || (intended_device_family == "HARDCOPY IV (E/GX)") || (intended_device_family == "hardcopy iv (e/gx)") || (intended_device_family == "HardCopyIV(GX/E)") || (intended_device_family == "HARDCOPYIV(GX/E)") || (intended_device_family == "hardcopyiv(gx/e)") || (intended_device_family == "HardCopyIV(E/GX)") || (intended_device_family == "HARDCOPYIV(E/GX)") || (intended_device_family == "hardcopyiv(e/gx)"))
-                                || (((intended_device_family == "Stratix V") || (intended_device_family == "STRATIX V") || (intended_device_family == "stratix v") || (intended_device_family == "StratixV") || (intended_device_family == "STRATIXV") || (intended_device_family == "stratixv") || (intended_device_family == "Stratix V (GS)") || (intended_device_family == "STRATIX V (GS)") || (intended_device_family == "stratix v (gs)") || (intended_device_family == "StratixV(GS)") || (intended_device_family == "STRATIXV(GS)") || (intended_device_family == "stratixv(gs)") || (intended_device_family == "Stratix V (GT)") || (intended_device_family == "STRATIX V (GT)") || (intended_device_family == "stratix v (gt)") || (intended_device_family == "StratixV(GT)") || (intended_device_family == "STRATIXV(GT)") || (intended_device_family == "stratixv(gt)") || (intended_device_family == "Stratix V (GX)") || (intended_device_family == "STRATIX V (GX)") || (intended_device_family == "stratix v (gx)") || (intended_device_family == "StratixV(GX)") || (intended_device_family == "STRATIXV(GX)") || (intended_device_family == "stratixv(gx)") || (intended_device_family == "Stratix V (GS/GX)") || (intended_device_family == "STRATIX V (GS/GX)") || (intended_device_family == "stratix v (gs/gx)") || (intended_device_family == "StratixV(GS/GX)") || (intended_device_family == "STRATIXV(GS/GX)") || (intended_device_family == "stratixv(gs/gx)") || (intended_device_family == "Stratix V (GS/GT)") || (intended_device_family == "STRATIX V (GS/GT)") || (intended_device_family == "stratix v (gs/gt)") || (intended_device_family == "StratixV(GS/GT)") || (intended_device_family == "STRATIXV(GS/GT)") || (intended_device_family == "stratixv(gs/gt)") || (intended_device_family == "Stratix V (GT/GX)") || (intended_device_family == "STRATIX V (GT/GX)") || (intended_device_family == "stratix v (gt/gx)") || (intended_device_family == "StratixV(GT/GX)") || (intended_device_family == "STRATIXV(GT/GX)") || (intended_device_family == "stratixv(gt/gx)") || (intended_device_family == "Stratix V (GX/GS)") || (intended_device_family == "STRATIX V (GX/GS)") || (intended_device_family == "stratix v (gx/gs)") || (intended_device_family == "StratixV(GX/GS)") || (intended_device_family == "STRATIXV(GX/GS)") || (intended_device_family == "stratixv(gx/gs)") || (intended_device_family == "Stratix V (GT/GS)") || (intended_device_family == "STRATIX V (GT/GS)") || (intended_device_family == "stratix v (gt/gs)") || (intended_device_family == "StratixV(GT/GS)") || (intended_device_family == "STRATIXV(GT/GS)") || (intended_device_family == "stratixv(gt/gs)") || (intended_device_family == "Stratix V (GX/GT)") || (intended_device_family == "STRATIX V (GX/GT)") || (intended_device_family == "stratix v (gx/gt)") || (intended_device_family == "StratixV(GX/GT)") || (intended_device_family == "STRATIXV(GX/GT)") || (intended_device_family == "stratixv(gx/gt)") || (intended_device_family == "Stratix V (GS/GT/GX)") || (intended_device_family == "STRATIX V (GS/GT/GX)") || (intended_device_family == "stratix v (gs/gt/gx)") || (intended_device_family == "Stratix V (GS/GX/GT)") || (intended_device_family == "STRATIX V (GS/GX/GT)") || (intended_device_family == "stratix v (gs/gx/gt)") || (intended_device_family == "Stratix V (GT/GS/GX)") || (intended_device_family == "STRATIX V (GT/GS/GX)") || (intended_device_family == "stratix v (gt/gs/gx)") || (intended_device_family == "Stratix V (GT/GX/GS)") || (intended_device_family == "STRATIX V (GT/GX/GS)") || (intended_device_family == "stratix v (gt/gx/gs)") || (intended_device_family == "Stratix V (GX/GS/GT)") || (intended_device_family == "STRATIX V (GX/GS/GT)") || (intended_device_family == "stratix v (gx/gs/gt)") || (intended_device_family == "Stratix V (GX/GT/GS)") || (intended_device_family == "STRATIX V (GX/GT/GS)") || (intended_device_family == "stratix v (gx/gt/gs)") || (intended_device_family == "StratixV(GS/GT/GX)") || (intended_device_family == "STRATIXV(GS/GT/GX)") || (intended_device_family == "stratixv(gs/gt/gx)") || (intended_device_family == "StratixV(GS/GX/GT)") || (intended_device_family == "STRATIXV(GS/GX/GT)") || (intended_device_family == "stratixv(gs/gx/gt)") || (intended_device_family == "StratixV(GT/GS/GX)") || (intended_device_family == "STRATIXV(GT/GS/GX)") || (intended_device_family == "stratixv(gt/gs/gx)") || (intended_device_family == "StratixV(GT/GX/GS)") || (intended_device_family == "STRATIXV(GT/GX/GS)") || (intended_device_family == "stratixv(gt/gx/gs)") || (intended_device_family == "StratixV(GX/GS/GT)") || (intended_device_family == "STRATIXV(GX/GS/GT)") || (intended_device_family == "stratixv(gx/gs/gt)") || (intended_device_family == "StratixV(GX/GT/GS)") || (intended_device_family == "STRATIXV(GX/GT/GS)") || (intended_device_family == "stratixv(gx/gt/gs)"))
-                                ) || (((intended_device_family == "Arria V") || (intended_device_family == "ARRIA V") || (intended_device_family == "arria v") || (intended_device_family == "ArriaV") || (intended_device_family == "ARRIAV") || (intended_device_family == "arriav"))
-                                ) || (((intended_device_family == "Arria II GZ") || (intended_device_family == "ARRIA II GZ") || (intended_device_family == "arria ii gz") || (intended_device_family == "ArriaII GZ") || (intended_device_family == "ARRIAII GZ") || (intended_device_family == "arriaii gz") || (intended_device_family == "Arria IIGZ") || (intended_device_family == "ARRIA IIGZ") || (intended_device_family == "arria iigz") || (intended_device_family == "ArriaIIGZ") || (intended_device_family == "ARRIAIIGZ") || (intended_device_family == "arriaiigz"))
-                                ) ) || ((intended_device_family == "HardCopy III") || (intended_device_family == "HARDCOPY III") || (intended_device_family == "hardcopy iii") || (intended_device_family == "HardCopyIII") || (intended_device_family == "HARDCOPYIII") || (intended_device_family == "hardcopyiii") || (intended_device_family == "HCX") || (intended_device_family == "hcx"))
-                                ) ) || (((intended_device_family == "Cyclone II") || (intended_device_family == "CYCLONE II") || (intended_device_family == "cyclone ii") || (intended_device_family == "Cycloneii") || (intended_device_family == "CYCLONEII") || (intended_device_family == "cycloneii") || (intended_device_family == "Magellan") || (intended_device_family == "MAGELLAN") || (intended_device_family == "magellan"))
+                                ) || (((intended_device_family == "Stratix V") || (intended_device_family == "STRATIX V") || (intended_device_family == "stratix v") || (intended_device_family == "StratixV") || (intended_device_family == "STRATIXV") || (intended_device_family == "stratixv") || (intended_device_family == "Stratix V (GS)") || (intended_device_family == "STRATIX V (GS)") || (intended_device_family == "stratix v (gs)") || (intended_device_family == "StratixV(GS)") || (intended_device_family == "STRATIXV(GS)") || (intended_device_family == "stratixv(gs)") || (intended_device_family == "Stratix V (GT)") || (intended_device_family == "STRATIX V (GT)") || (intended_device_family == "stratix v (gt)") || (intended_device_family == "StratixV(GT)") || (intended_device_family == "STRATIXV(GT)") || (intended_device_family == "stratixv(gt)") || (intended_device_family == "Stratix V (GX)") || (intended_device_family == "STRATIX V (GX)") || (intended_device_family == "stratix v (gx)") || (intended_device_family == "StratixV(GX)") || (intended_device_family == "STRATIXV(GX)") || (intended_device_family == "stratixv(gx)") || (intended_device_family == "Stratix V (GS/GX)") || (intended_device_family == "STRATIX V (GS/GX)") || (intended_device_family == "stratix v (gs/gx)") || (intended_device_family == "StratixV(GS/GX)") || (intended_device_family == "STRATIXV(GS/GX)") || (intended_device_family == "stratixv(gs/gx)") || (intended_device_family == "Stratix V (GS/GT)") || (intended_device_family == "STRATIX V (GS/GT)") || (intended_device_family == "stratix v (gs/gt)") || (intended_device_family == "StratixV(GS/GT)") || (intended_device_family == "STRATIXV(GS/GT)") || (intended_device_family == "stratixv(gs/gt)") || (intended_device_family == "Stratix V (GT/GX)") || (intended_device_family == "STRATIX V (GT/GX)") || (intended_device_family == "stratix v (gt/gx)") || (intended_device_family == "StratixV(GT/GX)") || (intended_device_family == "STRATIXV(GT/GX)") || (intended_device_family == "stratixv(gt/gx)") || (intended_device_family == "Stratix V (GX/GS)") || (intended_device_family == "STRATIX V (GX/GS)") || (intended_device_family == "stratix v (gx/gs)") || (intended_device_family == "StratixV(GX/GS)") || (intended_device_family == "STRATIXV(GX/GS)") || (intended_device_family == "stratixv(gx/gs)") || (intended_device_family == "Stratix V (GT/GS)") || (intended_device_family == "STRATIX V (GT/GS)") || (intended_device_family == "stratix v (gt/gs)") || (intended_device_family == "StratixV(GT/GS)") || (intended_device_family == "STRATIXV(GT/GS)") || (intended_device_family == "stratixv(gt/gs)") || (intended_device_family == "Stratix V (GX/GT)") || (intended_device_family == "STRATIX V (GX/GT)") || (intended_device_family == "stratix v (gx/gt)") || (intended_device_family == "StratixV(GX/GT)") || (intended_device_family == "STRATIXV(GX/GT)") || (intended_device_family == "stratixv(gx/gt)") || (intended_device_family == "Stratix V (GS/GT/GX)") || (intended_device_family == "STRATIX V (GS/GT/GX)") || (intended_device_family == "stratix v (gs/gt/gx)") || (intended_device_family == "Stratix V (GS/GX/GT)") || (intended_device_family == "STRATIX V (GS/GX/GT)") || (intended_device_family == "stratix v (gs/gx/gt)") || (intended_device_family == "Stratix V (GT/GS/GX)") || (intended_device_family == "STRATIX V (GT/GS/GX)") || (intended_device_family == "stratix v (gt/gs/gx)") || (intended_device_family == "Stratix V (GT/GX/GS)") || (intended_device_family == "STRATIX V (GT/GX/GS)") || (intended_device_family == "stratix v (gt/gx/gs)") || (intended_device_family == "Stratix V (GX/GS/GT)") || (intended_device_family == "STRATIX V (GX/GS/GT)") || (intended_device_family == "stratix v (gx/gs/gt)") || (intended_device_family == "Stratix V (GX/GT/GS)") || (intended_device_family == "STRATIX V (GX/GT/GS)") || (intended_device_family == "stratix v (gx/gt/gs)") || (intended_device_family == "StratixV(GS/GT/GX)") || (intended_device_family == "STRATIXV(GS/GT/GX)") || (intended_device_family == "stratixv(gs/gt/gx)") || (intended_device_family == "StratixV(GS/GX/GT)") || (intended_device_family == "STRATIXV(GS/GX/GT)") || (intended_device_family == "stratixv(gs/gx/gt)") || (intended_device_family == "StratixV(GT/GS/GX)") || (intended_device_family == "STRATIXV(GT/GS/GX)") || (intended_device_family == "stratixv(gt/gs/gx)") || (intended_device_family == "StratixV(GT/GX/GS)") || (intended_device_family == "STRATIXV(GT/GX/GS)") || (intended_device_family == "stratixv(gt/gx/gs)") || (intended_device_family == "StratixV(GX/GS/GT)") || (intended_device_family == "STRATIXV(GX/GS/GT)") || (intended_device_family == "stratixv(gx/gs/gt)") || (intended_device_family == "StratixV(GX/GT/GS)") || (intended_device_family == "STRATIXV(GX/GT/GS)") || (intended_device_family == "stratixv(gx/gt/gs)") || (intended_device_family == "Stratix V (GS/GT/GX/E)") || (intended_device_family == "STRATIX V (GS/GT/GX/E)") || (intended_device_family == "stratix v (gs/gt/gx/e)") || (intended_device_family == "StratixV(GS/GT/GX/E)") || (intended_device_family == "STRATIXV(GS/GT/GX/E)") || (intended_device_family == "stratixv(gs/gt/gx/e)") || (intended_device_family == "Stratix V (E)") || (intended_device_family == "STRATIX V (E)") || (intended_device_family == "stratix v (e)") || (intended_device_family == "StratixV(E)") || (intended_device_family == "STRATIXV(E)") || (intended_device_family == "stratixv(e)"))
+                                || (((intended_device_family == "Arria V GZ") || (intended_device_family == "ARRIA V GZ") || (intended_device_family == "arria v gz") || (intended_device_family == "ArriaVGZ") || (intended_device_family == "ARRIAVGZ") || (intended_device_family == "arriavgz"))
+                                ) ) || (((intended_device_family == "Arria V") || (intended_device_family == "ARRIA V") || (intended_device_family == "arria v") || (intended_device_family == "Arria V (GT/GX)") || (intended_device_family == "ARRIA V (GT/GX)") || (intended_device_family == "arria v (gt/gx)") || (intended_device_family == "ArriaV(GT/GX)") || (intended_device_family == "ARRIAV(GT/GX)") || (intended_device_family == "arriav(gt/gx)") || (intended_device_family == "ArriaV") || (intended_device_family == "ARRIAV") || (intended_device_family == "arriav") || (intended_device_family == "Arria V (GT/GX/ST/SX)") || (intended_device_family == "ARRIA V (GT/GX/ST/SX)") || (intended_device_family == "arria v (gt/gx/st/sx)") || (intended_device_family == "ArriaV(GT/GX/ST/SX)") || (intended_device_family == "ARRIAV(GT/GX/ST/SX)") || (intended_device_family == "arriav(gt/gx/st/sx)") || (intended_device_family == "Arria V (GT)") || (intended_device_family == "ARRIA V (GT)") || (intended_device_family == "arria v (gt)") || (intended_device_family == "ArriaV(GT)") || (intended_device_family == "ARRIAV(GT)") || (intended_device_family == "arriav(gt)") || (intended_device_family == "Arria V (GX)") || (intended_device_family == "ARRIA V (GX)") || (intended_device_family == "arria v (gx)") || (intended_device_family == "ArriaV(GX)") || (intended_device_family == "ARRIAV(GX)") || (intended_device_family == "arriav(gx)") || (intended_device_family == "Arria V (ST)") || (intended_device_family == "ARRIA V (ST)") || (intended_device_family == "arria v (st)") || (intended_device_family == "ArriaV(ST)") || (intended_device_family == "ARRIAV(ST)") || (intended_device_family == "arriav(st)") || (intended_device_family == "Arria V (SX)") || (intended_device_family == "ARRIA V (SX)") || (intended_device_family == "arria v (sx)") || (intended_device_family == "ArriaV(SX)") || (intended_device_family == "ARRIAV(SX)") || (intended_device_family == "arriav(sx)"))
+                                || (((intended_device_family == "Cyclone V") || (intended_device_family == "CYCLONE V") || (intended_device_family == "cyclone v") || (intended_device_family == "CycloneV") || (intended_device_family == "CYCLONEV") || (intended_device_family == "cyclonev") || (intended_device_family == "Cyclone V (GT/GX/E/SX)") || (intended_device_family == "CYCLONE V (GT/GX/E/SX)") || (intended_device_family == "cyclone v (gt/gx/e/sx)") || (intended_device_family == "CycloneV(GT/GX/E/SX)") || (intended_device_family == "CYCLONEV(GT/GX/E/SX)") || (intended_device_family == "cyclonev(gt/gx/e/sx)") || (intended_device_family == "Cyclone V (E/GX/GT/SX/SE/ST)") || (intended_device_family == "CYCLONE V (E/GX/GT/SX/SE/ST)") || (intended_device_family == "cyclone v (e/gx/gt/sx/se/st)") || (intended_device_family == "CycloneV(E/GX/GT/SX/SE/ST)") || (intended_device_family == "CYCLONEV(E/GX/GT/SX/SE/ST)") || (intended_device_family == "cyclonev(e/gx/gt/sx/se/st)") || (intended_device_family == "Cyclone V (E)") || (intended_device_family == "CYCLONE V (E)") || (intended_device_family == "cyclone v (e)") || (intended_device_family == "CycloneV(E)") || (intended_device_family == "CYCLONEV(E)") || (intended_device_family == "cyclonev(e)") || (intended_device_family == "Cyclone V (GX)") || (intended_device_family == "CYCLONE V (GX)") || (intended_device_family == "cyclone v (gx)") || (intended_device_family == "CycloneV(GX)") || (intended_device_family == "CYCLONEV(GX)") || (intended_device_family == "cyclonev(gx)") || (intended_device_family == "Cyclone V (GT)") || (intended_device_family == "CYCLONE V (GT)") || (intended_device_family == "cyclone v (gt)") || (intended_device_family == "CycloneV(GT)") || (intended_device_family == "CYCLONEV(GT)") || (intended_device_family == "cyclonev(gt)") || (intended_device_family == "Cyclone V (SX)") || (intended_device_family == "CYCLONE V (SX)") || (intended_device_family == "cyclone v (sx)") || (intended_device_family == "CycloneV(SX)") || (intended_device_family == "CYCLONEV(SX)") || (intended_device_family == "cyclonev(sx)") || (intended_device_family == "Cyclone V (SE)") || (intended_device_family == "CYCLONE V (SE)") || (intended_device_family == "cyclone v (se)") || (intended_device_family == "CycloneV(SE)") || (intended_device_family == "CYCLONEV(SE)") || (intended_device_family == "cyclonev(se)") || (intended_device_family == "Cyclone V (ST)") || (intended_device_family == "CYCLONE V (ST)") || (intended_device_family == "cyclone v (st)") || (intended_device_family == "CycloneV(ST)") || (intended_device_family == "CYCLONEV(ST)") || (intended_device_family == "cyclonev(st)"))
+                                ) ) || (((intended_device_family == "Arria II GZ") || (intended_device_family == "ARRIA II GZ") || (intended_device_family == "arria ii gz") || (intended_device_family == "ArriaII GZ") || (intended_device_family == "ARRIAII GZ") || (intended_device_family == "arriaii gz") || (intended_device_family == "Arria IIGZ") || (intended_device_family == "ARRIA IIGZ") || (intended_device_family == "arria iigz") || (intended_device_family == "ArriaIIGZ") || (intended_device_family == "ARRIAIIGZ") || (intended_device_family == "arriaiigz"))
+                                ) || (((intended_device_family == "Arria 10") || (intended_device_family == "ARRIA 10") || (intended_device_family == "arria 10") || (intended_device_family == "Arria10") || (intended_device_family == "ARRIA10") || (intended_device_family == "arria10") || (intended_device_family == "Arria VI") || (intended_device_family == "ARRIA VI") || (intended_device_family == "arria vi") || (intended_device_family == "ArriaVI") || (intended_device_family == "ARRIAVI") || (intended_device_family == "arriavi") || (intended_device_family == "Night Fury") || (intended_device_family == "NIGHT FURY") || (intended_device_family == "night fury") || (intended_device_family == "nightfury") || (intended_device_family == "NIGHTFURY") || (intended_device_family == "Arria 10 (GX/SX/GT)") || (intended_device_family == "ARRIA 10 (GX/SX/GT)") || (intended_device_family == "arria 10 (gx/sx/gt)") || (intended_device_family == "Arria10(GX/SX/GT)") || (intended_device_family == "ARRIA10(GX/SX/GT)") || (intended_device_family == "arria10(gx/sx/gt)") || (intended_device_family == "Arria 10 (GX)") || (intended_device_family == "ARRIA 10 (GX)") || (intended_device_family == "arria 10 (gx)") || (intended_device_family == "Arria10(GX)") || (intended_device_family == "ARRIA10(GX)") || (intended_device_family == "arria10(gx)") || (intended_device_family == "Arria 10 (SX)") || (intended_device_family == "ARRIA 10 (SX)") || (intended_device_family == "arria 10 (sx)") || (intended_device_family == "Arria10(SX)") || (intended_device_family == "ARRIA10(SX)") || (intended_device_family == "arria10(sx)") || (intended_device_family == "Arria 10 (GT)") || (intended_device_family == "ARRIA 10 (GT)") || (intended_device_family == "arria 10 (gt)") || (intended_device_family == "Arria10(GT)") || (intended_device_family == "ARRIA10(GT)") || (intended_device_family == "arria10(gt)"))
+                                || ((intended_device_family == "Arria 10") || (intended_device_family == "ARRIA 10") || (intended_device_family == "arria 10") || (intended_device_family == "Arria10") || (intended_device_family == "ARRIA10") || (intended_device_family == "arria10") || (intended_device_family == "Arria VI") || (intended_device_family == "ARRIA VI") || (intended_device_family == "arria vi") || (intended_device_family == "ArriaVI") || (intended_device_family == "ARRIAVI") || (intended_device_family == "arriavi") || (intended_device_family == "Night Fury") || (intended_device_family == "NIGHT FURY") || (intended_device_family == "night fury") || (intended_device_family == "nightfury") || (intended_device_family == "NIGHTFURY") || (intended_device_family == "Arria 10 (GX/SX/GT)") || (intended_device_family == "ARRIA 10 (GX/SX/GT)") || (intended_device_family == "arria 10 (gx/sx/gt)") || (intended_device_family == "Arria10(GX/SX/GT)") || (intended_device_family == "ARRIA10(GX/SX/GT)") || (intended_device_family == "arria10(gx/sx/gt)") || (intended_device_family == "Arria 10 (GX)") || (intended_device_family == "ARRIA 10 (GX)") || (intended_device_family == "arria 10 (gx)") || (intended_device_family == "Arria10(GX)") || (intended_device_family == "ARRIA10(GX)") || (intended_device_family == "arria10(gx)") || (intended_device_family == "Arria 10 (SX)") || (intended_device_family == "ARRIA 10 (SX)") || (intended_device_family == "arria 10 (sx)") || (intended_device_family == "Arria10(SX)") || (intended_device_family == "ARRIA10(SX)") || (intended_device_family == "arria10(sx)") || (intended_device_family == "Arria 10 (GT)") || (intended_device_family == "ARRIA 10 (GT)") || (intended_device_family == "arria 10 (gt)") || (intended_device_family == "Arria10(GT)") || (intended_device_family == "ARRIA10(GT)") || (intended_device_family == "arria10(gt)"))
+                                ) || (((intended_device_family == "Cyclone 10 GX") || (intended_device_family == "CYCLONE 10 GX") || (intended_device_family == "cyclone 10 gx") || (intended_device_family == "Cyclone10GX") || (intended_device_family == "CYCLONE10GX") || (intended_device_family == "cyclone10gx"))
+                                || ((intended_device_family == "Cyclone 10 GX") || (intended_device_family == "CYCLONE 10 GX") || (intended_device_family == "cyclone 10 gx") || (intended_device_family == "Cyclone10GX") || (intended_device_family == "CYCLONE10GX") || (intended_device_family == "cyclone10gx"))
+                                ) || (((intended_device_family == "Stratix 10") || (intended_device_family == "STRATIX 10") || (intended_device_family == "stratix 10") || (intended_device_family == "Stratix10") || (intended_device_family == "STRATIX10") || (intended_device_family == "stratix10") || (intended_device_family == "nadder") || (intended_device_family == "NADDER") || (intended_device_family == "Stratix 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "stratix 10 (gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix10(GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX10(GX/SX/MX/TX/DX)") || (intended_device_family == "stratix10(gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix 10 (GX)") || (intended_device_family == "STRATIX 10 (GX)") || (intended_device_family == "stratix 10 (gx)") || (intended_device_family == "Stratix10(GX)") || (intended_device_family == "STRATIX10(GX)") || (intended_device_family == "stratix10(gx)") || (intended_device_family == "Stratix 10 (SX)") || (intended_device_family == "STRATIX 10 (SX)") || (intended_device_family == "stratix 10 (sx)") || (intended_device_family == "Stratix10(SX)") || (intended_device_family == "STRATIX10(SX)") || (intended_device_family == "stratix10(sx)") || (intended_device_family == "Stratix 10 (MX)") || (intended_device_family == "STRATIX 10 (MX)") || (intended_device_family == "stratix 10 (mx)") || (intended_device_family == "Stratix10(MX)") || (intended_device_family == "STRATIX10(MX)") || (intended_device_family == "stratix10(mx)") || (intended_device_family == "Stratix 10 (TX)") || (intended_device_family == "STRATIX 10 (TX)") || (intended_device_family == "stratix 10 (tx)") || (intended_device_family == "Stratix10(TX)") || (intended_device_family == "STRATIX10(TX)") || (intended_device_family == "stratix10(tx)") || (intended_device_family == "Stratix 10 (DX)") || (intended_device_family == "STRATIX 10 (DX)") || (intended_device_family == "stratix 10 (dx)") || (intended_device_family == "Stratix10(DX)") || (intended_device_family == "STRATIX10(DX)") || (intended_device_family == "stratix10(dx)"))
+                                || ((intended_device_family == "Stratix 10") || (intended_device_family == "STRATIX 10") || (intended_device_family == "stratix 10") || (intended_device_family == "Stratix10") || (intended_device_family == "STRATIX10") || (intended_device_family == "stratix10") || (intended_device_family == "nadder") || (intended_device_family == "NADDER") || (intended_device_family == "Stratix 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "stratix 10 (gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix10(GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX10(GX/SX/MX/TX/DX)") || (intended_device_family == "stratix10(gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix 10 (GX)") || (intended_device_family == "STRATIX 10 (GX)") || (intended_device_family == "stratix 10 (gx)") || (intended_device_family == "Stratix10(GX)") || (intended_device_family == "STRATIX10(GX)") || (intended_device_family == "stratix10(gx)") || (intended_device_family == "Stratix 10 (SX)") || (intended_device_family == "STRATIX 10 (SX)") || (intended_device_family == "stratix 10 (sx)") || (intended_device_family == "Stratix10(SX)") || (intended_device_family == "STRATIX10(SX)") || (intended_device_family == "stratix10(sx)") || (intended_device_family == "Stratix 10 (MX)") || (intended_device_family == "STRATIX 10 (MX)") || (intended_device_family == "stratix 10 (mx)") || (intended_device_family == "Stratix10(MX)") || (intended_device_family == "STRATIX10(MX)") || (intended_device_family == "stratix10(mx)") || (intended_device_family == "Stratix 10 (TX)") || (intended_device_family == "STRATIX 10 (TX)") || (intended_device_family == "stratix 10 (tx)") || (intended_device_family == "Stratix10(TX)") || (intended_device_family == "STRATIX10(TX)") || (intended_device_family == "stratix10(tx)") || (intended_device_family == "Stratix 10 (DX)") || (intended_device_family == "STRATIX 10 (DX)") || (intended_device_family == "stratix 10 (dx)") || (intended_device_family == "Stratix10(DX)") || (intended_device_family == "STRATIX10(DX)") || (intended_device_family == "stratix10(dx)"))
+                                ) || (((intended_device_family == "Agilex") || (intended_device_family == "AGILEX") || (intended_device_family == "agilex") || (intended_device_family == "AGILEX") || (intended_device_family == "agilex") || (intended_device_family == "Falcon Mesa") || (intended_device_family == "FALCON MESA") || (intended_device_family == "falcon mesa") || (intended_device_family == "FALCONMESA") || (intended_device_family == "falconmesa") || (intended_device_family == "falconmesa") || (intended_device_family == "FALCONMESA") || (intended_device_family == "Stratix 20") || (intended_device_family == "STRATIX 20") || (intended_device_family == "stratix 20") || (intended_device_family == "Stratix20") || (intended_device_family == "STRATIX20") || (intended_device_family == "stratix20") || (intended_device_family == "stratix 20") || (intended_device_family == "STRATIX 20") || (intended_device_family == "stratix20") || (intended_device_family == "STRATIX20") || (intended_device_family == "STRATIX 20") || (intended_device_family == "stratix 20") || (intended_device_family == "STRATIX20") || (intended_device_family == "stratix20") || (intended_device_family == "Agilex (F-Series/I-Series)") || (intended_device_family == "AGILEX (F-SERIES/I-SERIES)") || (intended_device_family == "agilex (f-series/i-series)") || (intended_device_family == "Agilex(F-Series/I-Series)") || (intended_device_family == "AGILEX(F-SERIES/I-SERIES)") || (intended_device_family == "agilex(f-series/i-series)") || (intended_device_family == "Agilex (F-Series)") || (intended_device_family == "AGILEX (F-SERIES)") || (intended_device_family == "agilex (f-series)") || (intended_device_family == "Agilex(F-Series)") || (intended_device_family == "AGILEX(F-SERIES)") || (intended_device_family == "agilex(f-series)") || (intended_device_family == "Agilex (I-Series)") || (intended_device_family == "AGILEX (I-SERIES)") || (intended_device_family == "agilex (i-series)") || (intended_device_family == "Agilex(I-Series)") || (intended_device_family == "AGILEX(I-SERIES)") || (intended_device_family == "agilex(i-series)"))
+                                ) ) || (((intended_device_family == "HardCopy III") || (intended_device_family == "HARDCOPY III") || (intended_device_family == "hardcopy iii") || (intended_device_family == "HardCopyIII") || (intended_device_family == "HARDCOPYIII") || (intended_device_family == "hardcopyiii") || (intended_device_family == "HCX") || (intended_device_family == "hcx"))
+                                || ((intended_device_family == "HardCopy III") || (intended_device_family == "HARDCOPY III") || (intended_device_family == "hardcopy iii") || (intended_device_family == "HardCopyIII") || (intended_device_family == "HARDCOPYIII") || (intended_device_family == "hardcopyiii") || (intended_device_family == "HCX") || (intended_device_family == "hcx"))
+                                ) ) ) || (((intended_device_family == "Cyclone II") || (intended_device_family == "CYCLONE II") || (intended_device_family == "cyclone ii") || (intended_device_family == "Cycloneii") || (intended_device_family == "CYCLONEII") || (intended_device_family == "cycloneii") || (intended_device_family == "Magellan") || (intended_device_family == "MAGELLAN") || (intended_device_family == "magellan") || (intended_device_family == "CycloneII") || (intended_device_family == "CYCLONEII") || (intended_device_family == "cycloneii"))
                                 || (((intended_device_family == "Cyclone III") || (intended_device_family == "CYCLONE III") || (intended_device_family == "cyclone iii") || (intended_device_family == "CycloneIII") || (intended_device_family == "CYCLONEIII") || (intended_device_family == "cycloneiii") || (intended_device_family == "Barracuda") || (intended_device_family == "BARRACUDA") || (intended_device_family == "barracuda") || (intended_device_family == "Cuda") || (intended_device_family == "CUDA") || (intended_device_family == "cuda") || (intended_device_family == "CIII") || (intended_device_family == "ciii"))
                                 || ((intended_device_family == "Cyclone III LS") || (intended_device_family == "CYCLONE III LS") || (intended_device_family == "cyclone iii ls") || (intended_device_family == "CycloneIIILS") || (intended_device_family == "CYCLONEIIILS") || (intended_device_family == "cycloneiiils") || (intended_device_family == "Cyclone III LPS") || (intended_device_family == "CYCLONE III LPS") || (intended_device_family == "cyclone iii lps") || (intended_device_family == "Cyclone LPS") || (intended_device_family == "CYCLONE LPS") || (intended_device_family == "cyclone lps") || (intended_device_family == "CycloneLPS") || (intended_device_family == "CYCLONELPS") || (intended_device_family == "cyclonelps") || (intended_device_family == "Tarpon") || (intended_device_family == "TARPON") || (intended_device_family == "tarpon") || (intended_device_family == "Cyclone IIIE") || (intended_device_family == "CYCLONE IIIE") || (intended_device_family == "cyclone iiie"))
                                 || (((intended_device_family == "Cyclone IV GX") || (intended_device_family == "CYCLONE IV GX") || (intended_device_family == "cyclone iv gx") || (intended_device_family == "Cyclone IVGX") || (intended_device_family == "CYCLONE IVGX") || (intended_device_family == "cyclone ivgx") || (intended_device_family == "CycloneIV GX") || (intended_device_family == "CYCLONEIV GX") || (intended_device_family == "cycloneiv gx") || (intended_device_family == "CycloneIVGX") || (intended_device_family == "CYCLONEIVGX") || (intended_device_family == "cycloneivgx") || (intended_device_family == "Cyclone IV") || (intended_device_family == "CYCLONE IV") || (intended_device_family == "cyclone iv") || (intended_device_family == "CycloneIV") || (intended_device_family == "CYCLONEIV") || (intended_device_family == "cycloneiv") || (intended_device_family == "Cyclone IV (GX)") || (intended_device_family == "CYCLONE IV (GX)") || (intended_device_family == "cyclone iv (gx)") || (intended_device_family == "CycloneIV(GX)") || (intended_device_family == "CYCLONEIV(GX)") || (intended_device_family == "cycloneiv(gx)") || (intended_device_family == "Cyclone III GX") || (intended_device_family == "CYCLONE III GX") || (intended_device_family == "cyclone iii gx") || (intended_device_family == "CycloneIII GX") || (intended_device_family == "CYCLONEIII GX") || (intended_device_family == "cycloneiii gx") || (intended_device_family == "Cyclone IIIGX") || (intended_device_family == "CYCLONE IIIGX") || (intended_device_family == "cyclone iiigx") || (intended_device_family == "CycloneIIIGX") || (intended_device_family == "CYCLONEIIIGX") || (intended_device_family == "cycloneiiigx") || (intended_device_family == "Cyclone III GL") || (intended_device_family == "CYCLONE III GL") || (intended_device_family == "cyclone iii gl") || (intended_device_family == "CycloneIII GL") || (intended_device_family == "CYCLONEIII GL") || (intended_device_family == "cycloneiii gl") || (intended_device_family == "Cyclone IIIGL") || (intended_device_family == "CYCLONE IIIGL") || (intended_device_family == "cyclone iiigl") || (intended_device_family == "CycloneIIIGL") || (intended_device_family == "CYCLONEIIIGL") || (intended_device_family == "cycloneiiigl") || (intended_device_family == "Stingray") || (intended_device_family == "STINGRAY") || (intended_device_family == "stingray"))
                                 || ((intended_device_family == "Cyclone IV GX") || (intended_device_family == "CYCLONE IV GX") || (intended_device_family == "cyclone iv gx") || (intended_device_family == "Cyclone IVGX") || (intended_device_family == "CYCLONE IVGX") || (intended_device_family == "cyclone ivgx") || (intended_device_family == "CycloneIV GX") || (intended_device_family == "CYCLONEIV GX") || (intended_device_family == "cycloneiv gx") || (intended_device_family == "CycloneIVGX") || (intended_device_family == "CYCLONEIVGX") || (intended_device_family == "cycloneivgx") || (intended_device_family == "Cyclone IV") || (intended_device_family == "CYCLONE IV") || (intended_device_family == "cyclone iv") || (intended_device_family == "CycloneIV") || (intended_device_family == "CYCLONEIV") || (intended_device_family == "cycloneiv") || (intended_device_family == "Cyclone IV (GX)") || (intended_device_family == "CYCLONE IV (GX)") || (intended_device_family == "cyclone iv (gx)") || (intended_device_family == "CycloneIV(GX)") || (intended_device_family == "CYCLONEIV(GX)") || (intended_device_family == "cycloneiv(gx)") || (intended_device_family == "Cyclone III GX") || (intended_device_family == "CYCLONE III GX") || (intended_device_family == "cyclone iii gx") || (intended_device_family == "CycloneIII GX") || (intended_device_family == "CYCLONEIII GX") || (intended_device_family == "cycloneiii gx") || (intended_device_family == "Cyclone IIIGX") || (intended_device_family == "CYCLONE IIIGX") || (intended_device_family == "cyclone iiigx") || (intended_device_family == "CycloneIIIGX") || (intended_device_family == "CYCLONEIIIGX") || (intended_device_family == "cycloneiiigx") || (intended_device_family == "Cyclone III GL") || (intended_device_family == "CYCLONE III GL") || (intended_device_family == "cyclone iii gl") || (intended_device_family == "CycloneIII GL") || (intended_device_family == "CYCLONEIII GL") || (intended_device_family == "cycloneiii gl") || (intended_device_family == "Cyclone IIIGL") || (intended_device_family == "CYCLONE IIIGL") || (intended_device_family == "cyclone iiigl") || (intended_device_family == "CycloneIIIGL") || (intended_device_family == "CYCLONEIIIGL") || (intended_device_family == "cycloneiiigl") || (intended_device_family == "Stingray") || (intended_device_family == "STINGRAY") || (intended_device_family == "stingray"))
                                 ) || (((intended_device_family == "Cyclone IV E") || (intended_device_family == "CYCLONE IV E") || (intended_device_family == "cyclone iv e") || (intended_device_family == "CycloneIV E") || (intended_device_family == "CYCLONEIV E") || (intended_device_family == "cycloneiv e") || (intended_device_family == "Cyclone IVE") || (intended_device_family == "CYCLONE IVE") || (intended_device_family == "cyclone ive") || (intended_device_family == "CycloneIVE") || (intended_device_family == "CYCLONEIVE") || (intended_device_family == "cycloneive"))
+                                ) || (((intended_device_family == "MAX 10") || (intended_device_family == "max 10") || (intended_device_family == "MAX 10 FPGA") || (intended_device_family == "max 10 fpga") || (intended_device_family == "Zippleback") || (intended_device_family == "ZIPPLEBACK") || (intended_device_family == "zippleback") || (intended_device_family == "MAX10") || (intended_device_family == "max10") || (intended_device_family == "MAX 10 (DA/DF/DC/SA/SC)") || (intended_device_family == "max 10 (da/df/dc/sa/sc)") || (intended_device_family == "MAX10(DA/DF/DC/SA/SC)") || (intended_device_family == "max10(da/df/dc/sa/sc)") || (intended_device_family == "MAX 10 (DA)") || (intended_device_family == "max 10 (da)") || (intended_device_family == "MAX10(DA)") || (intended_device_family == "max10(da)") || (intended_device_family == "MAX 10 (DF)") || (intended_device_family == "max 10 (df)") || (intended_device_family == "MAX10(DF)") || (intended_device_family == "max10(df)") || (intended_device_family == "MAX 10 (DC)") || (intended_device_family == "max 10 (dc)") || (intended_device_family == "MAX10(DC)") || (intended_device_family == "max10(dc)") || (intended_device_family == "MAX 10 (SA)") || (intended_device_family == "max 10 (sa)") || (intended_device_family == "MAX10(SA)") || (intended_device_family == "max10(sa)") || (intended_device_family == "MAX 10 (SC)") || (intended_device_family == "max 10 (sc)") || (intended_device_family == "MAX10(SC)") || (intended_device_family == "max10(sc)"))
                                 ) ) ) ))
                                 ? 1 : 0;
 
     parameter FAMILY_HAS_STRATIXIII_STYLE_RAM = (((((intended_device_family == "Stratix III") || (intended_device_family == "STRATIX III") || (intended_device_family == "stratix iii") || (intended_device_family == "StratixIII") || (intended_device_family == "STRATIXIII") || (intended_device_family == "stratixiii") || (intended_device_family == "Titan") || (intended_device_family == "TITAN") || (intended_device_family == "titan") || (intended_device_family == "SIII") || (intended_device_family == "siii"))
                                 || (((intended_device_family == "Stratix IV") || (intended_device_family == "STRATIX IV") || (intended_device_family == "stratix iv") || (intended_device_family == "TGX") || (intended_device_family == "tgx") || (intended_device_family == "StratixIV") || (intended_device_family == "STRATIXIV") || (intended_device_family == "stratixiv") || (intended_device_family == "Stratix IV (GT)") || (intended_device_family == "STRATIX IV (GT)") || (intended_device_family == "stratix iv (gt)") || (intended_device_family == "Stratix IV (GX)") || (intended_device_family == "STRATIX IV (GX)") || (intended_device_family == "stratix iv (gx)") || (intended_device_family == "Stratix IV (E)") || (intended_device_family == "STRATIX IV (E)") || (intended_device_family == "stratix iv (e)") || (intended_device_family == "StratixIV(GT)") || (intended_device_family == "STRATIXIV(GT)") || (intended_device_family == "stratixiv(gt)") || (intended_device_family == "StratixIV(GX)") || (intended_device_family == "STRATIXIV(GX)") || (intended_device_family == "stratixiv(gx)") || (intended_device_family == "StratixIV(E)") || (intended_device_family == "STRATIXIV(E)") || (intended_device_family == "stratixiv(e)") || (intended_device_family == "StratixIIIGX") || (intended_device_family == "STRATIXIIIGX") || (intended_device_family == "stratixiiigx") || (intended_device_family == "Stratix IV (GT/GX/E)") || (intended_device_family == "STRATIX IV (GT/GX/E)") || (intended_device_family == "stratix iv (gt/gx/e)") || (intended_device_family == "Stratix IV (GT/E/GX)") || (intended_device_family == "STRATIX IV (GT/E/GX)") || (intended_device_family == "stratix iv (gt/e/gx)") || (intended_device_family == "Stratix IV (E/GT/GX)") || (intended_device_family == "STRATIX IV (E/GT/GX)") || (intended_device_family == "stratix iv (e/gt/gx)") || (intended_device_family == "Stratix IV (E/GX/GT)") || (intended_device_family == "STRATIX IV (E/GX/GT)") || (intended_device_family == "stratix iv (e/gx/gt)") || (intended_device_family == "StratixIV(GT/GX/E)") || (intended_device_family == "STRATIXIV(GT/GX/E)") || (intended_device_family == "stratixiv(gt/gx/e)") || (intended_device_family == "StratixIV(GT/E/GX)") || (intended_device_family == "STRATIXIV(GT/E/GX)") || (intended_device_family == "stratixiv(gt/e/gx)") || (intended_device_family == "StratixIV(E/GX/GT)") || (intended_device_family == "STRATIXIV(E/GX/GT)") || (intended_device_family == "stratixiv(e/gx/gt)") || (intended_device_family == "StratixIV(E/GT/GX)") || (intended_device_family == "STRATIXIV(E/GT/GX)") || (intended_device_family == "stratixiv(e/gt/gx)") || (intended_device_family == "Stratix IV (GX/E)") || (intended_device_family == "STRATIX IV (GX/E)") || (intended_device_family == "stratix iv (gx/e)") || (intended_device_family == "StratixIV(GX/E)") || (intended_device_family == "STRATIXIV(GX/E)") || (intended_device_family == "stratixiv(gx/e)"))
                                 || ((intended_device_family == "Arria II GX") || (intended_device_family == "ARRIA II GX") || (intended_device_family == "arria ii gx") || (intended_device_family == "ArriaIIGX") || (intended_device_family == "ARRIAIIGX") || (intended_device_family == "arriaiigx") || (intended_device_family == "Arria IIGX") || (intended_device_family == "ARRIA IIGX") || (intended_device_family == "arria iigx") || (intended_device_family == "ArriaII GX") || (intended_device_family == "ARRIAII GX") || (intended_device_family == "arriaii gx") || (intended_device_family == "Arria II") || (intended_device_family == "ARRIA II") || (intended_device_family == "arria ii") || (intended_device_family == "ArriaII") || (intended_device_family == "ARRIAII") || (intended_device_family == "arriaii") || (intended_device_family == "Arria II (GX/E)") || (intended_device_family == "ARRIA II (GX/E)") || (intended_device_family == "arria ii (gx/e)") || (intended_device_family == "ArriaII(GX/E)") || (intended_device_family == "ARRIAII(GX/E)") || (intended_device_family == "arriaii(gx/e)") || (intended_device_family == "PIRANHA") || (intended_device_family == "piranha"))
+                                || (((intended_device_family == "HardCopy IV") || (intended_device_family == "HARDCOPY IV") || (intended_device_family == "hardcopy iv") || (intended_device_family == "HardCopyIV") || (intended_device_family == "HARDCOPYIV") || (intended_device_family == "hardcopyiv") || (intended_device_family == "HardCopy IV (GX)") || (intended_device_family == "HARDCOPY IV (GX)") || (intended_device_family == "hardcopy iv (gx)") || (intended_device_family == "HardCopy IV (E)") || (intended_device_family == "HARDCOPY IV (E)") || (intended_device_family == "hardcopy iv (e)") || (intended_device_family == "HardCopyIV(GX)") || (intended_device_family == "HARDCOPYIV(GX)") || (intended_device_family == "hardcopyiv(gx)") || (intended_device_family == "HardCopyIV(E)") || (intended_device_family == "HARDCOPYIV(E)") || (intended_device_family == "hardcopyiv(e)") || (intended_device_family == "HCXIV") || (intended_device_family == "hcxiv") || (intended_device_family == "HardCopy IV (GX/E)") || (intended_device_family == "HARDCOPY IV (GX/E)") || (intended_device_family == "hardcopy iv (gx/e)") || (intended_device_family == "HardCopy IV (E/GX)") || (intended_device_family == "HARDCOPY IV (E/GX)") || (intended_device_family == "hardcopy iv (e/gx)") || (intended_device_family == "HardCopyIV(GX/E)") || (intended_device_family == "HARDCOPYIV(GX/E)") || (intended_device_family == "hardcopyiv(gx/e)") || (intended_device_family == "HardCopyIV(E/GX)") || (intended_device_family == "HARDCOPYIV(E/GX)") || (intended_device_family == "hardcopyiv(e/gx)"))
                                 || ((intended_device_family == "HardCopy IV") || (intended_device_family == "HARDCOPY IV") || (intended_device_family == "hardcopy iv") || (intended_device_family == "HardCopyIV") || (intended_device_family == "HARDCOPYIV") || (intended_device_family == "hardcopyiv") || (intended_device_family == "HardCopy IV (GX)") || (intended_device_family == "HARDCOPY IV (GX)") || (intended_device_family == "hardcopy iv (gx)") || (intended_device_family == "HardCopy IV (E)") || (intended_device_family == "HARDCOPY IV (E)") || (intended_device_family == "hardcopy iv (e)") || (intended_device_family == "HardCopyIV(GX)") || (intended_device_family == "HARDCOPYIV(GX)") || (intended_device_family == "hardcopyiv(gx)") || (intended_device_family == "HardCopyIV(E)") || (intended_device_family == "HARDCOPYIV(E)") || (intended_device_family == "hardcopyiv(e)") || (intended_device_family == "HCXIV") || (intended_device_family == "hcxiv") || (intended_device_family == "HardCopy IV (GX/E)") || (intended_device_family == "HARDCOPY IV (GX/E)") || (intended_device_family == "hardcopy iv (gx/e)") || (intended_device_family == "HardCopy IV (E/GX)") || (intended_device_family == "HARDCOPY IV (E/GX)") || (intended_device_family == "hardcopy iv (e/gx)") || (intended_device_family == "HardCopyIV(GX/E)") || (intended_device_family == "HARDCOPYIV(GX/E)") || (intended_device_family == "hardcopyiv(gx/e)") || (intended_device_family == "HardCopyIV(E/GX)") || (intended_device_family == "HARDCOPYIV(E/GX)") || (intended_device_family == "hardcopyiv(e/gx)"))
-                                || (((intended_device_family == "Stratix V") || (intended_device_family == "STRATIX V") || (intended_device_family == "stratix v") || (intended_device_family == "StratixV") || (intended_device_family == "STRATIXV") || (intended_device_family == "stratixv") || (intended_device_family == "Stratix V (GS)") || (intended_device_family == "STRATIX V (GS)") || (intended_device_family == "stratix v (gs)") || (intended_device_family == "StratixV(GS)") || (intended_device_family == "STRATIXV(GS)") || (intended_device_family == "stratixv(gs)") || (intended_device_family == "Stratix V (GT)") || (intended_device_family == "STRATIX V (GT)") || (intended_device_family == "stratix v (gt)") || (intended_device_family == "StratixV(GT)") || (intended_device_family == "STRATIXV(GT)") || (intended_device_family == "stratixv(gt)") || (intended_device_family == "Stratix V (GX)") || (intended_device_family == "STRATIX V (GX)") || (intended_device_family == "stratix v (gx)") || (intended_device_family == "StratixV(GX)") || (intended_device_family == "STRATIXV(GX)") || (intended_device_family == "stratixv(gx)") || (intended_device_family == "Stratix V (GS/GX)") || (intended_device_family == "STRATIX V (GS/GX)") || (intended_device_family == "stratix v (gs/gx)") || (intended_device_family == "StratixV(GS/GX)") || (intended_device_family == "STRATIXV(GS/GX)") || (intended_device_family == "stratixv(gs/gx)") || (intended_device_family == "Stratix V (GS/GT)") || (intended_device_family == "STRATIX V (GS/GT)") || (intended_device_family == "stratix v (gs/gt)") || (intended_device_family == "StratixV(GS/GT)") || (intended_device_family == "STRATIXV(GS/GT)") || (intended_device_family == "stratixv(gs/gt)") || (intended_device_family == "Stratix V (GT/GX)") || (intended_device_family == "STRATIX V (GT/GX)") || (intended_device_family == "stratix v (gt/gx)") || (intended_device_family == "StratixV(GT/GX)") || (intended_device_family == "STRATIXV(GT/GX)") || (intended_device_family == "stratixv(gt/gx)") || (intended_device_family == "Stratix V (GX/GS)") || (intended_device_family == "STRATIX V (GX/GS)") || (intended_device_family == "stratix v (gx/gs)") || (intended_device_family == "StratixV(GX/GS)") || (intended_device_family == "STRATIXV(GX/GS)") || (intended_device_family == "stratixv(gx/gs)") || (intended_device_family == "Stratix V (GT/GS)") || (intended_device_family == "STRATIX V (GT/GS)") || (intended_device_family == "stratix v (gt/gs)") || (intended_device_family == "StratixV(GT/GS)") || (intended_device_family == "STRATIXV(GT/GS)") || (intended_device_family == "stratixv(gt/gs)") || (intended_device_family == "Stratix V (GX/GT)") || (intended_device_family == "STRATIX V (GX/GT)") || (intended_device_family == "stratix v (gx/gt)") || (intended_device_family == "StratixV(GX/GT)") || (intended_device_family == "STRATIXV(GX/GT)") || (intended_device_family == "stratixv(gx/gt)") || (intended_device_family == "Stratix V (GS/GT/GX)") || (intended_device_family == "STRATIX V (GS/GT/GX)") || (intended_device_family == "stratix v (gs/gt/gx)") || (intended_device_family == "Stratix V (GS/GX/GT)") || (intended_device_family == "STRATIX V (GS/GX/GT)") || (intended_device_family == "stratix v (gs/gx/gt)") || (intended_device_family == "Stratix V (GT/GS/GX)") || (intended_device_family == "STRATIX V (GT/GS/GX)") || (intended_device_family == "stratix v (gt/gs/gx)") || (intended_device_family == "Stratix V (GT/GX/GS)") || (intended_device_family == "STRATIX V (GT/GX/GS)") || (intended_device_family == "stratix v (gt/gx/gs)") || (intended_device_family == "Stratix V (GX/GS/GT)") || (intended_device_family == "STRATIX V (GX/GS/GT)") || (intended_device_family == "stratix v (gx/gs/gt)") || (intended_device_family == "Stratix V (GX/GT/GS)") || (intended_device_family == "STRATIX V (GX/GT/GS)") || (intended_device_family == "stratix v (gx/gt/gs)") || (intended_device_family == "StratixV(GS/GT/GX)") || (intended_device_family == "STRATIXV(GS/GT/GX)") || (intended_device_family == "stratixv(gs/gt/gx)") || (intended_device_family == "StratixV(GS/GX/GT)") || (intended_device_family == "STRATIXV(GS/GX/GT)") || (intended_device_family == "stratixv(gs/gx/gt)") || (intended_device_family == "StratixV(GT/GS/GX)") || (intended_device_family == "STRATIXV(GT/GS/GX)") || (intended_device_family == "stratixv(gt/gs/gx)") || (intended_device_family == "StratixV(GT/GX/GS)") || (intended_device_family == "STRATIXV(GT/GX/GS)") || (intended_device_family == "stratixv(gt/gx/gs)") || (intended_device_family == "StratixV(GX/GS/GT)") || (intended_device_family == "STRATIXV(GX/GS/GT)") || (intended_device_family == "stratixv(gx/gs/gt)") || (intended_device_family == "StratixV(GX/GT/GS)") || (intended_device_family == "STRATIXV(GX/GT/GS)") || (intended_device_family == "stratixv(gx/gt/gs)"))
-                                ) || (((intended_device_family == "Arria V") || (intended_device_family == "ARRIA V") || (intended_device_family == "arria v") || (intended_device_family == "ArriaV") || (intended_device_family == "ARRIAV") || (intended_device_family == "arriav"))
-                                ) || (((intended_device_family == "Arria II GZ") || (intended_device_family == "ARRIA II GZ") || (intended_device_family == "arria ii gz") || (intended_device_family == "ArriaII GZ") || (intended_device_family == "ARRIAII GZ") || (intended_device_family == "arriaii gz") || (intended_device_family == "Arria IIGZ") || (intended_device_family == "ARRIA IIGZ") || (intended_device_family == "arria iigz") || (intended_device_family == "ArriaIIGZ") || (intended_device_family == "ARRIAIIGZ") || (intended_device_family == "arriaiigz"))
-                                ) ) || ((intended_device_family == "HardCopy III") || (intended_device_family == "HARDCOPY III") || (intended_device_family == "hardcopy iii") || (intended_device_family == "HardCopyIII") || (intended_device_family == "HARDCOPYIII") || (intended_device_family == "hardcopyiii") || (intended_device_family == "HCX") || (intended_device_family == "hcx"))
-                                ) || (((intended_device_family == "Cyclone III") || (intended_device_family == "CYCLONE III") || (intended_device_family == "cyclone iii") || (intended_device_family == "CycloneIII") || (intended_device_family == "CYCLONEIII") || (intended_device_family == "cycloneiii") || (intended_device_family == "Barracuda") || (intended_device_family == "BARRACUDA") || (intended_device_family == "barracuda") || (intended_device_family == "Cuda") || (intended_device_family == "CUDA") || (intended_device_family == "cuda") || (intended_device_family == "CIII") || (intended_device_family == "ciii"))
+                                ) || (((intended_device_family == "Stratix V") || (intended_device_family == "STRATIX V") || (intended_device_family == "stratix v") || (intended_device_family == "StratixV") || (intended_device_family == "STRATIXV") || (intended_device_family == "stratixv") || (intended_device_family == "Stratix V (GS)") || (intended_device_family == "STRATIX V (GS)") || (intended_device_family == "stratix v (gs)") || (intended_device_family == "StratixV(GS)") || (intended_device_family == "STRATIXV(GS)") || (intended_device_family == "stratixv(gs)") || (intended_device_family == "Stratix V (GT)") || (intended_device_family == "STRATIX V (GT)") || (intended_device_family == "stratix v (gt)") || (intended_device_family == "StratixV(GT)") || (intended_device_family == "STRATIXV(GT)") || (intended_device_family == "stratixv(gt)") || (intended_device_family == "Stratix V (GX)") || (intended_device_family == "STRATIX V (GX)") || (intended_device_family == "stratix v (gx)") || (intended_device_family == "StratixV(GX)") || (intended_device_family == "STRATIXV(GX)") || (intended_device_family == "stratixv(gx)") || (intended_device_family == "Stratix V (GS/GX)") || (intended_device_family == "STRATIX V (GS/GX)") || (intended_device_family == "stratix v (gs/gx)") || (intended_device_family == "StratixV(GS/GX)") || (intended_device_family == "STRATIXV(GS/GX)") || (intended_device_family == "stratixv(gs/gx)") || (intended_device_family == "Stratix V (GS/GT)") || (intended_device_family == "STRATIX V (GS/GT)") || (intended_device_family == "stratix v (gs/gt)") || (intended_device_family == "StratixV(GS/GT)") || (intended_device_family == "STRATIXV(GS/GT)") || (intended_device_family == "stratixv(gs/gt)") || (intended_device_family == "Stratix V (GT/GX)") || (intended_device_family == "STRATIX V (GT/GX)") || (intended_device_family == "stratix v (gt/gx)") || (intended_device_family == "StratixV(GT/GX)") || (intended_device_family == "STRATIXV(GT/GX)") || (intended_device_family == "stratixv(gt/gx)") || (intended_device_family == "Stratix V (GX/GS)") || (intended_device_family == "STRATIX V (GX/GS)") || (intended_device_family == "stratix v (gx/gs)") || (intended_device_family == "StratixV(GX/GS)") || (intended_device_family == "STRATIXV(GX/GS)") || (intended_device_family == "stratixv(gx/gs)") || (intended_device_family == "Stratix V (GT/GS)") || (intended_device_family == "STRATIX V (GT/GS)") || (intended_device_family == "stratix v (gt/gs)") || (intended_device_family == "StratixV(GT/GS)") || (intended_device_family == "STRATIXV(GT/GS)") || (intended_device_family == "stratixv(gt/gs)") || (intended_device_family == "Stratix V (GX/GT)") || (intended_device_family == "STRATIX V (GX/GT)") || (intended_device_family == "stratix v (gx/gt)") || (intended_device_family == "StratixV(GX/GT)") || (intended_device_family == "STRATIXV(GX/GT)") || (intended_device_family == "stratixv(gx/gt)") || (intended_device_family == "Stratix V (GS/GT/GX)") || (intended_device_family == "STRATIX V (GS/GT/GX)") || (intended_device_family == "stratix v (gs/gt/gx)") || (intended_device_family == "Stratix V (GS/GX/GT)") || (intended_device_family == "STRATIX V (GS/GX/GT)") || (intended_device_family == "stratix v (gs/gx/gt)") || (intended_device_family == "Stratix V (GT/GS/GX)") || (intended_device_family == "STRATIX V (GT/GS/GX)") || (intended_device_family == "stratix v (gt/gs/gx)") || (intended_device_family == "Stratix V (GT/GX/GS)") || (intended_device_family == "STRATIX V (GT/GX/GS)") || (intended_device_family == "stratix v (gt/gx/gs)") || (intended_device_family == "Stratix V (GX/GS/GT)") || (intended_device_family == "STRATIX V (GX/GS/GT)") || (intended_device_family == "stratix v (gx/gs/gt)") || (intended_device_family == "Stratix V (GX/GT/GS)") || (intended_device_family == "STRATIX V (GX/GT/GS)") || (intended_device_family == "stratix v (gx/gt/gs)") || (intended_device_family == "StratixV(GS/GT/GX)") || (intended_device_family == "STRATIXV(GS/GT/GX)") || (intended_device_family == "stratixv(gs/gt/gx)") || (intended_device_family == "StratixV(GS/GX/GT)") || (intended_device_family == "STRATIXV(GS/GX/GT)") || (intended_device_family == "stratixv(gs/gx/gt)") || (intended_device_family == "StratixV(GT/GS/GX)") || (intended_device_family == "STRATIXV(GT/GS/GX)") || (intended_device_family == "stratixv(gt/gs/gx)") || (intended_device_family == "StratixV(GT/GX/GS)") || (intended_device_family == "STRATIXV(GT/GX/GS)") || (intended_device_family == "stratixv(gt/gx/gs)") || (intended_device_family == "StratixV(GX/GS/GT)") || (intended_device_family == "STRATIXV(GX/GS/GT)") || (intended_device_family == "stratixv(gx/gs/gt)") || (intended_device_family == "StratixV(GX/GT/GS)") || (intended_device_family == "STRATIXV(GX/GT/GS)") || (intended_device_family == "stratixv(gx/gt/gs)") || (intended_device_family == "Stratix V (GS/GT/GX/E)") || (intended_device_family == "STRATIX V (GS/GT/GX/E)") || (intended_device_family == "stratix v (gs/gt/gx/e)") || (intended_device_family == "StratixV(GS/GT/GX/E)") || (intended_device_family == "STRATIXV(GS/GT/GX/E)") || (intended_device_family == "stratixv(gs/gt/gx/e)") || (intended_device_family == "Stratix V (E)") || (intended_device_family == "STRATIX V (E)") || (intended_device_family == "stratix v (e)") || (intended_device_family == "StratixV(E)") || (intended_device_family == "STRATIXV(E)") || (intended_device_family == "stratixv(e)"))
+                                || (((intended_device_family == "Arria V GZ") || (intended_device_family == "ARRIA V GZ") || (intended_device_family == "arria v gz") || (intended_device_family == "ArriaVGZ") || (intended_device_family == "ARRIAVGZ") || (intended_device_family == "arriavgz"))
+                                ) ) || (((intended_device_family == "Arria V") || (intended_device_family == "ARRIA V") || (intended_device_family == "arria v") || (intended_device_family == "Arria V (GT/GX)") || (intended_device_family == "ARRIA V (GT/GX)") || (intended_device_family == "arria v (gt/gx)") || (intended_device_family == "ArriaV(GT/GX)") || (intended_device_family == "ARRIAV(GT/GX)") || (intended_device_family == "arriav(gt/gx)") || (intended_device_family == "ArriaV") || (intended_device_family == "ARRIAV") || (intended_device_family == "arriav") || (intended_device_family == "Arria V (GT/GX/ST/SX)") || (intended_device_family == "ARRIA V (GT/GX/ST/SX)") || (intended_device_family == "arria v (gt/gx/st/sx)") || (intended_device_family == "ArriaV(GT/GX/ST/SX)") || (intended_device_family == "ARRIAV(GT/GX/ST/SX)") || (intended_device_family == "arriav(gt/gx/st/sx)") || (intended_device_family == "Arria V (GT)") || (intended_device_family == "ARRIA V (GT)") || (intended_device_family == "arria v (gt)") || (intended_device_family == "ArriaV(GT)") || (intended_device_family == "ARRIAV(GT)") || (intended_device_family == "arriav(gt)") || (intended_device_family == "Arria V (GX)") || (intended_device_family == "ARRIA V (GX)") || (intended_device_family == "arria v (gx)") || (intended_device_family == "ArriaV(GX)") || (intended_device_family == "ARRIAV(GX)") || (intended_device_family == "arriav(gx)") || (intended_device_family == "Arria V (ST)") || (intended_device_family == "ARRIA V (ST)") || (intended_device_family == "arria v (st)") || (intended_device_family == "ArriaV(ST)") || (intended_device_family == "ARRIAV(ST)") || (intended_device_family == "arriav(st)") || (intended_device_family == "Arria V (SX)") || (intended_device_family == "ARRIA V (SX)") || (intended_device_family == "arria v (sx)") || (intended_device_family == "ArriaV(SX)") || (intended_device_family == "ARRIAV(SX)") || (intended_device_family == "arriav(sx)"))
+                                || (((intended_device_family == "Cyclone V") || (intended_device_family == "CYCLONE V") || (intended_device_family == "cyclone v") || (intended_device_family == "CycloneV") || (intended_device_family == "CYCLONEV") || (intended_device_family == "cyclonev") || (intended_device_family == "Cyclone V (GT/GX/E/SX)") || (intended_device_family == "CYCLONE V (GT/GX/E/SX)") || (intended_device_family == "cyclone v (gt/gx/e/sx)") || (intended_device_family == "CycloneV(GT/GX/E/SX)") || (intended_device_family == "CYCLONEV(GT/GX/E/SX)") || (intended_device_family == "cyclonev(gt/gx/e/sx)") || (intended_device_family == "Cyclone V (E/GX/GT/SX/SE/ST)") || (intended_device_family == "CYCLONE V (E/GX/GT/SX/SE/ST)") || (intended_device_family == "cyclone v (e/gx/gt/sx/se/st)") || (intended_device_family == "CycloneV(E/GX/GT/SX/SE/ST)") || (intended_device_family == "CYCLONEV(E/GX/GT/SX/SE/ST)") || (intended_device_family == "cyclonev(e/gx/gt/sx/se/st)") || (intended_device_family == "Cyclone V (E)") || (intended_device_family == "CYCLONE V (E)") || (intended_device_family == "cyclone v (e)") || (intended_device_family == "CycloneV(E)") || (intended_device_family == "CYCLONEV(E)") || (intended_device_family == "cyclonev(e)") || (intended_device_family == "Cyclone V (GX)") || (intended_device_family == "CYCLONE V (GX)") || (intended_device_family == "cyclone v (gx)") || (intended_device_family == "CycloneV(GX)") || (intended_device_family == "CYCLONEV(GX)") || (intended_device_family == "cyclonev(gx)") || (intended_device_family == "Cyclone V (GT)") || (intended_device_family == "CYCLONE V (GT)") || (intended_device_family == "cyclone v (gt)") || (intended_device_family == "CycloneV(GT)") || (intended_device_family == "CYCLONEV(GT)") || (intended_device_family == "cyclonev(gt)") || (intended_device_family == "Cyclone V (SX)") || (intended_device_family == "CYCLONE V (SX)") || (intended_device_family == "cyclone v (sx)") || (intended_device_family == "CycloneV(SX)") || (intended_device_family == "CYCLONEV(SX)") || (intended_device_family == "cyclonev(sx)") || (intended_device_family == "Cyclone V (SE)") || (intended_device_family == "CYCLONE V (SE)") || (intended_device_family == "cyclone v (se)") || (intended_device_family == "CycloneV(SE)") || (intended_device_family == "CYCLONEV(SE)") || (intended_device_family == "cyclonev(se)") || (intended_device_family == "Cyclone V (ST)") || (intended_device_family == "CYCLONE V (ST)") || (intended_device_family == "cyclone v (st)") || (intended_device_family == "CycloneV(ST)") || (intended_device_family == "CYCLONEV(ST)") || (intended_device_family == "cyclonev(st)"))
+                                ) ) || (((intended_device_family == "Arria II GZ") || (intended_device_family == "ARRIA II GZ") || (intended_device_family == "arria ii gz") || (intended_device_family == "ArriaII GZ") || (intended_device_family == "ARRIAII GZ") || (intended_device_family == "arriaii gz") || (intended_device_family == "Arria IIGZ") || (intended_device_family == "ARRIA IIGZ") || (intended_device_family == "arria iigz") || (intended_device_family == "ArriaIIGZ") || (intended_device_family == "ARRIAIIGZ") || (intended_device_family == "arriaiigz"))
+                                ) || (((intended_device_family == "Arria 10") || (intended_device_family == "ARRIA 10") || (intended_device_family == "arria 10") || (intended_device_family == "Arria10") || (intended_device_family == "ARRIA10") || (intended_device_family == "arria10") || (intended_device_family == "Arria VI") || (intended_device_family == "ARRIA VI") || (intended_device_family == "arria vi") || (intended_device_family == "ArriaVI") || (intended_device_family == "ARRIAVI") || (intended_device_family == "arriavi") || (intended_device_family == "Night Fury") || (intended_device_family == "NIGHT FURY") || (intended_device_family == "night fury") || (intended_device_family == "nightfury") || (intended_device_family == "NIGHTFURY") || (intended_device_family == "Arria 10 (GX/SX/GT)") || (intended_device_family == "ARRIA 10 (GX/SX/GT)") || (intended_device_family == "arria 10 (gx/sx/gt)") || (intended_device_family == "Arria10(GX/SX/GT)") || (intended_device_family == "ARRIA10(GX/SX/GT)") || (intended_device_family == "arria10(gx/sx/gt)") || (intended_device_family == "Arria 10 (GX)") || (intended_device_family == "ARRIA 10 (GX)") || (intended_device_family == "arria 10 (gx)") || (intended_device_family == "Arria10(GX)") || (intended_device_family == "ARRIA10(GX)") || (intended_device_family == "arria10(gx)") || (intended_device_family == "Arria 10 (SX)") || (intended_device_family == "ARRIA 10 (SX)") || (intended_device_family == "arria 10 (sx)") || (intended_device_family == "Arria10(SX)") || (intended_device_family == "ARRIA10(SX)") || (intended_device_family == "arria10(sx)") || (intended_device_family == "Arria 10 (GT)") || (intended_device_family == "ARRIA 10 (GT)") || (intended_device_family == "arria 10 (gt)") || (intended_device_family == "Arria10(GT)") || (intended_device_family == "ARRIA10(GT)") || (intended_device_family == "arria10(gt)"))
+                                || ((intended_device_family == "Arria 10") || (intended_device_family == "ARRIA 10") || (intended_device_family == "arria 10") || (intended_device_family == "Arria10") || (intended_device_family == "ARRIA10") || (intended_device_family == "arria10") || (intended_device_family == "Arria VI") || (intended_device_family == "ARRIA VI") || (intended_device_family == "arria vi") || (intended_device_family == "ArriaVI") || (intended_device_family == "ARRIAVI") || (intended_device_family == "arriavi") || (intended_device_family == "Night Fury") || (intended_device_family == "NIGHT FURY") || (intended_device_family == "night fury") || (intended_device_family == "nightfury") || (intended_device_family == "NIGHTFURY") || (intended_device_family == "Arria 10 (GX/SX/GT)") || (intended_device_family == "ARRIA 10 (GX/SX/GT)") || (intended_device_family == "arria 10 (gx/sx/gt)") || (intended_device_family == "Arria10(GX/SX/GT)") || (intended_device_family == "ARRIA10(GX/SX/GT)") || (intended_device_family == "arria10(gx/sx/gt)") || (intended_device_family == "Arria 10 (GX)") || (intended_device_family == "ARRIA 10 (GX)") || (intended_device_family == "arria 10 (gx)") || (intended_device_family == "Arria10(GX)") || (intended_device_family == "ARRIA10(GX)") || (intended_device_family == "arria10(gx)") || (intended_device_family == "Arria 10 (SX)") || (intended_device_family == "ARRIA 10 (SX)") || (intended_device_family == "arria 10 (sx)") || (intended_device_family == "Arria10(SX)") || (intended_device_family == "ARRIA10(SX)") || (intended_device_family == "arria10(sx)") || (intended_device_family == "Arria 10 (GT)") || (intended_device_family == "ARRIA 10 (GT)") || (intended_device_family == "arria 10 (gt)") || (intended_device_family == "Arria10(GT)") || (intended_device_family == "ARRIA10(GT)") || (intended_device_family == "arria10(gt)"))
+                                ) || (((intended_device_family == "Cyclone 10 GX") || (intended_device_family == "CYCLONE 10 GX") || (intended_device_family == "cyclone 10 gx") || (intended_device_family == "Cyclone10GX") || (intended_device_family == "CYCLONE10GX") || (intended_device_family == "cyclone10gx"))
+                                || ((intended_device_family == "Cyclone 10 GX") || (intended_device_family == "CYCLONE 10 GX") || (intended_device_family == "cyclone 10 gx") || (intended_device_family == "Cyclone10GX") || (intended_device_family == "CYCLONE10GX") || (intended_device_family == "cyclone10gx"))
+                                ) || (((intended_device_family == "Stratix 10") || (intended_device_family == "STRATIX 10") || (intended_device_family == "stratix 10") || (intended_device_family == "Stratix10") || (intended_device_family == "STRATIX10") || (intended_device_family == "stratix10") || (intended_device_family == "nadder") || (intended_device_family == "NADDER") || (intended_device_family == "Stratix 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "stratix 10 (gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix10(GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX10(GX/SX/MX/TX/DX)") || (intended_device_family == "stratix10(gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix 10 (GX)") || (intended_device_family == "STRATIX 10 (GX)") || (intended_device_family == "stratix 10 (gx)") || (intended_device_family == "Stratix10(GX)") || (intended_device_family == "STRATIX10(GX)") || (intended_device_family == "stratix10(gx)") || (intended_device_family == "Stratix 10 (SX)") || (intended_device_family == "STRATIX 10 (SX)") || (intended_device_family == "stratix 10 (sx)") || (intended_device_family == "Stratix10(SX)") || (intended_device_family == "STRATIX10(SX)") || (intended_device_family == "stratix10(sx)") || (intended_device_family == "Stratix 10 (MX)") || (intended_device_family == "STRATIX 10 (MX)") || (intended_device_family == "stratix 10 (mx)") || (intended_device_family == "Stratix10(MX)") || (intended_device_family == "STRATIX10(MX)") || (intended_device_family == "stratix10(mx)") || (intended_device_family == "Stratix 10 (TX)") || (intended_device_family == "STRATIX 10 (TX)") || (intended_device_family == "stratix 10 (tx)") || (intended_device_family == "Stratix10(TX)") || (intended_device_family == "STRATIX10(TX)") || (intended_device_family == "stratix10(tx)") || (intended_device_family == "Stratix 10 (DX)") || (intended_device_family == "STRATIX 10 (DX)") || (intended_device_family == "stratix 10 (dx)") || (intended_device_family == "Stratix10(DX)") || (intended_device_family == "STRATIX10(DX)") || (intended_device_family == "stratix10(dx)"))
+                                || ((intended_device_family == "Stratix 10") || (intended_device_family == "STRATIX 10") || (intended_device_family == "stratix 10") || (intended_device_family == "Stratix10") || (intended_device_family == "STRATIX10") || (intended_device_family == "stratix10") || (intended_device_family == "nadder") || (intended_device_family == "NADDER") || (intended_device_family == "Stratix 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX 10 (GX/SX/MX/TX/DX)") || (intended_device_family == "stratix 10 (gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix10(GX/SX/MX/TX/DX)") || (intended_device_family == "STRATIX10(GX/SX/MX/TX/DX)") || (intended_device_family == "stratix10(gx/sx/mx/tx/dx)") || (intended_device_family == "Stratix 10 (GX)") || (intended_device_family == "STRATIX 10 (GX)") || (intended_device_family == "stratix 10 (gx)") || (intended_device_family == "Stratix10(GX)") || (intended_device_family == "STRATIX10(GX)") || (intended_device_family == "stratix10(gx)") || (intended_device_family == "Stratix 10 (SX)") || (intended_device_family == "STRATIX 10 (SX)") || (intended_device_family == "stratix 10 (sx)") || (intended_device_family == "Stratix10(SX)") || (intended_device_family == "STRATIX10(SX)") || (intended_device_family == "stratix10(sx)") || (intended_device_family == "Stratix 10 (MX)") || (intended_device_family == "STRATIX 10 (MX)") || (intended_device_family == "stratix 10 (mx)") || (intended_device_family == "Stratix10(MX)") || (intended_device_family == "STRATIX10(MX)") || (intended_device_family == "stratix10(mx)") || (intended_device_family == "Stratix 10 (TX)") || (intended_device_family == "STRATIX 10 (TX)") || (intended_device_family == "stratix 10 (tx)") || (intended_device_family == "Stratix10(TX)") || (intended_device_family == "STRATIX10(TX)") || (intended_device_family == "stratix10(tx)") || (intended_device_family == "Stratix 10 (DX)") || (intended_device_family == "STRATIX 10 (DX)") || (intended_device_family == "stratix 10 (dx)") || (intended_device_family == "Stratix10(DX)") || (intended_device_family == "STRATIX10(DX)") || (intended_device_family == "stratix10(dx)"))
+                                ) || (((intended_device_family == "Agilex") || (intended_device_family == "AGILEX") || (intended_device_family == "agilex") || (intended_device_family == "AGILEX") || (intended_device_family == "agilex") || (intended_device_family == "Falcon Mesa") || (intended_device_family == "FALCON MESA") || (intended_device_family == "falcon mesa") || (intended_device_family == "FALCONMESA") || (intended_device_family == "falconmesa") || (intended_device_family == "falconmesa") || (intended_device_family == "FALCONMESA") || (intended_device_family == "Stratix 20") || (intended_device_family == "STRATIX 20") || (intended_device_family == "stratix 20") || (intended_device_family == "Stratix20") || (intended_device_family == "STRATIX20") || (intended_device_family == "stratix20") || (intended_device_family == "stratix 20") || (intended_device_family == "STRATIX 20") || (intended_device_family == "stratix20") || (intended_device_family == "STRATIX20") || (intended_device_family == "STRATIX 20") || (intended_device_family == "stratix 20") || (intended_device_family == "STRATIX20") || (intended_device_family == "stratix20") || (intended_device_family == "Agilex (F-Series/I-Series)") || (intended_device_family == "AGILEX (F-SERIES/I-SERIES)") || (intended_device_family == "agilex (f-series/i-series)") || (intended_device_family == "Agilex(F-Series/I-Series)") || (intended_device_family == "AGILEX(F-SERIES/I-SERIES)") || (intended_device_family == "agilex(f-series/i-series)") || (intended_device_family == "Agilex (F-Series)") || (intended_device_family == "AGILEX (F-SERIES)") || (intended_device_family == "agilex (f-series)") || (intended_device_family == "Agilex(F-Series)") || (intended_device_family == "AGILEX(F-SERIES)") || (intended_device_family == "agilex(f-series)") || (intended_device_family == "Agilex (I-Series)") || (intended_device_family == "AGILEX (I-SERIES)") || (intended_device_family == "agilex (i-series)") || (intended_device_family == "Agilex(I-Series)") || (intended_device_family == "AGILEX(I-SERIES)") || (intended_device_family == "agilex(i-series)"))
+                                ) ) || (((intended_device_family == "HardCopy III") || (intended_device_family == "HARDCOPY III") || (intended_device_family == "hardcopy iii") || (intended_device_family == "HardCopyIII") || (intended_device_family == "HARDCOPYIII") || (intended_device_family == "hardcopyiii") || (intended_device_family == "HCX") || (intended_device_family == "hcx"))
+                                || ((intended_device_family == "HardCopy III") || (intended_device_family == "HARDCOPY III") || (intended_device_family == "hardcopy iii") || (intended_device_family == "HardCopyIII") || (intended_device_family == "HARDCOPYIII") || (intended_device_family == "hardcopyiii") || (intended_device_family == "HCX") || (intended_device_family == "hcx"))
+                                ) ) || (((intended_device_family == "Cyclone III") || (intended_device_family == "CYCLONE III") || (intended_device_family == "cyclone iii") || (intended_device_family == "CycloneIII") || (intended_device_family == "CYCLONEIII") || (intended_device_family == "cycloneiii") || (intended_device_family == "Barracuda") || (intended_device_family == "BARRACUDA") || (intended_device_family == "barracuda") || (intended_device_family == "Cuda") || (intended_device_family == "CUDA") || (intended_device_family == "cuda") || (intended_device_family == "CIII") || (intended_device_family == "ciii"))
                                 || ((intended_device_family == "Cyclone III LS") || (intended_device_family == "CYCLONE III LS") || (intended_device_family == "cyclone iii ls") || (intended_device_family == "CycloneIIILS") || (intended_device_family == "CYCLONEIIILS") || (intended_device_family == "cycloneiiils") || (intended_device_family == "Cyclone III LPS") || (intended_device_family == "CYCLONE III LPS") || (intended_device_family == "cyclone iii lps") || (intended_device_family == "Cyclone LPS") || (intended_device_family == "CYCLONE LPS") || (intended_device_family == "cyclone lps") || (intended_device_family == "CycloneLPS") || (intended_device_family == "CYCLONELPS") || (intended_device_family == "cyclonelps") || (intended_device_family == "Tarpon") || (intended_device_family == "TARPON") || (intended_device_family == "tarpon") || (intended_device_family == "Cyclone IIIE") || (intended_device_family == "CYCLONE IIIE") || (intended_device_family == "cyclone iiie"))
                                 || (((intended_device_family == "Cyclone IV GX") || (intended_device_family == "CYCLONE IV GX") || (intended_device_family == "cyclone iv gx") || (intended_device_family == "Cyclone IVGX") || (intended_device_family == "CYCLONE IVGX") || (intended_device_family == "cyclone ivgx") || (intended_device_family == "CycloneIV GX") || (intended_device_family == "CYCLONEIV GX") || (intended_device_family == "cycloneiv gx") || (intended_device_family == "CycloneIVGX") || (intended_device_family == "CYCLONEIVGX") || (intended_device_family == "cycloneivgx") || (intended_device_family == "Cyclone IV") || (intended_device_family == "CYCLONE IV") || (intended_device_family == "cyclone iv") || (intended_device_family == "CycloneIV") || (intended_device_family == "CYCLONEIV") || (intended_device_family == "cycloneiv") || (intended_device_family == "Cyclone IV (GX)") || (intended_device_family == "CYCLONE IV (GX)") || (intended_device_family == "cyclone iv (gx)") || (intended_device_family == "CycloneIV(GX)") || (intended_device_family == "CYCLONEIV(GX)") || (intended_device_family == "cycloneiv(gx)") || (intended_device_family == "Cyclone III GX") || (intended_device_family == "CYCLONE III GX") || (intended_device_family == "cyclone iii gx") || (intended_device_family == "CycloneIII GX") || (intended_device_family == "CYCLONEIII GX") || (intended_device_family == "cycloneiii gx") || (intended_device_family == "Cyclone IIIGX") || (intended_device_family == "CYCLONE IIIGX") || (intended_device_family == "cyclone iiigx") || (intended_device_family == "CycloneIIIGX") || (intended_device_family == "CYCLONEIIIGX") || (intended_device_family == "cycloneiiigx") || (intended_device_family == "Cyclone III GL") || (intended_device_family == "CYCLONE III GL") || (intended_device_family == "cyclone iii gl") || (intended_device_family == "CycloneIII GL") || (intended_device_family == "CYCLONEIII GL") || (intended_device_family == "cycloneiii gl") || (intended_device_family == "Cyclone IIIGL") || (intended_device_family == "CYCLONE IIIGL") || (intended_device_family == "cyclone iiigl") || (intended_device_family == "CycloneIIIGL") || (intended_device_family == "CYCLONEIIIGL") || (intended_device_family == "cycloneiiigl") || (intended_device_family == "Stingray") || (intended_device_family == "STINGRAY") || (intended_device_family == "stingray"))
                                 || ((intended_device_family == "Cyclone IV GX") || (intended_device_family == "CYCLONE IV GX") || (intended_device_family == "cyclone iv gx") || (intended_device_family == "Cyclone IVGX") || (intended_device_family == "CYCLONE IVGX") || (intended_device_family == "cyclone ivgx") || (intended_device_family == "CycloneIV GX") || (intended_device_family == "CYCLONEIV GX") || (intended_device_family == "cycloneiv gx") || (intended_device_family == "CycloneIVGX") || (intended_device_family == "CYCLONEIVGX") || (intended_device_family == "cycloneivgx") || (intended_device_family == "Cyclone IV") || (intended_device_family == "CYCLONE IV") || (intended_device_family == "cyclone iv") || (intended_device_family == "CycloneIV") || (intended_device_family == "CYCLONEIV") || (intended_device_family == "cycloneiv") || (intended_device_family == "Cyclone IV (GX)") || (intended_device_family == "CYCLONE IV (GX)") || (intended_device_family == "cyclone iv (gx)") || (intended_device_family == "CycloneIV(GX)") || (intended_device_family == "CYCLONEIV(GX)") || (intended_device_family == "cycloneiv(gx)") || (intended_device_family == "Cyclone III GX") || (intended_device_family == "CYCLONE III GX") || (intended_device_family == "cyclone iii gx") || (intended_device_family == "CycloneIII GX") || (intended_device_family == "CYCLONEIII GX") || (intended_device_family == "cycloneiii gx") || (intended_device_family == "Cyclone IIIGX") || (intended_device_family == "CYCLONE IIIGX") || (intended_device_family == "cyclone iiigx") || (intended_device_family == "CycloneIIIGX") || (intended_device_family == "CYCLONEIIIGX") || (intended_device_family == "cycloneiiigx") || (intended_device_family == "Cyclone III GL") || (intended_device_family == "CYCLONE III GL") || (intended_device_family == "cyclone iii gl") || (intended_device_family == "CycloneIII GL") || (intended_device_family == "CYCLONEIII GL") || (intended_device_family == "cycloneiii gl") || (intended_device_family == "Cyclone IIIGL") || (intended_device_family == "CYCLONE IIIGL") || (intended_device_family == "cyclone iiigl") || (intended_device_family == "CycloneIIIGL") || (intended_device_family == "CYCLONEIIIGL") || (intended_device_family == "cycloneiiigl") || (intended_device_family == "Stingray") || (intended_device_family == "STINGRAY") || (intended_device_family == "stingray"))
                                 ) || (((intended_device_family == "Cyclone IV E") || (intended_device_family == "CYCLONE IV E") || (intended_device_family == "cyclone iv e") || (intended_device_family == "CycloneIV E") || (intended_device_family == "CYCLONEIV E") || (intended_device_family == "cycloneiv e") || (intended_device_family == "Cyclone IVE") || (intended_device_family == "CYCLONE IVE") || (intended_device_family == "cyclone ive") || (intended_device_family == "CycloneIVE") || (intended_device_family == "CYCLONEIVE") || (intended_device_family == "cycloneive"))
+                                ) || (((intended_device_family == "MAX 10") || (intended_device_family == "max 10") || (intended_device_family == "MAX 10 FPGA") || (intended_device_family == "max 10 fpga") || (intended_device_family == "Zippleback") || (intended_device_family == "ZIPPLEBACK") || (intended_device_family == "zippleback") || (intended_device_family == "MAX10") || (intended_device_family == "max10") || (intended_device_family == "MAX 10 (DA/DF/DC/SA/SC)") || (intended_device_family == "max 10 (da/df/dc/sa/sc)") || (intended_device_family == "MAX10(DA/DF/DC/SA/SC)") || (intended_device_family == "max10(da/df/dc/sa/sc)") || (intended_device_family == "MAX 10 (DA)") || (intended_device_family == "max 10 (da)") || (intended_device_family == "MAX10(DA)") || (intended_device_family == "max10(da)") || (intended_device_family == "MAX 10 (DF)") || (intended_device_family == "max 10 (df)") || (intended_device_family == "MAX10(DF)") || (intended_device_family == "max10(df)") || (intended_device_family == "MAX 10 (DC)") || (intended_device_family == "max 10 (dc)") || (intended_device_family == "MAX10(DC)") || (intended_device_family == "max10(dc)") || (intended_device_family == "MAX 10 (SA)") || (intended_device_family == "max 10 (sa)") || (intended_device_family == "MAX10(SA)") || (intended_device_family == "max10(sa)") || (intended_device_family == "MAX 10 (SC)") || (intended_device_family == "max 10 (sc)") || (intended_device_family == "MAX10(SC)") || (intended_device_family == "max10(sc)"))
                                 ) ) ))
                                 ? 1 : 0;
 
@@ -30922,6 +31532,7 @@ module dcfifo_mixed_widths ( data, rdclk, wrclk, aclr, rdreq, wrreq,
     output [lpm_widthu_r-1:0] rdusedw;
     output [lpm_widthu-1:0] wrusedw;
     output [lpm_width_r-1:0] q;
+    output [1:0] eccstatus;
 
 // INTERNAL WIRE DECLARATION
     wire w_rdfull_s;
@@ -30945,8 +31556,8 @@ module dcfifo_mixed_widths ( data, rdclk, wrclk, aclr, rdreq, wrreq,
     wire [lpm_width-1:0] w_q_s;
     wire [lpm_width-1:0] w_q_a;
     wire [lpm_width_r-1:0] w_q_l;
-  
-// INTERNAL REGISTER DECLARATION  
+
+// INTERNAL REGISTER DECLARATION
     reg feature_family_has_stratixii_style_ram;
     reg feature_family_stratix;
     reg use_low_latency_fifo;
@@ -30956,12 +31567,12 @@ module dcfifo_mixed_widths ( data, rdclk, wrclk, aclr, rdreq, wrreq,
 
 // COMPONENT INSTANTIATIONS
     ALTERA_DEVICE_FAMILIES dev ();
-    
+
     initial
     begin
         feature_family_has_stratixii_style_ram = dev.FEATURE_FAMILY_HAS_STRATIXII_STYLE_RAM(intended_device_family);
         feature_family_stratix = dev.FEATURE_FAMILY_STRATIX(intended_device_family);
-        
+
         use_low_latency_fifo = (((feature_family_has_stratixii_style_ram == 1) &&
                                 ((use_eab == "ON") || ((use_eab == "OFF") && (lpm_width != lpm_width_r) && (lpm_width_r != 0)) ||
                                 ((lpm_numwords < 16) && (clocks_are_synchronized == "FALSE")))) ||
@@ -30970,7 +31581,7 @@ module dcfifo_mixed_widths ( data, rdclk, wrclk, aclr, rdreq, wrreq,
                                 (clocks_are_synchronized == "FALSE_LOW_LATENCY"))));
     end
 
-    generate 
+    generate
     if (clocks_are_synchronized == "TRUE")
     begin : dcfifo_sync
     dcfifo_sync #(
@@ -30982,7 +31593,7 @@ module dcfifo_mixed_widths ( data, rdclk, wrclk, aclr, rdreq, wrreq,
         .underflow_checking (underflow_checking),
         .overflow_checking (overflow_checking),
         .use_eab (use_eab),
-        .add_ram_output_register (add_ram_output_register)) 
+        .add_ram_output_register (add_ram_output_register))
         SYNC (
         .data (data),
         .rdclk (rdclk),
@@ -30999,8 +31610,8 @@ module dcfifo_mixed_widths ( data, rdclk, wrclk, aclr, rdreq, wrreq,
         .q (w_q_s));
     end
     endgenerate
-    
-    generate 
+
+    generate
     if (clocks_are_synchronized != "TRUE")
     begin : dcfifo_async
     dcfifo_async #(
@@ -31015,6 +31626,8 @@ module dcfifo_mixed_widths ( data, rdclk, wrclk, aclr, rdreq, wrreq,
         .lpm_showahead (lpm_showahead),
         .underflow_checking (underflow_checking),
         .overflow_checking (overflow_checking),
+        .read_aclr_synch (read_aclr_synch),
+        .write_aclr_synch (write_aclr_synch),
         .use_eab (use_eab),
         .add_ram_output_register (add_ram_output_register))
     ASYNC (
@@ -31063,6 +31676,7 @@ module dcfifo_mixed_widths ( data, rdclk, wrclk, aclr, rdreq, wrreq,
         LOWLATENCY.underflow_checking = underflow_checking,
         LOWLATENCY.overflow_checking = overflow_checking,
         LOWLATENCY.add_usedw_msb_bit = add_usedw_msb_bit,
+        LOWLATENCY.read_aclr_synch = read_aclr_synch,
         LOWLATENCY.write_aclr_synch = write_aclr_synch,
         LOWLATENCY.use_eab = use_eab,
         LOWLATENCY.clocks_are_synchronized = clocks_are_synchronized,
@@ -31079,7 +31693,7 @@ module dcfifo_mixed_widths ( data, rdclk, wrclk, aclr, rdreq, wrreq,
                 $display ("Warning! Number of metastability protection registers is not specified. Based on the parameter value CLOCKS_ARE_SYNCHRONIZED=FALSE, the synchronization register chain length between read and write clock domains will be 2.");
                 $display("Time: %0t  Instance: %m", $time);
             end
-        end    
+        end
     end
 
 // CONTINOUS ASSIGNMENT
@@ -31103,7 +31717,9 @@ module dcfifo_mixed_widths ( data, rdclk, wrclk, aclr, rdreq, wrreq,
 
     assign       q = (use_low_latency_fifo == 1) ? w_q_l :
                     (clocks_are_synchronized == "TRUE")  ? w_q_s : w_q_a;
-
+// ECC status
+    assign eccstatus = {2'b0};
+    
 endmodule // dcfifo_mixed_widths
 // END OF MODULE
 
@@ -31124,7 +31740,7 @@ endmodule // dcfifo_mixed_widths
 
 // MODULE DECLARATION
 module dcfifo ( data, rdclk, wrclk, aclr, rdreq, wrreq,
-                rdfull, wrfull, rdempty, wrempty, rdusedw, wrusedw, q);
+                eccstatus, rdfull, wrfull, rdempty, wrempty, rdusedw, wrusedw, q);
 
 // GLOBAL PARAMETER DECLARATION
     parameter lpm_width = 1;
@@ -31144,7 +31760,9 @@ module dcfifo ( data, rdclk, wrclk, aclr, rdreq, wrreq,
     parameter lpm_hint = "USE_EAB=ON";
     parameter lpm_type = "dcfifo";
     parameter add_usedw_msb_bit = "OFF";
+    parameter read_aclr_synch = "OFF";
     parameter write_aclr_synch = "OFF";
+    parameter enable_ecc = "FALSE";
 
 // LOCAL_PARAMETERS_BEGIN
 
@@ -31169,6 +31787,7 @@ module dcfifo ( data, rdclk, wrclk, aclr, rdreq, wrreq,
     output [lpm_widthu-1:0] rdusedw;
     output [lpm_widthu-1:0] wrusedw;
     output [lpm_width-1:0] q;
+    output [1:0] eccstatus;
 
 // INTERNAL WIRE DECLARATION
     wire w_rdfull;
@@ -31216,6 +31835,7 @@ module dcfifo ( data, rdclk, wrclk, aclr, rdreq, wrreq,
         DCFIFO_MW.add_width = add_width,
         DCFIFO_MW.ram_block_type = ram_block_type,
         DCFIFO_MW.add_usedw_msb_bit = add_usedw_msb_bit,
+        DCFIFO_MW.read_aclr_synch = read_aclr_synch,
         DCFIFO_MW.write_aclr_synch = write_aclr_synch,
         DCFIFO_MW.lpm_hint = lpm_hint;
 
@@ -31228,8 +31848,3725 @@ module dcfifo ( data, rdclk, wrclk, aclr, rdreq, wrreq,
     assign wrusedw = w_wrusedw;
     assign       q = w_q;
 
+// ECC status
+    assign eccstatus = {2'b0};
+
 endmodule // dcfifo
 // END OF MODULE
+
+// START_FILE_HEADER ------------------------------------------------
+// Filename    :  altera_syncram_derived.v
+//
+// Description :
+//
+// Limitation  :
+//
+// Author      :
+//
+// Copyright (c) Altera Corporation 1997-2002
+// All rights reserved
+//
+// END_FILE_HEADER --------------------------------------------------
+//
+// START_MODULE_NAME------------------------------------------------------------
+//
+// Module Name     : ALTERA_SYNCRAM
+//
+// Description     : Synchronous ram model for Arria 10 series family
+//
+// Limitation      :
+//
+// END_MODULE_NAME--------------------------------------------------------------
+
+`timescale 1 ps / 1 ps
+
+// BEGINNING OF MODULE
+
+// MODULE DECLARATION
+
+module altera_syncram_derived   (
+                    wren_a,
+                    wren_b,
+                    rden_a,
+                    rden_b,
+                    data_a,
+                    data_b,
+                    address_a,
+                    address_b,
+                    clock0,
+                    clock1,
+                    clocken0,
+                    clocken1,
+                    clocken2,
+                    clocken3,
+                    aclr0,
+                    aclr1,
+                    byteena_a,
+                    byteena_b,
+                    addressstall_a,
+                    addressstall_b,
+                    q_a,
+                    q_b,
+                    eccstatus,
+                    // Available only from Stratix10 onwards,
+                    address2_a,
+                    address2_b,
+                    eccencparity,
+                    eccencbypass,
+                    sclr
+                    );
+
+// GLOBAL PARAMETER DECLARATION
+
+    // PORT A PARAMETERS
+    parameter width_a          = 1;
+    parameter widthad_a        = 1;
+    parameter widthad2_a       = 1;
+    parameter numwords_a       = 0;
+    parameter outdata_reg_a    = "UNREGISTERED";
+    parameter address_aclr_a   = "NONE";
+    parameter outdata_aclr_a   = "NONE";
+    parameter width_byteena_a  = 1;
+
+    // PORT B PARAMETERS
+    parameter width_b                   = 1;
+    parameter widthad_b                 = 1;
+    parameter widthad2_b                = 1;
+    parameter numwords_b                = 0;
+    parameter rdcontrol_reg_b           = "CLOCK1";
+    parameter address_reg_b             = "CLOCK1";
+    parameter outdata_reg_b             = "UNREGISTERED";
+    parameter outdata_aclr_b            = "NONE";
+    parameter indata_reg_b              = "CLOCK1";
+    parameter byteena_reg_b             = "CLOCK1";
+    parameter address_aclr_b            = "NONE";
+    parameter width_byteena_b           = 1;
+
+    // Clock Enable Parameters
+    parameter clock_enable_input_a  = "NORMAL";
+    parameter clock_enable_output_a = "NORMAL";
+    parameter clock_enable_input_b  = "NORMAL";
+    parameter clock_enable_output_b = "NORMAL";
+    parameter clock_enable_core_a   = "USE_INPUT_CLKEN";
+    parameter clock_enable_core_b   = "USE_INPUT_CLKEN";
+
+    // ECC STATUS RELATED PARAMETERS
+    parameter enable_ecc = "FALSE";
+    parameter width_eccstatus = 2;
+    parameter ecc_pipeline_stage_enabled = "FALSE";
+
+    // Stratix 10 NEW FEATURES
+    parameter outdata_sclr_a            = "NONE";
+    parameter outdata_sclr_b            = "NONE";
+    parameter enable_ecc_encoder_bypass = "FALSE";
+    parameter enable_coherent_read      = "FALSE";
+    parameter enable_force_to_zero      = "FALSE";
+    parameter width_eccencparity        = 8;
+
+    // GLOBAL PARAMETERS
+    parameter operation_mode                     = "BIDIR_DUAL_PORT";
+    parameter optimization_option                = "AUTO";
+    parameter byte_size                          = 0;
+    parameter ram_block_type                     = "AUTO";
+    parameter init_file                          = "UNUSED";
+    parameter init_file_layout                   = "UNUSED";
+    parameter maximum_depth                      = 0;
+    parameter intended_device_family             = "Arria 10";
+    parameter lpm_hint                           = "UNUSED";
+    parameter lpm_type                           = "altsyncram";
+    parameter implement_in_les                   = "OFF";
+    parameter power_up_uninitialized             = "FALSE";
+
+    parameter read_during_write_mode_port_a = "NEW_DATA_NO_NBE_READ" ;
+    parameter read_during_write_mode_port_b = "NEW_DATA_NO_NBE_READ" ;
+    parameter read_during_write_mode_mixed_ports = "DONT_CARE";
+
+    parameter family_c10gx     = ((intended_device_family == "Cyclone 10 GX") || (intended_device_family == "CYCLONE 10 GX") || (intended_device_family == "CYCLONE10GX") || (intended_device_family == "cyclone10gx") || (intended_device_family == "C10GX")     || (intended_device_family == "c10gx"))     ? 1 : 0;
+    parameter family_arria10   = ((intended_device_family == "Arria 10")      || (intended_device_family == "ARRIA 10")      || (intended_device_family == "arria 10")    || (intended_device_family == "Arria10")     || (intended_device_family == "ARRIA10")   || (intended_device_family == "arria10"))   ? 1 : 0;
+    parameter family_stratix10 = ((intended_device_family == "Stratix 10")    || (intended_device_family == "STRATIX 10")    || (intended_device_family == "stratix 10")  || (intended_device_family == "Stratix10")   || (intended_device_family == "STRATIX10") || (intended_device_family == "stratix10")) ? 1 : 0;
+
+     // Read During Write Parameters : Set to "NEW_DATA_WITH_NBE_READ" for S10 device onwards.
+     parameter i_read_during_write_mode_port_a      = (!(family_c10gx || family_arria10) && (operation_mode != "SINGLE_PORT") && (read_during_write_mode_port_a == "NEW_DATA_NO_NBE_READ")) ? "NEW_DATA_WITH_NBE_READ":read_during_write_mode_port_a;
+     parameter i_read_during_write_mode_port_b      = (!(family_c10gx || family_arria10) && (operation_mode != "SINGLE_PORT") && (read_during_write_mode_port_b == "NEW_DATA_NO_NBE_READ")) ? "NEW_DATA_WITH_NBE_READ":read_during_write_mode_port_b;
+
+// SIMULATION_ONLY_PARAMETERS_BEGIN
+
+    parameter sim_show_memory_data_in_port_b_layout  = "OFF";
+
+// SIMULATION_ONLY_PARAMETERS_END
+
+// LOCAL_PARAMETERS_BEGIN
+`ifdef ENA_NON_CORRUPT
+    parameter enable_non_corrupted_behav = 1;
+`else
+    parameter enable_non_corrupted_behav = 0;
+`endif
+
+`ifdef ENA_INPUT_X_PROP
+    parameter enable_input_x_prop = 1;
+`else
+    parameter enable_input_x_prop = 0;
+`endif
+
+`ifdef VCS_SQP_BE_RDW
+    parameter enable_vcs_sqp_be_rdw = 1;
+`else
+    parameter enable_vcs_sqp_be_rdw = 0;
+`endif
+
+    parameter is_lutram = ((ram_block_type == "LUTRAM") || (ram_block_type == "MLAB"))? 1 : 0;
+
+    parameter is_bidir_and_wrcontrol_addb_clk0 =    ((((operation_mode == "QUAD_PORT") || (operation_mode == "BIDIR_DUAL_PORT")) && (address_reg_b == "CLOCK0"))?
+                                                    1 : 0);
+
+    parameter is_bidir_and_wrcontrol_addb_clk1 =    ((((operation_mode == "QUAD_PORT") || (operation_mode == "BIDIR_DUAL_PORT")) && (address_reg_b == "CLOCK1"))?
+                                                    1 : 0);
+
+    parameter dual_port_addreg_b_clk0 = (((operation_mode == "DUAL_PORT") && (address_reg_b == "CLOCK0"))? 1: 0);
+
+    parameter dual_port_addreg_b_clk1 = (((operation_mode == "DUAL_PORT") && (address_reg_b == "CLOCK1"))? 1: 0);
+
+    parameter i_byte_size_tmp = (width_byteena_a > 1)? width_a / width_byteena_a : 8;
+
+    parameter i_lutram_read = (((is_lutram == 1) && (i_read_during_write_mode_port_a == "DONT_CARE")) ||
+                                ((is_lutram == 1) && (outdata_reg_a == "UNREGISTERED") && (operation_mode == "SINGLE_PORT")))? 1 : 0;
+
+   parameter enable_mem_data_b_reading =  (sim_show_memory_data_in_port_b_layout == "ON") && ((operation_mode == "QUAD_PORT") || (operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "DUAL_PORT")) ? 1 : 0;
+
+   parameter wrcontrol_wraddress_reg_b = ((operation_mode == "QUAD_PORT") || (operation_mode == "BIDIR_DUAL_PORT"))? address_reg_b : "CLOCK1";
+
+   parameter is_write_on_positive_edge = 1; //TBR
+
+   parameter lutram_single_port_fast_read = ((is_lutram == 1) && ((i_read_during_write_mode_port_a == "DONT_CARE") || (outdata_reg_a == "UNREGISTERED")) && (operation_mode == "SINGLE_PORT")) ? 1 : 0;
+
+   parameter lutram_dual_port_fast_read = ((is_lutram == 1) && ((read_during_write_mode_mixed_ports == "NEW_DATA") || (read_during_write_mode_mixed_ports == "DONT_CARE") || (read_during_write_mode_mixed_ports == "CONSTRAINED_DONT_CARE") || ((read_during_write_mode_mixed_ports == "OLD_DATA") && (outdata_reg_b == "UNREGISTERED")))) ? 1 : 0;
+
+   parameter block_ram_output_unreg =  ((is_lutram != 1) && (outdata_reg_a != "CLOCK0") && (outdata_reg_a != "CLOCK1")) ? 1 : 0;
+
+   parameter s3_address_aclr_b =  ((is_lutram != 1) && (outdata_reg_b != "CLOCK0") && (outdata_reg_b != "CLOCK1")) ? 1 : 0;
+
+   parameter is_rom = (operation_mode == "ROM") ? 1 : 0;
+   parameter is_sqp = (operation_mode == "QUAD_PORT") ? 1 : 0;
+
+   parameter i_address_aclr_family_b = ((operation_mode != "DUAL_PORT") || ((is_lutram == 1) && (operation_mode == "DUAL_PORT") && (read_during_write_mode_mixed_ports == "OLD_DATA"))) ? 1 : 0;
+`ifdef RDW_DONT_CARE_IS_X
+   parameter rdw_dont_care_is_x = 1;
+`else
+   parameter rdw_dont_care_is_x = 0;
+`endif
+   parameter lutram_dont_care_give_x = ((is_lutram == 1) && (operation_mode == "DUAL_PORT") && (read_during_write_mode_mixed_ports == "DONT_CARE") && (rdw_dont_care_is_x == 1));
+// LOCAL_PARAMETERS_END
+
+// INPUT PORT DECLARATION
+
+    input  wren_a; // Port A write/read enable input
+    input  wren_b; // Port B write enable input
+    input  rden_a; // Port A read enable input
+    input  rden_b; // Port B read enable input
+    input  [width_a-1:0] data_a; // Port A data input
+    input  [width_b-1:0] data_b; // Port B data input
+    input  [widthad_a-1:0] address_a; // Port A address input
+    input  [widthad_b-1:0] address_b; // Port B address input
+
+    // clock inputs on both ports and here are their usage
+    // Port A -- 1. all input registers must be clocked by clock0.
+    //           2. output register can be clocked by either clock0, clock1 or none.
+    // Port B -- 1. all input registered must be clocked by either clock0 or clock1.
+    //           2. output register can be clocked by either clock0, clock1 or none.
+    input  clock0;
+    input  clock1;
+
+    // clock enable inputs and here are their usage
+    // clocken0 -- can only be used for enabling clock0.
+    // clocken1 -- can only be used for enabling clock1.
+    // clocken2 -- as an alternative for enabling clock0.
+    // clocken3 -- as an alternative for enabling clock1.
+    input  clocken0;
+    input  clocken1;
+    input  clocken2;
+    input  clocken3;
+
+    // clear inputs on both ports and here are their usage
+    // Port A -- 1. all input registers can only be cleared by clear0 or none.
+    //           2. output register can be cleared by either clear0, clear1 or none.
+    // Port B -- 1. all input registers can be cleared by clear0, clear1 or none.
+    //           2. output register can be cleared by either clear0, clear1 or none.
+    input  aclr0;
+    input  aclr1;
+
+    input [width_byteena_a-1:0] byteena_a; // Port A byte enable input
+    input [width_byteena_b-1:0] byteena_b; // Port B byte enable input
+
+    // Stratix II related ports
+    input addressstall_a;
+    input addressstall_b;
+
+    // Stratix 10 new features
+    input   sclr;
+    input   eccencbypass;
+    input   [width_eccencparity-1:0] eccencparity;
+    input   [widthad2_a-1:0] address2_a; // Port A address input (Read Address for SQP)
+    input   [widthad2_b-1:0] address2_b; // Port B address input (Read Address for SQP)
+
+// OUTPUT PORT DECLARATION
+
+    output [width_a-1:0] q_a; // Port A output
+    output [width_b-1:0] q_b; // Port B output
+
+    output [width_eccstatus-1:0] eccstatus;   // ECC status flags
+
+// INTERNAL REGISTERS DECLARATION
+
+    reg [width_eccstatus-1:0] ecc_data [0:(1<<widthad_a)-1];
+    reg [width_eccstatus-1:0] ecc_data_b [0:(1<<widthad_b)-1];
+    reg [width_eccencparity-1:0] i_eccencparity;
+    reg [width_a-1:0] mem_data [0:(1<<widthad_a)-1];
+    reg [width_b-1:0] mem_data_b [0:(1<<widthad_b)-1];
+    reg [width_a-1:0] i_data_reg_a;
+    reg [width_eccstatus-1:0] temp_ecc_a;
+    reg [width_eccstatus-1:0] temp_ecc_b;
+    reg [width_a-1:0] temp_wa;
+    reg [width_a-1:0] temp_wa2;
+    reg [width_a-1:0] temp_wa2b;
+    reg [width_a-1:0] init_temp;
+    reg [width_b-1:0] i_data_reg_b;
+    reg [width_b-1:0] temp_wb;
+    reg [width_b-1:0] ecc_status_old;
+    reg [width_b-1:0] temp_wb2;
+    reg temp;
+    reg [width_a-1:0] i_q_reg_a;
+    reg [width_eccstatus-1:0] i_q_reg_ecc_a;
+    reg [width_a-1:0] i_q_tmp_a;
+    reg [width_eccstatus-1:0] i_q_tmp_ecc_a;
+    reg [width_a-1:0] i_q_tmp2_a;
+    reg [width_eccstatus-1:0] i_q_tmp2_ecc_a;
+    reg [width_b-1:0] i_q_reg_b;
+    reg [width_eccstatus-1:0] i_q_reg_ecc_b;
+    reg [width_b-1:0] i_q_tmp_b = 'b0;
+    reg [width_eccstatus-1:0] i_q_tmp_ecc_b;
+    reg [width_b-1:0] i_q_tmp2_b;
+    reg [width_eccstatus-1:0] i_q_tmp2_ecc_b;
+    reg [width_b-1:0] i_q_output_latch;
+    reg [width_eccstatus-1:0] i_q_output_latch_ecc;
+    reg [width_a-1:0] i_byteena_mask_reg_a;
+    reg [width_b-1:0] i_byteena_mask_reg_b;
+    reg [widthad_a-1:0] i_address_reg_a;
+    reg [widthad_b-1:0] i_address_reg_b;
+    reg [widthad2_a-1:0] i_address_reg_a2;
+    reg [widthad2_b-1:0] i_address_reg_b2;
+
+    reg [width_b-1:0] i_q_ecc_reg_b;
+    reg [width_eccstatus-1:0] i_q_ecc_status_reg_b;
+    reg [width_b-1:0] i_q_ecc_tmp_b;
+    reg [width_eccstatus-1:0] i_q_ecc_status_tmp_b;
+
+    reg [widthad_a-1:0] i_original_address_a;
+
+    reg [width_a-1:0] i_byteena_mask_reg_a_tmp;
+    reg [width_b-1:0] i_byteena_mask_reg_b_tmp;
+    reg [width_a-1:0] i_byteena_mask_reg_a_out;
+    reg [width_b-1:0] i_byteena_mask_reg_b_out;
+    reg [width_a-1:0] i_byteena_mask_reg_a_x;
+    reg [width_b-1:0] i_byteena_mask_reg_b_x;
+    reg [width_a-1:0] i_byteena_mask_reg_a_out_b;
+    reg [width_b-1:0] i_byteena_mask_reg_b_out_a;
+
+    reg [8*256:1] ram_initf;
+    reg i_wren_reg_a;
+    reg i_wren_reg_b;
+    reg i_rden_reg_a;
+    reg i_rden_reg_b;
+    reg i_rden_reg_b_bypass;
+    reg i_read_flag_a;
+    reg i_read_flag_b;
+    reg i_write_flag_a;
+    reg i_write_flag_b;
+    reg good_to_go_a;
+    reg good_to_go_b;
+    reg [31:0] file_desc;
+    reg init_file_b_port;
+    reg i_nmram_write_a;
+    reg i_nmram_write_b;
+
+    reg [width_a - 1: 0] wa_mult_x;
+    reg [width_eccstatus - 1: 0] ecc_a_mult_x;
+    reg [width_a - 1: 0] wa_mult_x_ii;
+    reg [width_a - 1: 0] wa_mult_x_iii;
+    reg [widthad_a + width_a - 1:0] add_reg_a_mult_wa;
+    reg [widthad_b + width_b -1:0] add_reg_b_mult_wb;
+    reg [widthad_a + width_a - 1:0] add_reg_a_mult_wa_pl_wa;
+    reg [widthad_b + width_b -1:0] add_reg_b_mult_wb_pl_wb;
+
+    reg same_clock_pulse0;
+    reg same_clock_pulse1;
+
+    reg [width_b - 1 : 0] i_original_data_b;
+    reg [width_a - 1 : 0] i_original_data_a;
+
+    reg i_address_aclr_a_flag;
+    reg i_address_aclr_a_prev;
+    reg i_address_aclr_b_flag;
+    reg i_address_aclr_b_prev;
+    reg i_outdata_aclr_a_prev;
+    reg i_outdata_aclr_b_prev;
+    reg i_outdata_aclr_b_reg; // When coherent read feature is enabled, ensure 1st cycle after aclear deassert on RDW on same address is dont care
+    reg i_outdata_sclr_a_prev;
+    reg i_outdata_sclr_b_prev;
+    reg i_outdata_sclr_a_reg;
+    reg i_outdata_sclr_b_reg;
+    reg i_force_reread_a;
+    reg i_force_reread_a1;
+    reg i_force_reread_b;
+    reg i_force_reread_b1;
+    reg i_force_reread_a_signal;
+    reg i_force_reread_b_signal;
+    reg lutram_clocken0;
+// REG FOR DELTA DELAYS OF INPUT PORTS
+
+    reg wren_a_dly;
+    reg wren_b_dly;
+    reg rden_a_dly;
+    reg rden_b_dly;
+    reg [width_a-1:0] data_a_dly;
+    reg [width_b-1:0] data_b_dly;
+    reg [widthad_a-1:0] address_a_dly;
+    reg [widthad_b-1:0] address_b_dly;
+    reg clocken0_dly = 'b0;
+    reg clocken1_dly;
+    reg clocken2_dly;
+    reg clocken3_dly;
+    reg [width_byteena_a-1:0] byteena_a_dly;
+    reg [width_byteena_b-1:0] byteena_b_dly;
+    reg addressstall_a_dly;
+    reg addressstall_b_dly;
+
+    // Available only from Stratix10 onwards;
+    reg [widthad2_a-1:0] address2_a_dly;
+    reg [widthad2_b-1:0] address2_b_dly;
+    reg [width_eccencparity-1:0] eccencparity_dly;
+    reg eccencbypass_dly;
+
+// INTERNAL PARAMETER
+    reg [21*8:0] cread_during_write_mode_mixed_ports;
+    reg [7*8:0] i_ram_block_type;
+    integer i_byte_size;
+
+    wire i_good_to_write_a;
+    wire i_good_to_write_b;
+    reg i_good_to_write_a2;
+    reg i_good_to_write_b2;
+
+    reg i_core_clocken_a_reg;
+    reg i_core_clocken0_b_reg;
+    reg i_core_clocken1_b_reg;
+
+// INTERNAL WIRE DECLARATIONS
+
+    wire i_indata_aclr_a;
+    wire i_address_aclr_a;
+    wire i_wrcontrol_aclr_a;
+    wire i_indata_aclr_b;
+    wire i_address_aclr_b;
+    wire i_wrcontrol_aclr_b;
+    wire i_outdata_aclr_a;
+    wire i_outdata_aclr_b;
+    wire i_outdata_sclr_a;
+    wire i_outdata_sclr_b;
+    wire i_rdcontrol_aclr_b;
+    wire i_byteena_aclr_a;
+    wire i_byteena_aclr_b;
+    wire i_outdata_clken_a;
+    wire i_outdata_clken_b;
+    wire i_outlatch_clken_a;
+    wire i_outlatch_clken_b;
+    wire i_clocken0;
+    wire i_clocken1_b;
+    wire i_clocken0_b;
+    wire i_core_clocken_a;
+    wire i_core_clocken_b;
+    wire i_core_clocken0_b;
+    wire i_core_clocken1_b;
+    wire [widthad_a - 1:0] i_out_addr_a;
+    wire [widthad_b - 1:0] i_out_addr_b;
+
+// INTERNAL TRI DECLARATION
+
+    tri0 wren_a;
+    tri0 wren_b;
+    tri1 rden_a;
+    tri1 rden_b;
+    tri1 clock0;
+    tri1 clocken0;
+    tri1 clocken1;
+    tri1 clocken2;
+    tri1 clocken3;
+    tri0 aclr0;
+    tri0 aclr1;
+    tri0 sclr;
+    tri0 eccencbypass;
+    tri0 [width_eccencparity-1:0] eccencparity;
+    tri0 [widthad2_a -1:0] address2_a;
+    tri0 [widthad2_b -1:0] address2_b;
+    tri0 addressstall_a;
+    tri0 addressstall_b;
+    tri1 [width_byteena_a-1:0] byteena_a;
+    tri1 [width_byteena_b-1:0] byteena_b;
+    tri1 [width_byteena_a-1:0] i_byteena_a;
+    tri1 [width_byteena_b-1:0] i_byteena_b;
+
+
+// LOCAL INTEGER DECLARATION
+
+    integer i_numwords_a;
+    integer i_numwords_b;
+    integer i_aclr_flag_a;
+    integer i_aclr_flag_b;
+    integer i_q_tmp2_a_idx;
+
+    // for loop iterators
+    integer init_i;
+    integer i;
+    integer i2;
+    integer i3;
+    integer i4;
+    integer i5;
+    integer j;
+    integer j2;
+    integer j3;
+    integer k;
+    integer k2;
+    integer k3;
+    integer k4;
+    integer j4;
+
+    // For temporary calculation
+    integer i_div_wa;
+    integer i_div_wb;
+    integer j_plus_i2;
+    integer j2_plus_i5;
+    integer j3_plus_i5;
+    integer j_plus_i2_div_a;
+    integer j2_plus_i5_div_a;
+    integer j3_plus_i5_div_a;
+    integer j3_plus_i5_div_b;
+    integer i_byteena_count;
+    integer port_a_bit_count_low;
+    integer port_a_bit_count_high;
+    integer port_b_bit_count_low;
+    integer port_b_bit_count_high;
+
+    time i_data_write_time_a;
+    time i_data_write_time_b;
+
+    // ------------------------
+    // COMPONENT INSTANTIATIONS
+    // ------------------------
+    // ALTERA_DEVICE_FAMILIES dev ();
+    ALTERA_MF_MEMORY_INITIALIZATION mem ();
+
+// DELTA DELAYS FOR INPUT PORTS
+    always@(wren_a) begin
+        wren_a_dly <= wren_a;
+    end
+
+    always@(wren_b) begin
+        wren_b_dly <= wren_b;
+    end
+
+    always@(rden_a) begin
+        rden_a_dly <= rden_a;
+    end
+
+    always@(rden_b) begin
+        rden_b_dly <= rden_b;
+    end
+
+    always@(data_a) begin
+        data_a_dly <= data_a;
+    end
+
+    always@(data_b) begin
+        data_b_dly <= data_b;
+    end
+
+    always@(address_a) begin
+        address_a_dly <= address_a;
+    end
+
+    always@(address_b) begin
+        address_b_dly <= address_b;
+    end
+
+    always@(clocken0) begin
+        clocken0_dly <= clocken0;
+    end
+
+    always@(clocken1) begin
+        clocken1_dly <= clocken1;
+    end
+
+    always@(clocken2) begin
+        clocken2_dly <= clocken2;
+    end
+
+    always@(clocken3) begin
+        clocken3_dly <= clocken3;
+    end
+
+    always@(byteena_a) begin
+        byteena_a_dly <= byteena_a;
+    end
+
+    always@(byteena_b) begin
+        byteena_b_dly <= byteena_b;
+    end
+
+    always@(addressstall_a) begin
+        addressstall_a_dly <= addressstall_a;
+    end
+
+    always@(addressstall_b) begin
+        addressstall_b_dly <= addressstall_b;
+    end
+
+    always@(eccencparity) begin
+        eccencparity_dly <= eccencparity;
+    end
+
+    always@(eccencbypass) begin
+        eccencbypass_dly <= eccencbypass;
+    end
+
+    always@(address2_a) begin
+        address2_a_dly <= address2_a;
+    end
+
+    always@(address2_b) begin
+        address2_b_dly <= address2_b;
+    end
+
+
+        // Initialize mem_data
+    task automatic initialize_mem_contents();
+        if ((init_file == "UNUSED") || (init_file == ""))
+        begin
+            if(power_up_uninitialized == "TRUE")
+            begin
+                wa_mult_x = 'bx;
+                for (i = 0; i < (1 << widthad_a); i = i + 1)
+                    mem_data[i] = wa_mult_x;
+
+                if (enable_mem_data_b_reading)
+                begin
+                    for (i = 0; i < (1 << widthad_b); i = i + 1)
+                    mem_data_b[i] = 'bx;
+                end
+            end
+            else
+            begin
+                wa_mult_x = 'b0;
+                ecc_a_mult_x = {width_eccstatus{1'b0}};
+                for (i = 0; i < (1 << widthad_a); i = i + 1)
+                begin
+                    mem_data[i] = wa_mult_x;
+                    ecc_data[i] = wa_mult_x;
+                end
+                if (enable_mem_data_b_reading)
+                begin
+                    for (i = 0; i < (1 << widthad_b); i = i + 1)
+                        mem_data_b[i] = 'b0;
+                        ecc_data_b[i] = {width_eccstatus{1'b0}};
+                end
+            end
+    end
+        else  // Memory initialization file is used
+        begin
+            wa_mult_x = 'b0;
+            ecc_a_mult_x = {width_eccstatus{1'b0}};
+            for (i = 0; i < (1 << widthad_a); i = i + 1)
+            begin
+                mem_data[i] = wa_mult_x;
+                ecc_data[i] = ecc_a_mult_x;
+            end
+
+            for (i = 0; i < (1 << widthad_b); i = i + 1)
+            begin
+                mem_data_b[i] = 'b0;
+                ecc_data_b[i] = {width_eccstatus{1'b0}};
+            end
+
+            init_file_b_port = 0;
+
+            if ((init_file_layout != "PORT_A") &&
+                (init_file_layout != "PORT_B"))
+            begin
+                if (operation_mode == "DUAL_PORT")
+                    init_file_b_port = 1;
+                else
+                    init_file_b_port = 0;
+            end
+            else
+            begin
+                if (init_file_layout == "PORT_A")
+                    init_file_b_port = 0;
+                else if (init_file_layout == "PORT_B")
+                    init_file_b_port = 1;
+            end
+
+            if (init_file_b_port)
+            begin
+                if (ram_initf == 0) begin
+                    mem.convert_to_ver_file(init_file, width_b, ram_initf);
+                end
+
+                $display("Initializing memory contents for %m with %s", ram_initf);
+                $readmemh(ram_initf, mem_data_b);
+                for (i = 0; i < (i_numwords_b * width_b); i = i + 1)
+                begin
+                    temp_wb = mem_data_b[i / width_b];
+                    temp_ecc_b = {width_eccstatus{1'b0}};
+                    i_div_wa = i / width_a;
+                    temp_wa = mem_data[i_div_wa];
+                    temp_ecc_a = {width_eccstatus{1'b0}};
+                    temp_wa[i % width_a] = temp_wb[i % width_b];
+                    temp_ecc_a[i % width_a] = temp_ecc_b[i % width_b];
+                    mem_data[i_div_wa] = temp_wa;
+                    ecc_data[i_div_wa] = temp_ecc_a;
+                end
+            end
+            else
+            begin
+                if (ram_initf == 0) begin
+                    mem.convert_to_ver_file(init_file, width_a, ram_initf);
+                end
+
+                $display("Initializing memory contents for %m with %s", ram_initf);
+                $readmemh(ram_initf, mem_data);
+
+                if (enable_mem_data_b_reading)
+                begin
+                    for (i = 0; i < (i_numwords_a * width_a); i = i + 1)
+                    begin
+                        temp_wa = mem_data[i / width_a];
+                        i_div_wb = i / width_b;
+                        temp_wb = mem_data_b[i_div_wb];
+                        temp_ecc_b = {width_eccstatus{1'b0}};
+                        temp_wb[i % width_b] = temp_wa[i % width_a];
+                        temp_ecc_b[i % width_b] = temp_ecc_a[i % width_a];
+                        mem_data_b[i_div_wb] = temp_wb;
+                        ecc_data_b[i_div_wb] = temp_ecc_b;
+                    end
+                end
+            end
+        end
+    endtask
+
+// INITIAL CONSTRUCT BLOCK
+
+    initial
+    begin
+
+
+        i_numwords_a = (numwords_a != 0) ? numwords_a : (1 << widthad_a);
+        i_numwords_b = (numwords_b != 0) ? numwords_b : (1 << widthad_b);
+
+
+        if ((is_lutram == 1) || (ram_block_type == "M10K") || (ram_block_type == "M20K"))
+            i_ram_block_type = ram_block_type;
+        else
+            i_ram_block_type = "AUTO";
+
+        cread_during_write_mode_mixed_ports = read_during_write_mode_mixed_ports;
+
+        i_byte_size = (byte_size > 0) ? byte_size
+                        : ((i_byte_size_tmp != 5) && (i_byte_size_tmp !=10) && (i_byte_size_tmp != 8) && (i_byte_size_tmp != 9)) ?
+                            8 : i_byte_size_tmp;
+
+        // Parameter Checking
+        if ((operation_mode != "QUAD_PORT") && (operation_mode != "BIDIR_DUAL_PORT") && (operation_mode != "SINGLE_PORT") &&
+            (operation_mode != "DUAL_PORT") && (operation_mode != "ROM") && (operation_mode != "QUAD_PORT"))
+        begin
+            $display("Error: Not a valid operation mode.");
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if (i_ram_block_type != ram_block_type)
+        begin
+            $display("Warning: RAM block type is assumed as %s", i_ram_block_type);
+            $display("Time: %0t  Instance: %m", $time);
+        end
+
+
+        if ((cread_during_write_mode_mixed_ports != "DONT_CARE") &&
+            (cread_during_write_mode_mixed_ports != "CONSTRAINED_DONT_CARE") &&
+            (cread_during_write_mode_mixed_ports != "OLD_DATA") &&
+            (cread_during_write_mode_mixed_ports != "NEW_A_OLD_B") &&
+            (cread_during_write_mode_mixed_ports != "NEW_DATA"))
+        begin
+            $display("Error: Invalid value for read_during_write_mode_mixed_ports parameter. It has to be OLD_DATA or DONT_CARE or CONSTRAINED_DONT_CARE or NEW_DATA");
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if ((cread_during_write_mode_mixed_ports != read_during_write_mode_mixed_ports) && ((operation_mode != "SINGLE_PORT") && (operation_mode != "ROM")))
+        begin
+            $display("Warning: read_during_write_mode_mixed_ports is assumed as %s", cread_during_write_mode_mixed_ports);
+            $display("Time: %0t  Instance: %m", $time);
+        end
+
+        if ((is_lutram != 1) && (cread_during_write_mode_mixed_ports == "CONSTRAINED_DONT_CARE"))
+        begin
+            $display("Warning: read_during_write_mode_mixed_ports cannot be set to CONSTRAINED_DONT_CARE for non-LUTRAM ram block type. This will cause incorrect simulation result.");
+            $display("Time: %0t  Instance: %m", $time);
+        end
+
+        if ((is_lutram != 1) && (cread_during_write_mode_mixed_ports == "NEW_DATA"))
+        begin
+            $display("Warning: read_during_write_mode_mixed_ports cannot be set to NEW_DATA for non-LUTRAM ram block type. This will cause incorrect simulation result.");
+            $display("Time: %0t  Instance: %m", $time);
+        end
+
+        if ((is_lutram == 1) && (i_read_during_write_mode_port_a == "NEW_DATA_WITH_NBE_READ") && (operation_mode == "SINGLE_PORT") && (outdata_reg_a == "UNREGISTERED"))
+        begin
+            $display("Warning: Value for read_during_write_mode_port_a of instance is not honoured in SINGLE PORT operation mode when output registers are not clocked by clock0 for LUTRAM.");
+            $display("Time: %0t  Instance: %m", $time);
+        end
+
+        // This warning is applicable for NF and C10 only.
+        if ((is_lutram != 1) && (ram_block_type != "AUTO") && (i_read_during_write_mode_port_a == "DONT_CARE") && (operation_mode == "SINGLE_PORT") &&(family_c10gx || family_arria10))
+        begin
+            $display("Warning: Value for read_during_write_mode_port_a of instance is assumed as NEW_DATA_NO_NBE_READ for current INTENDED DEVICE FAMILY %s", intended_device_family);
+            $display("Time: %0t  Instance: %m", $time);
+        end
+
+        if (!(family_arria10 || family_c10gx) && (operation_mode != "SINGLE_PORT")&& (i_read_during_write_mode_port_a == "NEW_DATA_NO_NBE_READ"))
+        begin
+            $display("Warning: starting Stratix 10 and onwards, read during write mode port a no longer support NEW_DATA_NO_NBE_READ, simulation will behave as NEW_DATA_WITH_NBE_READ");
+        end
+
+        if (!(family_arria10 || family_c10gx) && (operation_mode != "SINGLE_PORT") && (i_read_during_write_mode_port_b == "NEW_DATA_NO_NBE_READ"))
+        begin
+            $display("Warning: starting Stratix 10 and onwards, read during write mode port b no longer support NEW_DATA_NO_NBE_READ, simulation will behave as NEW_DATA_WITH_NBE_READ");
+        end
+
+        if ((i_byte_size != 5) && (i_byte_size != 8) && (i_byte_size != 9) && (i_byte_size != 10))
+        begin
+            $display("Error: byte_size has to be either 5,8,9 or 10 for %s device family", intended_device_family);
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if (width_a <= 0)
+        begin
+            $display("Error: Invalid value for WIDTH_A parameter");
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if ((width_b <= 0) &&
+            ((operation_mode != "SINGLE_PORT") && (operation_mode != "ROM")))
+        begin
+            $display("Error: Invalid value for WIDTH_B parameter");
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if (widthad_a <= 0)
+        begin
+            $display("Error: Invalid value for WIDTHAD_A parameter");
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if ((widthad_b <= 0) &&
+            ((operation_mode != "SINGLE_PORT") && (operation_mode != "ROM")))
+        begin
+            $display("Error: Invalid value for WIDTHAD_B parameter");
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if ((operation_mode == "DUAL_PORT") && (i_numwords_a * width_a != i_numwords_b * width_b))
+        begin
+            $display("Error: Total number of bits of port A and port B should be the same for dual port mode");
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if ((operation_mode == "BIDIR_DUAL_PORT") && (i_numwords_a * width_a != i_numwords_b * width_b))
+        begin
+            $display("Error: Total number of bits of port A and port B should be the same for bidir dual port mode");
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if ((operation_mode == "QUAD_PORT") && (i_numwords_a * width_a != i_numwords_b * width_b))
+        begin
+            $display("Error: Total number of bits of port A and port B should be the same for quad port mode");
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if ((implement_in_les != "OFF") && (implement_in_les != "ON"))
+        begin
+            $display("Error: Illegal value for implement_in_les parameter");
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if (((init_file == "UNUSED") || (init_file == "")) &&
+            (operation_mode == "ROM"))
+        begin
+            $display("Error! altera_syncram_derived needs data file for memory initialization in ROM mode.");
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if (((address_aclr_a != "UNUSED") && (address_aclr_a != "NONE") && (operation_mode != "ROM") && (operation_mode != "QUAD_PORT")) ||
+            ((address_aclr_b != "UNUSED") && (address_aclr_b != "NONE") && (operation_mode != "DUAL_PORT") && (operation_mode != "QUAD_PORT")))
+        begin
+            $display("Warning: %s aclr signal on input ports is not supported for current operation mode. The aclr to input ports will be ignored.", intended_device_family);
+            $display("Time: %0t  Instance: %m", $time);
+        end
+
+        if ((is_lutram != 1) && (i_ram_block_type != "AUTO") &&
+            ((read_during_write_mode_mixed_ports == "NEW_DATA") || (read_during_write_mode_mixed_ports == "CONSTRAINED_DONT_CARE")))
+        begin
+            $display("Error: %s value for read_during_write_mode_mixed_ports is not supported in %s RAM block type", read_during_write_mode_mixed_ports, i_ram_block_type);
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if ((operation_mode == "DUAL_PORT") && (outdata_reg_b != "CLOCK0") && (is_lutram == 1) && (read_during_write_mode_mixed_ports == "OLD_DATA"))
+        begin
+            $display("Warning: Value for read_during_write_mode_mixed_ports of instance is not honoured in DUAL PORT operation mode when output registers are not clocked by clock0 for LUTRAM.");
+            $display("Time: %0t  Instance: %m", $time);
+        end
+
+        if ((address_aclr_b != "NONE") && (address_aclr_b != "UNUSED") && ((operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "QUAD_PORT")))
+        begin
+            $display("Warning: %s value for address_aclr_b is not supported for write port in %s device family. The aclr to address_b registers will be ignored.", address_aclr_b, intended_device_family);
+            $display("Time: %0t  Instance: %m", $time);
+        end
+
+        if ((is_lutram == 1) && (read_during_write_mode_mixed_ports == "OLD_DATA")
+            && ((address_aclr_b != "NONE") && (address_aclr_b != "UNUSED")) && (operation_mode == "DUAL_PORT"))
+        begin
+            $display("Warning : aclr signal for address_b is ignored for RAM block type %s when read_during_write_mode_mixed_ports is set to OLD_DATA", ram_block_type);
+            $display("Time: %0t  Instance: %m", $time);
+        end
+
+       if((enable_ecc == "TRUE") && ((i_ram_block_type != "M20K") || (operation_mode != "DUAL_PORT")))
+        begin
+            $display("Error: %s value for enable_ecc is not supported in %s ram block type for %s device family in %s operation mode", enable_ecc, i_ram_block_type, intended_device_family, operation_mode);
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if ((i_ram_block_type != "M20K") && (ecc_pipeline_stage_enabled == "TRUE"))
+        begin
+            $display("Error: %s value for ecc_pipeline_stage_enabled is not supported in %s ram block type.", ecc_pipeline_stage_enabled, i_ram_block_type);
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if ((outdata_reg_b == "UNREGISTERED") && (ecc_pipeline_stage_enabled == "TRUE"))
+        begin
+            $display("Error: %s value for ecc_pipeline_stage_enabled is not supported when output_reg_b is set to %s.", ecc_pipeline_stage_enabled, outdata_reg_b);
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        //Setting this to only warning because in synthesis it will ignore the ecc_pipeline_stage_enabled parameter when enable_ecc is set to false
+        if((ecc_pipeline_stage_enabled == "TRUE") && (enable_ecc != "TRUE"))
+        begin
+            $display("Warning: %s value for ecc_pipeline_stage_enabled is not supported when enable_ecc is set to %s", ecc_pipeline_stage_enabled, enable_ecc);
+            $display("Time: %0t  Instance: %m", $time);
+        end
+
+        //Case:516279 - If it is family earlier than Stratix 10, generate error message when Old Data is selected
+        if ((family_c10gx || family_arria10) &&
+             (i_ram_block_type == "M20K") && (enable_ecc == "TRUE") && (read_during_write_mode_mixed_ports == "OLD_DATA"))
+        begin
+            $display("Error : ECC is not supported for read-before-write mode.");
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        // If it is family earlier than Stratix 10, generate error message when coherent read is enabled
+        if ((enable_coherent_read== "TRUE" && (family_c10gx || family_arria10)))
+        begin
+            $display("Error : Enable Coherent Read is not supported for family earlier than Stratix 10, please update intended_device_family accordingly.");
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if (operation_mode != "DUAL_PORT")
+        begin
+            if ((outdata_reg_a != "CLOCK0") && (outdata_reg_a != "CLOCK1") && (outdata_reg_a != "UNUSED")  && (outdata_reg_a != "UNREGISTERED"))
+            begin
+                $display("Error: %s value for outdata_reg_a is not supported.", outdata_reg_a);
+                $display("Time: %0t  Instance: %m", $time);
+                $finish;
+            end
+        end
+
+        if ((operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "DUAL_PORT") || (operation_mode == "QUAD_PORT"))
+        begin
+            if ((address_reg_b != "CLOCK0") && (address_reg_b != "CLOCK1") && (address_reg_b != "UNUSED"))
+            begin
+                $display("Error: %s value for address_reg_b is not supported.", address_reg_b);
+                $display("Time: %0t  Instance: %m", $time);
+                $finish;
+            end
+
+            if ((outdata_reg_b != "CLOCK0") && (outdata_reg_b != "CLOCK1") && (outdata_reg_b != "UNUSED") && (outdata_reg_b != "UNREGISTERED"))
+            begin
+                $display("Error: %s value for outdata_reg_b is not supported.", outdata_reg_b);
+                $display("Time: %0t  Instance: %m", $time);
+                $finish;
+            end
+
+            if ((rdcontrol_reg_b != "CLOCK0") && (rdcontrol_reg_b != "CLOCK1") && (rdcontrol_reg_b != "UNUSED") && (operation_mode == "DUAL_PORT"))
+            begin
+                $display("Error: %s value for rdcontrol_reg_b is not supported.", rdcontrol_reg_b);
+                $display("Time: %0t  Instance: %m", $time);
+                $finish;
+            end
+
+            if ((indata_reg_b != "CLOCK0") && (indata_reg_b != "CLOCK1") && (indata_reg_b != "UNUSED") && ((operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "QUAD_PORT")))
+            begin
+                $display("Error: %s value for indata_reg_b is not supported.", indata_reg_b);
+                $display("Time: %0t  Instance: %m", $time);
+                $finish;
+            end
+
+            if ((wrcontrol_wraddress_reg_b != "CLOCK0") && (wrcontrol_wraddress_reg_b != "CLOCK1") && (wrcontrol_wraddress_reg_b != "UNUSED") && ((operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "QUAD_PORT")))
+            begin
+                $display("Error: %s value for wrcontrol_wraddress_reg_b is not supported.", wrcontrol_wraddress_reg_b);
+                $display("Time: %0t  Instance: %m", $time);
+                $finish;
+            end
+
+            if ((byteena_reg_b != "CLOCK0") && (byteena_reg_b != "CLOCK1") && (byteena_reg_b != "UNUSED") && ((operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "QUAD_PORT")))
+            begin
+                $display("Error: %s value for byteena_reg_b is not supported.", byteena_reg_b);
+                $display("Time: %0t  Instance: %m", $time);
+                $finish;
+            end
+        end
+
+        // *****************************************
+        // legal operations for all operation modes:
+        //      |  PORT A  |  PORT B  |
+        //      |  RD  WR  |  RD  WR  |
+        // BDP  |  x   x   |  x   x   |
+        // DP   |      x   |  x       |
+        // SP   |  x   x   |          |
+        // ROM  |  x       |          |
+        // *****************************************
+
+
+        // Clear the filename to initialize
+        ram_initf = 0;
+
+        initialize_mem_contents();
+
+        i_nmram_write_a = 0;
+        i_nmram_write_b = 0;
+
+        i_aclr_flag_a = 0;
+        i_aclr_flag_b = 0;
+
+        i_outdata_aclr_a_prev = 0;
+        i_outdata_aclr_b_prev = 0;
+        i_address_aclr_a_prev = 0;
+        i_address_aclr_b_prev = 0;
+        i_outdata_sclr_a_prev = 0;
+        i_outdata_sclr_b_prev = 0;
+        i_outdata_sclr_a_reg  = 0;
+        i_outdata_sclr_b_reg  = 0;
+
+        i_force_reread_a        = 0;
+        i_force_reread_a1       = 0;
+        i_force_reread_b        = 0;
+        i_force_reread_b1       = 0;
+        i_force_reread_a_signal = 0;
+        i_force_reread_b_signal = 0;
+
+        // Initialize internal registers/signals
+        wren_a_dly             = 0;
+        i_data_reg_a           = 0;
+        i_data_reg_b           = 0;
+
+        if ((family_c10gx || family_arria10))
+        begin
+            i_address_reg_a  = 0;
+            i_address_reg_b  = 0;
+        end
+        else
+        begin
+            // Case:519832 Assign initial as 'x' for M20K DP in S10 and onwards
+            i_address_reg_a  = ((operation_mode == "DUAL_PORT") && (is_lutram != 1)) ? 'bx : 0;
+            i_address_reg_b  = ((operation_mode == "DUAL_PORT") && (is_lutram != 1)) ? 'bx : 0;
+        end
+        i_address_reg_a2 = 0;
+        i_address_reg_b2 = 0;
+
+        i_original_address_a   = 0;
+        i_wren_reg_a           = 0;
+        i_wren_reg_b           = 0;
+        i_read_flag_a          = 0;
+        i_read_flag_b          = 0;
+        i_write_flag_a         = 0;
+        i_write_flag_b         = 0;
+        i_byteena_mask_reg_a_x = 0;
+        i_byteena_mask_reg_b_x = 0;
+        i_original_data_b      = 0;
+        i_original_data_a      = 0;
+        i_data_write_time_a    = 0;
+        i_data_write_time_b    = 0;
+        i_core_clocken_a_reg   = 0;
+        i_core_clocken0_b_reg  = 0;
+        i_core_clocken1_b_reg  = 0;
+
+        i_byteena_mask_reg_a     = 'b0;
+        i_byteena_mask_reg_b     = 'b0;
+        i_byteena_mask_reg_a_out = 'b0;
+        i_byteena_mask_reg_b_out = 'b0;
+
+        i_rden_reg_a        = 0;
+        i_rden_reg_b        = 0;
+        i_rden_reg_b_bypass = 1'b0;
+        //initialize reg and latches
+        if (is_lutram == 1)
+        begin
+            i_q_tmp_a  = mem_data[0];
+            i_q_tmp2_a = mem_data[0];
+
+            for (init_i = 0; init_i < width_b; init_i = init_i + 1)
+            begin
+                init_temp = mem_data[init_i / width_a];
+                i_q_tmp_b[init_i] = init_temp[init_i % width_a];
+                i_q_tmp2_b[init_i] = init_temp[init_i % width_a];
+            end
+
+            i_q_reg_a            = 0;
+            i_q_reg_b            = 0;
+            i_q_reg_ecc_b        = 0;
+            i_q_output_latch     = 0;
+            i_q_output_latch_ecc = 0;
+        end
+        else
+        begin
+            i_q_tmp_a            = 0;
+            i_q_tmp_ecc_a        = 0;
+            i_q_tmp_b            = 0;
+            i_q_tmp_ecc_b        = 0;
+            i_q_tmp2_a           = 0;
+            i_q_tmp2_ecc_a       = 0;
+            i_q_tmp2_b           = 0;
+            i_q_tmp2_ecc_b       = 0;
+            i_q_reg_a            = 0;
+            i_q_reg_ecc_a        = 0;
+            i_q_reg_b            = 0;
+            i_q_reg_ecc_b        = 0;
+            i_q_ecc_status_reg_b = 0;
+            i_q_ecc_reg_b        = 0;
+        end
+
+        good_to_go_a = 0;
+        good_to_go_b = 0;
+
+        same_clock_pulse0 = 1'b0;
+        same_clock_pulse1 = 1'b0;
+
+        i_byteena_count = 0;
+
+        i_good_to_write_a2 = 1;
+        i_good_to_write_b2 = 1;
+        
+        lutram_clocken0 = 0;
+
+    end
+
+
+// SIGNAL ASSIGNMENT
+
+    // Clock enable signal assignment
+
+    // port a clock enable assignments:
+    assign i_outdata_clken_a              = (clock_enable_output_a == "BYPASS") ?
+                                            1'b1 : ((clock_enable_output_a == "ALTERNATE") && (outdata_reg_a == "CLOCK1")) ?
+                                            clocken3_dly : ((clock_enable_output_a == "ALTERNATE") && (outdata_reg_a == "CLOCK0")) ?
+                                            clocken2_dly : (outdata_reg_a == "CLOCK1") ?
+                                            clocken1_dly : (outdata_reg_a == "CLOCK0") ?
+                                            clocken0_dly : 1'b1;
+    // port b clock enable assignments:
+    assign i_outdata_clken_b              = (clock_enable_output_b == "BYPASS") ?
+                                            1'b1 : ((clock_enable_output_b == "ALTERNATE") && (outdata_reg_b == "CLOCK1")) ?
+                                            clocken3_dly : ((clock_enable_output_b == "ALTERNATE") && (outdata_reg_b == "CLOCK0")) ?
+                                            clocken2_dly : (outdata_reg_b == "CLOCK1") ?
+                                            clocken1_dly : (outdata_reg_b == "CLOCK0") ?
+                                            clocken0_dly : 1'b1;
+
+    // port a output latch clock enable assignments:
+    assign i_outlatch_clken_a             = ((clock_enable_output_b == "NORMAL") && (outdata_reg_a == "UNREGISTERED") && (outdata_reg_b == "CLOCK0") &&
+                                             ((operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "QUAD_PORT")))?
+                                            clocken0_dly : 1'b1;
+    // port b clock enable assignments:
+    assign i_outlatch_clken_b             = ((clock_enable_output_a == "NORMAL") && (outdata_reg_b == "UNREGISTERED") &&
+                                            ((operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "QUAD_PORT")))?
+                                            (((address_reg_b == "CLOCK0") && (outdata_reg_a == "CLOCK0")) ? clocken0_dly :
+                                            (((address_reg_b == "CLOCK1") && (outdata_reg_a == "CLOCK1")) ? clocken1_dly : 1'b1))
+                                            : 1'b1;
+
+    assign i_clocken0                     = (clock_enable_input_a == "BYPASS") ?
+                                            1'b1 : (clock_enable_input_a == "NORMAL") ?
+                                            clocken0_dly : clocken2_dly;
+
+    assign i_clocken0_b                   = (clock_enable_input_b == "BYPASS") ?
+                                            1'b1 : (clock_enable_input_b == "NORMAL") ?
+                                            clocken0_dly : clocken2_dly;
+
+    assign i_clocken1_b                   = (clock_enable_input_b == "BYPASS") ?
+                                            1'b1 : (clock_enable_input_b == "NORMAL") ?
+                                            clocken1_dly : clocken3_dly;
+
+    assign i_core_clocken_a               = (clock_enable_core_a == "BYPASS") ?
+                                            1'b1 : ((clock_enable_core_a == "USE_INPUT_CLKEN") ?
+                                            i_clocken0 : ((clock_enable_core_a == "NORMAL") ?
+                                            clocken0_dly : clocken2_dly));
+
+    assign i_core_clocken0_b              = (clock_enable_core_b == "BYPASS") ?
+                                            1'b1 : ((clock_enable_core_b == "USE_INPUT_CLKEN") ?
+                                            i_clocken0_b : ((clock_enable_core_b == "NORMAL") ?
+                                            clocken0_dly : clocken2_dly));
+
+    assign i_core_clocken1_b              = (clock_enable_core_b == "BYPASS") ?
+                                            1'b1 : ((clock_enable_core_b == "USE_INPUT_CLKEN") ?
+                                            i_clocken1_b : ((clock_enable_core_b == "NORMAL") ?
+                                            clocken1_dly : clocken3_dly));
+
+    assign i_core_clocken_b               = (address_reg_b == "CLOCK0") ?
+                                            i_core_clocken0_b : i_core_clocken1_b;
+
+    // Async clear signal assignment
+
+    // port a clear assigments:
+
+    assign i_indata_aclr_a    = 1'b0; //disconnected
+    assign i_address_aclr_a   = (address_aclr_a == "CLEAR0") ? aclr0 : ((address_aclr_a == "CLEAR1")? aclr1 : 1'b0);
+    assign i_wrcontrol_aclr_a = 1'b0; //disconnected
+    assign i_byteena_aclr_a   = 1'b0; //disconnected
+    assign i_outdata_aclr_a   = (outdata_aclr_a == "CLEAR0") ?
+                                aclr0 : ((outdata_aclr_a == "CLEAR1") ?
+                                aclr1 : 1'b0);
+    assign i_outdata_sclr_a   = (outdata_sclr_a == "SCLEAR") ? sclr : 1'b0;
+
+    // port b clear assignments:
+    assign i_indata_aclr_b    = 1'b0; //disconnected
+    assign i_address_aclr_b   = (address_aclr_b == "CLEAR0") ? aclr0 : ((address_aclr_b == "CLEAR1") ? aclr1 : 1'b0);
+    assign i_wrcontrol_aclr_b = 1'b0; //disconnected
+    assign i_rdcontrol_aclr_b = 1'b0; //disconnected
+    assign i_byteena_aclr_b   = 1'b0; //disconnected
+    assign i_outdata_aclr_b   = (outdata_aclr_b == "CLEAR0") ?
+                                aclr0 : ((outdata_aclr_b == "CLEAR1") ?
+                                aclr1 : 1'b0);
+    assign i_outdata_sclr_b   = (outdata_sclr_b == "SCLEAR") ? sclr : 1'b0;
+
+    assign i_byteena_a = byteena_a_dly;
+    assign i_byteena_b = byteena_b_dly;
+
+    assign i_out_addr_a = (operation_mode == "QUAD_PORT")? i_address_reg_a2 : i_address_reg_a;
+    assign i_out_addr_b = (operation_mode == "QUAD_PORT")? i_address_reg_b2 : i_address_reg_b;
+
+    // Ready to write setting
+
+    assign i_good_to_write_a = (((is_bidir_and_wrcontrol_addb_clk0 == 1) || (dual_port_addreg_b_clk0 == 1)) && (i_core_clocken0_b) && (~clock0)) ?
+                                    1'b1 : (((is_bidir_and_wrcontrol_addb_clk1 == 1) || (dual_port_addreg_b_clk1 == 1)) && (i_core_clocken1_b) && (~clock1)) ?
+                                    1'b1 : i_good_to_write_a2;
+
+    assign i_good_to_write_b = ((i_core_clocken0_b) && (~clock0)) ? 1'b1 : i_good_to_write_b2;
+
+    always @(i_good_to_write_a)
+    begin
+        i_good_to_write_a2 = i_good_to_write_a;
+    end
+
+    always @(i_good_to_write_b)
+    begin
+        i_good_to_write_b2 = i_good_to_write_b;
+    end
+
+
+    // Port A inputs registered : indata, address, byeteena, wren
+    // Aclr status flags get updated here for M-RAM ram_block_type
+
+    always @(posedge clock0)
+    begin
+
+        if (i_force_reread_a && i_outlatch_clken_a)
+        begin
+            i_force_reread_a_signal <= ~ i_force_reread_a_signal;
+            i_force_reread_a <= 0;
+        end
+
+        if (i_force_reread_b && ((is_bidir_and_wrcontrol_addb_clk0 == 1) || (dual_port_addreg_b_clk0 == 1)) && i_outlatch_clken_b)
+        begin
+            i_force_reread_b_signal <= ~ i_force_reread_b_signal;
+            i_force_reread_b <= 0;
+        end
+
+        if (clock1)
+            same_clock_pulse0 <= 1'b1;
+        else
+            same_clock_pulse0 <= 1'b0;
+
+        if (i_address_aclr_a && (is_rom == 1))
+            i_address_reg_a <= 0;
+
+        if (i_address_aclr_a && (is_sqp == 1))
+            i_address_reg_a2 <= 0;
+
+        i_core_clocken_a_reg <= i_core_clocken_a;
+        i_core_clocken0_b_reg <= i_core_clocken0_b;
+
+        if (i_core_clocken_a || (enable_input_x_prop && (i_core_clocken_a === 1'bx)))
+        begin
+            if (i_core_clocken_a === 1'bx && enable_input_x_prop)
+            begin
+                 i_write_flag_a <= ~i_write_flag_a;
+            end
+            if (i_force_reread_a1)
+            begin
+                i_force_reread_a_signal <= ~ i_force_reread_a_signal;
+                i_force_reread_a1 <= 0;
+            end
+            i_read_flag_a <= ~ i_read_flag_a;
+            if (i_force_reread_b1 && ((is_bidir_and_wrcontrol_addb_clk0 == 1) || (dual_port_addreg_b_clk0 == 1)))
+            begin
+                i_force_reread_b_signal <= ~ i_force_reread_b_signal;
+                i_force_reread_b1 <= 0;
+            end
+            if (is_write_on_positive_edge == 1)
+            begin
+                if (i_wren_reg_a || wren_a_dly || (enable_input_x_prop && ((i_wren_reg_a === 1'bx) || (wren_a_dly === 1'bx))))
+                begin
+                    i_write_flag_a <= ~ i_write_flag_a;
+                end
+                if (operation_mode != "ROM")
+                    i_nmram_write_a <= 1'b0;
+            end
+            else
+            begin
+                if (operation_mode != "ROM")
+                    i_nmram_write_a <= 1'b1;
+            end
+
+            if (is_lutram != 1)
+            begin
+                good_to_go_a <= 1;
+
+                i_rden_reg_a <= rden_a_dly;
+
+                if (i_wrcontrol_aclr_a)
+                    i_wren_reg_a <= 0;
+                else
+                begin
+                    i_wren_reg_a <= wren_a_dly;
+                end
+            end
+        end
+        else
+            i_nmram_write_a <= 1'b0;
+
+        if (i_core_clocken_b)
+            i_address_aclr_b_flag <= 0;
+
+        if (is_lutram)
+        begin
+            if (i_wrcontrol_aclr_a)
+                i_wren_reg_a <= 0;
+            else if (i_core_clocken_a)
+            begin
+                i_wren_reg_a <= wren_a_dly;
+            end
+            lutram_clocken0 <= wren_a & i_clocken0;
+        end
+
+        if (i_clocken0 || (enable_input_x_prop && i_clocken0 === 1'bx && is_lutram))
+        begin
+
+            // Port A inputs
+            i_outdata_sclr_a_reg <= (enable_input_x_prop && i_clocken0 === 1'bx && outdata_sclr_a == "SCLEAR")? 1'bx : i_outdata_sclr_a;
+            if (i_indata_aclr_a)
+                i_data_reg_a <= 0;
+            else
+                i_data_reg_a <= data_a_dly;
+
+            if (i_address_aclr_a && (is_rom == 1))
+                i_address_reg_a <= 0;
+
+            else if (!addressstall_a_dly || (addressstall_a_dly === 'bx && enable_input_x_prop))
+            begin
+                if (is_lutram && (operation_mode != "ROM" && operation_mode != "SINGLE_PORT"))
+                begin
+                    if (wren_a || (enable_input_x_prop && wren_a === 1'bx))
+                        i_address_reg_a <= address_a_dly;
+                end
+                else
+                    i_address_reg_a <= address_a_dly;
+            end
+
+            if (i_address_aclr_a && (is_sqp == 1))
+                i_address_reg_a2 <= 0;
+            else
+                i_address_reg_a2 <= address2_a_dly;
+
+            if (i_byteena_aclr_a)
+            begin
+                i_byteena_mask_reg_a <= 'b1;
+                i_byteena_mask_reg_a_out <= 0;
+                i_byteena_mask_reg_a_x <= 0;
+                i_byteena_mask_reg_a_out_b <= 'bx;
+            end
+            else
+            begin
+
+                if (width_byteena_a == 1)
+                begin
+                    i_byteena_mask_reg_a <= {width_a{i_byteena_a[0]}};
+                    i_byteena_mask_reg_a_out <= (i_byteena_a[0])? 'b0 : 'bx;
+                    i_byteena_mask_reg_a_out_b <= (i_byteena_a[0])? 'bx : 'b0;
+                    i_byteena_mask_reg_a_x <= ((i_byteena_a[0]) || (i_byteena_a[0] == 1'b0))? 'b0 : 'bx;
+                end
+                else
+                    for (k = 0; k < width_a; k = k+1)
+                    begin
+                        i_byteena_mask_reg_a[k] <= i_byteena_a[k/i_byte_size] !== 1'bx ? i_byteena_a[k/i_byte_size] : (enable_input_x_prop) ? 1'bx : 1'b1;
+                        i_byteena_mask_reg_a_out_b[k] <= (i_byteena_a[k/i_byte_size])? 1'bx: 1'b0;
+                        i_byteena_mask_reg_a_out[k] <= (i_byteena_a[k/i_byte_size])? 1'b0: 1'bx;
+                        i_byteena_mask_reg_a_x[k] <= ((i_byteena_a[k/i_byte_size]) || (i_byteena_a[k/i_byte_size] == 1'b0))? 1'b0: 1'bx;
+                    end
+
+            end
+
+            if (is_lutram == 1)
+            begin
+                good_to_go_a <= 1;
+
+                i_rden_reg_a <= (enable_input_x_prop && i_clocken0 === 1'bx)? 1'bx : rden_a_dly;
+
+                if (i_wrcontrol_aclr_a)
+                    i_wren_reg_a <= (enable_input_x_prop && i_clocken0 === 1'bx)? 1'bx : 0;
+                else
+                begin
+                    i_wren_reg_a <= (enable_input_x_prop && i_clocken0 === 1'bx)? 1'bx : wren_a_dly;
+                end
+            end
+
+        end
+
+
+        if (i_indata_aclr_a)
+            i_data_reg_a <= 0;
+
+        if (i_address_aclr_a && (is_rom == 1))
+            i_address_reg_a <= 0;
+
+        if (i_address_aclr_a && (is_sqp == 1))
+            i_address_reg_a2 <= 0;
+
+        if (i_byteena_aclr_a)
+        begin
+            i_byteena_mask_reg_a <= 'b1;
+            i_byteena_mask_reg_a_out <= 0;
+            i_byteena_mask_reg_a_x <= 0;
+            i_byteena_mask_reg_a_out_b <= 'bx;
+        end
+
+
+        // Port B
+
+        if (is_bidir_and_wrcontrol_addb_clk0)
+        begin
+
+            if (i_core_clocken0_b || (enable_input_x_prop && (i_core_clocken0_b === 1'bx)))
+            begin
+                good_to_go_b <= 1;
+
+                i_rden_reg_b <= rden_b_dly;
+
+                if (i_wrcontrol_aclr_b)
+                    i_wren_reg_b <= 0;
+                else
+                begin
+                    i_wren_reg_b <= wren_b_dly;
+                end
+
+                i_read_flag_b <= ~i_read_flag_b;
+
+                if (is_write_on_positive_edge == 1)
+                begin
+                    if (i_wren_reg_b || wren_b_dly || ((enable_input_x_prop == 1) && ((i_wren_reg_b === 1'bx) || (wren_b_dly === 1'bx))))
+                    begin
+                        i_write_flag_b <= ~ i_write_flag_b;
+                    end
+                    i_nmram_write_b <= 1'b0;
+                end
+                else
+                    i_nmram_write_b <= 1'b1;
+
+            end
+            else
+                i_nmram_write_b <= 1'b0;
+
+
+            if (i_clocken0_b)
+            begin
+
+                // Port B inputs
+                i_outdata_sclr_b_reg <=  i_outdata_sclr_b;
+                i_outdata_aclr_b_reg <=  i_outdata_aclr_b; // Used for coherent read feature
+                if (i_indata_aclr_b)
+                    i_data_reg_b <= 0;
+                else
+                    i_data_reg_b <= data_b_dly;
+
+                if (i_address_aclr_b && (i_address_aclr_family_b == 0))
+                    i_address_reg_b <= 0;
+                else if (!addressstall_b)
+                    i_address_reg_b <= address_b_dly;
+
+                if (i_address_aclr_b && (is_sqp == 1))
+                    i_address_reg_b2 <= 0;
+                 else
+                    i_address_reg_b2 <= address2_b_dly;
+
+                if (i_byteena_aclr_b)
+                begin
+                    i_byteena_mask_reg_b <= 'b1;
+                    i_byteena_mask_reg_b_out <= 0;
+                    i_byteena_mask_reg_b_x <= 0;
+                    i_byteena_mask_reg_b_out_a <= 'bx;
+                end
+                else
+                begin
+
+                    if (width_byteena_b == 1)
+                    begin
+                        i_byteena_mask_reg_b <= {width_b{i_byteena_b[0]}};
+                        i_byteena_mask_reg_b_out_a <= (i_byteena_b[0])? 'bx : 'b0;
+                        i_byteena_mask_reg_b_out <= (i_byteena_b[0])? 'b0 : 'bx;
+                        i_byteena_mask_reg_b_x <= ((i_byteena_b[0]) || (i_byteena_b[0] == 1'b0))? 'b0 : 'bx;
+                    end
+                    else
+                        for (k2 = 0; k2 < width_b; k2 = k2 + 1)
+                        begin
+                            i_byteena_mask_reg_b[k2] <= i_byteena_b[k2/i_byte_size] !== 1'bx ? i_byteena_b[k2/i_byte_size] : (enable_input_x_prop) ? 1'bx : 1'b1;
+                            i_byteena_mask_reg_b_out_a[k2] <= (i_byteena_b[k2/i_byte_size])? 1'bx : 1'b0;
+                            i_byteena_mask_reg_b_out[k2] <= (i_byteena_b[k2/i_byte_size])? 1'b0 : 1'bx;
+                            i_byteena_mask_reg_b_x[k2] <= ((i_byteena_b[k2/i_byte_size]) || (i_byteena_b[k2/i_byte_size] == 1'b0))? 1'b0 : 1'bx;
+                        end
+
+                end
+
+            end
+
+
+            if (i_indata_aclr_b)
+                i_data_reg_b <= 0;
+
+            if (i_wrcontrol_aclr_b)
+                i_wren_reg_b <= 0;
+
+            if (i_address_aclr_b && (i_address_aclr_family_b == 0))
+                i_address_reg_b <= 0;
+
+            if (i_address_aclr_b && (is_sqp == 1))
+                i_address_reg_b2 <= 0;
+
+            if (i_byteena_aclr_b)
+            begin
+                i_byteena_mask_reg_b <= 'b1;
+                i_byteena_mask_reg_b_out <= 0;
+                i_byteena_mask_reg_b_x <= 0;
+                i_byteena_mask_reg_b_out_a <= 'bx;
+            end
+        end
+
+        if (dual_port_addreg_b_clk0)
+        begin
+            //if (i_address_aclr_b && (i_address_aclr_family_b == 0))
+             //   i_address_reg_b <= 0;
+
+            if (i_core_clocken0_b || (i_core_clocken0_b === 1'bx && enable_input_x_prop))
+            begin
+                if (!is_lutram)
+                begin
+                    good_to_go_b <= 1;
+
+                    if (i_rdcontrol_aclr_b)
+                        i_rden_reg_b <= 1'b1;
+                    else
+                        i_rden_reg_b <= rden_b_dly;
+                end
+
+                i_read_flag_b <= ~ i_read_flag_b;
+            end
+            else if(i_rden_reg_b_bypass)
+            begin
+                i_read_flag_b <= ~i_read_flag_b;
+            end
+
+            if (i_clocken0_b)
+            begin
+                i_outdata_sclr_b_reg <=  i_outdata_sclr_b;
+                i_outdata_aclr_b_reg <=  i_outdata_aclr_b; // Used for coherent read feature
+                if (is_lutram)
+                begin
+                    good_to_go_b <= 1;
+
+                    if (i_rdcontrol_aclr_b)
+                        i_rden_reg_b <= 1'b1;
+                    else
+                        i_rden_reg_b <= rden_b_dly;
+                end
+
+                if (i_address_aclr_b && (i_address_aclr_family_b == 0))
+                        i_address_reg_b <= 0;
+                else if (!addressstall_b)
+                    i_address_reg_b <= address_b_dly;
+
+            end
+
+
+            if (i_rdcontrol_aclr_b)
+                i_rden_reg_b <= 1'b1;
+
+            //if (i_address_aclr_b && (i_address_aclr_family_b == 0))
+             //   i_address_reg_b <= 0;
+
+
+        end
+
+    end
+
+
+    always @(negedge clock0)
+    begin
+
+        if (clock1)
+            same_clock_pulse0 <= 1'b0;
+
+        if (is_write_on_positive_edge == 0)
+        begin
+            if (i_nmram_write_a == 1'b1)
+            begin
+                i_write_flag_a <= ~ i_write_flag_a;
+
+                if (is_lutram)
+                    i_read_flag_a <= ~i_read_flag_a;
+            end
+
+
+            if (is_bidir_and_wrcontrol_addb_clk0)
+            begin
+                if (i_nmram_write_b == 1'b1)
+                    i_write_flag_b <= ~ i_write_flag_b;
+            end
+        end
+
+        if (i_core_clocken0_b && (lutram_dual_port_fast_read == 1) && (dual_port_addreg_b_clk0 == 1))
+        begin
+            i_read_flag_b <= ~i_read_flag_b;
+        end
+
+    end
+
+
+
+    always @(posedge clock1)
+    begin
+        i_core_clocken1_b_reg <= i_core_clocken1_b;
+
+        if (i_force_reread_b && ((is_bidir_and_wrcontrol_addb_clk1 == 1) || (dual_port_addreg_b_clk1 == 1)))
+        begin
+            i_force_reread_b_signal <= ~ i_force_reread_b_signal;
+            i_force_reread_b <= 0;
+        end
+
+        if (clock0)
+            same_clock_pulse1 <= 1'b1;
+        else
+            same_clock_pulse1 <= 1'b0;
+
+        if (i_core_clocken_b)
+            i_address_aclr_b_flag <= 0;
+
+        if (is_bidir_and_wrcontrol_addb_clk1)
+        begin
+
+            if (i_core_clocken1_b)
+            begin
+                i_read_flag_b <= ~i_read_flag_b;
+
+                good_to_go_b <= 1;
+
+                i_rden_reg_b <= rden_b_dly;
+
+                if (i_wrcontrol_aclr_b)
+                    i_wren_reg_b <= 0;
+                else
+                begin
+                    i_wren_reg_b <= wren_b_dly;
+                end
+
+                if (is_write_on_positive_edge == 1)
+                begin
+                    if (i_wren_reg_b || wren_b_dly)
+                    begin
+                        i_write_flag_b <= ~ i_write_flag_b;
+                    end
+                    i_nmram_write_b <= 1'b0;
+                end
+                else
+                    i_nmram_write_b <= 1'b1;
+            end
+            else
+                i_nmram_write_b <= 1'b0;
+
+
+            if (i_clocken1_b)
+            begin
+
+                // Port B inputs
+
+                if (address_reg_b == "CLOCK1")
+                begin
+                    if (i_indata_aclr_b)
+                        i_data_reg_b <= 0;
+                    else
+                        i_data_reg_b <= data_b_dly;
+                end
+
+                if (i_address_aclr_b && (i_address_aclr_family_b == 0))
+                    i_address_reg_b <= 0;
+                else if (!addressstall_b)
+                    i_address_reg_b <= address_b_dly;
+
+                i_address_reg_b2 <= address2_b_dly;
+                if (i_byteena_aclr_b)
+                begin
+                    i_byteena_mask_reg_b <= 'b1;
+                    i_byteena_mask_reg_b_out <= 0;
+                    i_byteena_mask_reg_b_x <= 0;
+                    i_byteena_mask_reg_b_out_a <= 'bx;
+                end
+                else
+                begin
+                    if (width_byteena_b == 1)
+                    begin
+                        i_byteena_mask_reg_b <= {width_b{i_byteena_b[0]}};
+                        i_byteena_mask_reg_b_out_a <= (i_byteena_b[0])? 'bx : 'b0;
+                        i_byteena_mask_reg_b_out <= (i_byteena_b[0])? 'b0 : 'bx;
+                        i_byteena_mask_reg_b_x <= ((i_byteena_b[0]) || (i_byteena_b[0] == 1'b0))? 'b0 : 'bx;
+                    end
+                    else
+                        for (k2 = 0; k2 < width_b; k2 = k2 + 1)
+                        begin
+                            i_byteena_mask_reg_b[k2] <= i_byteena_b[k2/i_byte_size] !== 1'bx ? i_byteena_b[k2/i_byte_size] : (enable_input_x_prop) ? 1'bx : 1'b1;
+                            i_byteena_mask_reg_b_out_a[k2] <= (i_byteena_b[k2/i_byte_size])? 1'bx : 1'b0;
+                            i_byteena_mask_reg_b_out[k2] <= (i_byteena_b[k2/i_byte_size])? 1'b0 : 1'bx;
+                            i_byteena_mask_reg_b_x[k2] <= ((i_byteena_b[k2/i_byte_size]) || (i_byteena_b[k2/i_byte_size] == 1'b0))? 1'b0 : 1'bx;
+                        end
+
+                end
+
+            end
+
+
+            if (i_indata_aclr_b)
+                i_data_reg_b <= 0;
+
+            if (i_wrcontrol_aclr_b)
+                i_wren_reg_b <= 0;
+
+            if (i_address_aclr_b && (i_address_aclr_family_b == 0))
+                i_address_reg_b <= 0;
+
+            if (i_byteena_aclr_b)
+            begin
+                i_byteena_mask_reg_b <= 'b1;
+                i_byteena_mask_reg_b_out <= 0;
+                i_byteena_mask_reg_b_x <= 0;
+                i_byteena_mask_reg_b_out_a <= 'bx;
+            end
+        end
+
+        if (dual_port_addreg_b_clk1)
+        begin
+            if (i_address_aclr_b && (i_address_aclr_family_b == 0))
+                i_address_reg_b <= 0;
+
+            if (i_core_clocken1_b)
+            begin
+                if (i_force_reread_b1)
+                begin
+                    i_force_reread_b_signal <= ~ i_force_reread_b_signal;
+                    i_force_reread_b1 <= 0;
+                end
+                if (!is_lutram)
+                begin
+                    good_to_go_b <= 1;
+
+                    if (i_rdcontrol_aclr_b)
+                    begin
+                        i_rden_reg_b <= 1'b1;
+                    end
+                    else
+                    begin
+                        i_rden_reg_b <= rden_b_dly;
+                    end
+                end
+
+                i_read_flag_b <= ~i_read_flag_b;
+            end
+            else if(i_rden_reg_b_bypass)
+            begin
+                i_read_flag_b <= ~i_read_flag_b;
+            end
+
+            if (i_clocken1_b)
+            begin
+                if (is_lutram)
+                begin
+                    good_to_go_b <= 1;
+                    if (i_rdcontrol_aclr_b)
+                        i_rden_reg_b <= 1'b1;
+                    else
+                        i_rden_reg_b <= rden_b_dly;
+                end
+
+                if (i_address_aclr_b && (i_address_aclr_family_b == 0))
+                    i_address_reg_b <= 0;
+                else if (!addressstall_b)
+                    i_address_reg_b <= address_b_dly;
+
+                i_address_reg_b2 <= address2_b_dly;
+            end
+
+
+            if (i_rdcontrol_aclr_b)
+                i_rden_reg_b <= 1'b1;
+
+            if (i_address_aclr_b && (i_address_aclr_family_b == 0))
+                i_address_reg_b <= 0;
+
+            if (clock_enable_output_b == "BYPASS"  && !(family_arria10 || family_c10gx))
+            begin
+                i_outdata_sclr_b_reg <=  i_outdata_sclr_b;
+                i_outdata_aclr_b_reg <=  i_outdata_aclr_b;
+            end
+
+        end
+
+    end
+
+    always @(negedge clock1)
+    begin
+
+        if (clock0)
+            same_clock_pulse1 <= 1'b0;
+
+        if (is_write_on_positive_edge == 0)
+        begin
+
+            if (is_bidir_and_wrcontrol_addb_clk1)
+            begin
+                if (i_nmram_write_b == 1'b1)
+                    i_write_flag_b <= ~ i_write_flag_b;
+            end
+        end
+
+        if (i_core_clocken1_b && (lutram_dual_port_fast_read == 1) && (dual_port_addreg_b_clk1 ==1))
+        begin
+            i_read_flag_b <= ~i_read_flag_b;
+        end
+
+    end
+
+    always @(posedge i_address_aclr_b)
+    begin
+        if ((is_lutram == 1) && (operation_mode == "DUAL_PORT") && (i_address_aclr_family_b == 0))
+            i_read_flag_b <= ~i_read_flag_b;
+    end
+
+    always @(posedge i_address_aclr_a)
+    begin
+        if ((is_lutram == 1) && (operation_mode == "ROM"))
+            i_read_flag_a <= ~i_read_flag_a;
+    end
+
+    always @(posedge i_outdata_aclr_a or posedge i_outdata_sclr_a_reg)
+    begin
+        if ((outdata_reg_a != "CLOCK0") && (outdata_reg_a != "CLOCK1"))
+            i_read_flag_a <= ~i_read_flag_a;
+    end
+
+    always @(posedge i_outdata_aclr_b or posedge i_outdata_sclr_b_reg)
+    begin
+        if ((outdata_reg_b != "CLOCK0") && (outdata_reg_b != "CLOCK1"))
+            i_read_flag_b <= ~i_read_flag_b;
+    end
+
+    always @(negedge i_outdata_aclr_b or negedge i_outdata_sclr_b_reg)
+    begin
+    //Case:229246 Update atom model to reflect output latch behavior when ecc is turned on. This is only applicable for A10 and C10.
+        if ((family_c10gx || family_arria10))
+        begin
+            if ((enable_ecc == "TRUE") && (outdata_reg_b != "CLOCK0") && (outdata_reg_b != "CLOCK1"))
+            begin
+                i_rden_reg_b_bypass <= 1'b1;
+            end
+        end
+    end
+
+    // Port A writting -------------------------------------------------------------
+
+    always @(posedge i_write_flag_a or negedge i_write_flag_a)
+    begin
+        if ((operation_mode == "BIDIR_DUAL_PORT") ||
+            (operation_mode == "QUAD_PORT") ||
+            (operation_mode == "DUAL_PORT") ||
+            (operation_mode == "SINGLE_PORT"))
+        begin
+            if (enable_input_x_prop)
+            begin
+                if (clock0 === 1'bx && i_wren_reg_a === 1'b1)
+                begin
+                    mem_data[address_a] <= 'bx;
+                    //ecc_data[address_a] <= 'bx;
+                end
+                
+                if (!(is_lutram) && (i_wren_reg_a === 1'bx || i_write_flag_a === 1'bx || i_core_clocken_a === 1'bx || i_clocken0 === 1'bx) && clock0 === 1'b1 && enable_input_x_prop)
+                begin
+                    if (width_b > width_a && operation_mode == "DUAL_PORT")
+                    begin
+                        //mem_data[address_a] <= 'bx;
+                        for (i = 0; i < (width_b/width_a - address_a%(width_b/width_a)); i = i + 1)
+                        begin
+                            mem_data[address_a+i] <= 'bx;
+                        end
+                        for (i = (address_a%(width_b/width_a)); i > 0; i = i - 1)
+                        begin
+                            mem_data[address_a-i] <= 'bx;
+                        end
+                    end
+                    else if (width_a > width_b && operation_mode == "DUAL_PORT")
+                    begin
+                        mem_data[address_a] <= 'bx;
+                    end
+                    else
+                    begin
+                        mem_data[address_a] <= 'bx;
+                        ecc_data[address_a] <= 'bx;
+                    end
+                end
+                
+                if (i_wren_reg_a && addressstall_a === 1'bx)
+                begin
+                    mem_data[address_a] <= 'bx;
+                    ecc_data[address_a] <= 'bx;
+                end
+                else if (!(is_lutram) && (i_wren_reg_a && (^address_a === 1'bx)) || (i_wren_reg_a === 1'bx && (^address_a === 1'bx)))
+                begin
+                    for (i = 0; i < i_numwords_a; i = i + 1)
+                    begin
+                        mem_data[i] <= 'bx;
+                        ecc_data[i] <= 'bx;
+                    end
+                end
+                else if (i_wren_reg_a && ((^i_byteena_a) === 1'bx))
+                begin
+                    i_original_data_a = mem_data[address_a];
+                    for (i=0; i < width_a; i=i+1)
+                    begin
+                        if (i_byteena_mask_reg_a[i])
+                        begin
+                            temp_wa2[i] = (i_data_reg_a[i] & i_byteena_mask_reg_a[i]);
+                        end
+                        else if (i_byteena_mask_reg_a[i] === 1'bx)
+                        begin
+                            temp_wa2[i] = 1'bx;
+                        end
+                        else
+                        begin
+                            temp_wa2[i] = i_original_data_a[i];
+                        end
+                    end
+                    mem_data[address_a] <= temp_wa2;
+                end
+                else if (i_wren_reg_a)
+                begin
+                    if (eccencbypass === 1'bx)
+                    begin
+                        ecc_data[address_a] <= 'bx;
+                    end
+                else if (eccencbypass)
+                begin
+                    if ((^eccencparity) === 1'bx)
+                    begin
+                        ecc_data[address_a] <= 'bx;
+                    end
+                    else
+                    begin
+                        temp_ecc_a = mem.ecc_parity(eccencparity_dly);
+                        ecc_data[address_a] <= temp_ecc_a;
+                    end
+                end
+                end
+            end
+            
+            if ((i_wren_reg_a || (is_lutram && enable_input_x_prop && (wren_a === 1'bx || lutram_clocken0 === 1'bx))) && (i_good_to_write_a))
+            begin
+                i_aclr_flag_a = 0;
+                if (i_indata_aclr_a)
+                begin
+                    if (i_data_reg_a != 0)
+                    begin
+                        mem_data[i_address_reg_a] = 'bx;
+
+                        if (enable_mem_data_b_reading)
+                        begin
+                            j3 = i_address_reg_a * width_a;
+                            for (i5 = 0; i5 < width_a; i5 = i5+1)
+                            begin
+                                j3_plus_i5 = j3 + i5;
+                                temp_wb = mem_data_b[j3_plus_i5 / width_b];
+                                temp_wb[j3_plus_i5 % width_b] = {1'bx};
+                                mem_data_b[j3_plus_i5 / width_b] = temp_wb;
+                            end
+                        end
+                        i_aclr_flag_a = 1;
+                    end
+                end
+                else if (i_byteena_aclr_a)
+                begin
+                    if (i_byteena_mask_reg_a != 'b1)
+                    begin
+                        mem_data[i_address_reg_a] = 'bx;
+
+                        if (enable_mem_data_b_reading)
+                        begin
+                            j3 = i_address_reg_a * width_a;
+                            for (i5 = 0; i5 < width_a; i5 = i5+1)
+                            begin
+                                    j3_plus_i5 = j3 + i5;
+                                    temp_wb = mem_data_b[j3_plus_i5 / width_b];
+                                    temp_wb[j3_plus_i5 % width_b] = {1'bx};
+                                    mem_data_b[j3_plus_i5 / width_b] = temp_wb;
+                            end
+                        end
+                        i_aclr_flag_a = 1;
+                    end
+                end
+                else if (i_address_aclr_a && (is_rom == 1))
+                begin
+                    if (i_address_reg_a != 0)
+                    begin
+                        wa_mult_x_ii = 'bx;
+                        for (i4 = 0; i4 < i_numwords_a; i4 = i4 + 1)
+                            mem_data[i4] = wa_mult_x_ii;
+
+                        if (enable_mem_data_b_reading)
+                        begin
+                            for (i4 = 0; i4 < i_numwords_b; i4 = i4 + 1)
+                                mem_data_b[i4] = 'bx;
+                        end
+
+                        i_aclr_flag_a = 1;
+                    end
+                end
+
+                if (i_aclr_flag_a == 0)
+                begin
+            i_original_data_a = (enable_input_x_prop && ^i_address_reg_a === 1'bx)? mem_data[i_address_reg_b] : mem_data[i_address_reg_a];
+                    ecc_status_old = ecc_data[i_address_reg_a];
+                    i_original_address_a = i_address_reg_a;
+                    i_data_write_time_a = $time;
+                    temp_wa = mem_data[i_address_reg_a];
+                    temp_ecc_a = ecc_data[i_address_reg_a];
+                    port_a_bit_count_low = i_address_reg_a * width_a;
+                    port_b_bit_count_low = i_address_reg_b * width_b;
+                    port_b_bit_count_high = port_b_bit_count_low + width_b;
+
+                    for (i5 = 0; i5 < width_a; i5 = i5 + 1)
+                    begin
+                        i_byteena_count = port_a_bit_count_low % width_b;
+                        
+                        if (is_lutram && enable_input_x_prop && (wren_a === 1'bx || lutram_clocken0 === 1'bx))
+                        begin
+                            if (i_byteena_mask_reg_a[i5])
+                                temp_wa[i5] = 'bx;
+                        end
+                        else if((i_wren_reg_b && (i_address_reg_a == i_address_reg_b)) && i_byteena_mask_reg_a[i5] && enable_non_corrupted_behav)
+                        begin
+                            //temp_wb[i5] = temp_wb[i5] ^ i_byteena_mask_reg_a[i5];
+                            temp_wa[i5] =temp_wb;
+                            temp_wa[i5] = i_data_reg_a[i5];
+                        end
+                        else if ((port_a_bit_count_low >= port_b_bit_count_low) && (port_a_bit_count_low < port_b_bit_count_high) &&
+                                 ((i_core_clocken0_b_reg && (is_bidir_and_wrcontrol_addb_clk0 == 1)) || (i_core_clocken1_b_reg && (is_bidir_and_wrcontrol_addb_clk1 == 1))) &&
+                                 (i_wren_reg_b) && ((same_clock_pulse0 && same_clock_pulse1) || (address_reg_b == "CLOCK0")) &&
+                                 (i_byteena_mask_reg_b[i_byteena_count]) && (i_byteena_mask_reg_a[i5]))
+                            temp_wa[i5] = {1'bx};
+                        else if (i_byteena_mask_reg_a[i5])
+                            temp_wa[i5] = i_data_reg_a[i5];
+
+                        if (enable_mem_data_b_reading)
+                        begin
+                            temp_wb = mem_data_b[port_a_bit_count_low / width_b];
+                            temp_wb[port_a_bit_count_low % width_b] = temp_wa[i5];
+                            mem_data_b[port_a_bit_count_low / width_b] = temp_wb;
+                        end
+
+                        port_a_bit_count_low = port_a_bit_count_low + 1;
+                    end
+
+                    mem_data[i_address_reg_a] = temp_wa;
+                    
+                    if (is_lutram && enable_input_x_prop && (^i_address_reg_a === 1'bx))
+                    begin
+                        for (j4 = 0; j4 < (1<<widthad_a); j4 = j4 + 1)
+                        begin
+                            mem_data[j4] = 'bx;
+                        end
+                    end
+                    
+                    if (eccencbypass)
+                    begin
+                        temp_ecc_a = mem.ecc_parity(eccencparity_dly);
+                        ecc_data[i_address_reg_a] = temp_ecc_a;
+                    end
+                    else
+                    begin
+                        temp_ecc_a = mem.ecc_parity(8'h0);
+                        ecc_data[i_address_reg_a] = 2'h0;
+                    end
+
+                    if ((dual_port_addreg_b_clk0 == 1) ||                               //SIMPLE DUAL PORT same clock
+                        (is_bidir_and_wrcontrol_addb_clk0 == 1) ||                      //TRUE DUAL PORT same clock
+                        ((lutram_dual_port_fast_read == 1) && (operation_mode == "DUAL_PORT")))
+                        i_read_flag_b = ~i_read_flag_b;
+
+                    if ((i_read_during_write_mode_port_a == "OLD_DATA") ||
+                        ((is_lutram == 1) && (i_read_during_write_mode_port_a == "DONT_CARE")))
+                        i_read_flag_a = ~i_read_flag_a;
+                end
+            end
+        end
+    end    // Port A writting ----------------------------------------------------
+
+
+    // Port B writting -----------------------------------------------------------
+
+
+    always @(posedge i_write_flag_b or negedge i_write_flag_b)
+    begin
+        if ((operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "QUAD_PORT"))
+        begin
+            if (enable_input_x_prop)
+            begin
+                if (clock0 === 1'bx && i_wren_reg_b === 1'b1)
+                begin
+                    mem_data[i_address_reg_b] <= 'bx;
+                end
+                if ((i_wren_reg_b === 1'bx || i_write_flag_b === 1'bx || i_core_clocken_b === 1'bx || i_core_clocken1_b === 1'bx) && clock0 === 1'b1)
+                begin
+                    mem_data[i_address_reg_b] <= 'bx;
+                end
+                if (i_wren_reg_a && addressstall_b === 1'bx)
+                begin
+                    mem_data[i_address_reg_b] <= 'bx;
+                end
+                else if ((i_wren_reg_b && (^i_address_reg_b === 1'bx)) || (i_wren_reg_b === 1'bx && (^i_address_reg_b === 1'bx)))
+                begin
+                    for (i = 0; i < i_numwords_b; i = i + 1)
+                    begin
+                        mem_data[i] <= 'bx;
+                    end
+                end
+                else if (i_wren_reg_b && (^i_byteena_b === 1'bx))
+                begin
+                    i_original_data_b = mem_data[i_address_reg_b];
+                    for (i=0; i < width_b; i=i+1)
+                    begin
+                        if (i_byteena_mask_reg_b[i])
+                        begin
+                            temp_wb2[i] = (i_data_reg_b[i] & i_byteena_mask_reg_b[i]);
+                        end
+                        else if (i_byteena_mask_reg_b[i] === 1'bx)
+                        begin
+                            temp_wb2[i] = 1'bx;
+                        end
+                        else
+                        begin
+                            temp_wb2[i] = i_original_data_b[i];
+                        end
+                    end
+                    mem_data[i_address_reg_b] <= temp_wb2;
+                end
+            end
+
+            if ((i_wren_reg_b) && (i_good_to_write_b))
+            begin
+
+                i_aclr_flag_b = 0;
+
+                // RAM content is following width_a
+                // if Port B is of different width, need to make some adjustments
+
+                if (i_indata_aclr_b)
+                begin
+                    if (i_data_reg_b != 0)
+                    begin
+                        if (enable_mem_data_b_reading)
+                            mem_data_b[i_address_reg_b] = 'bx;
+
+                        if (width_a == width_b)
+                            mem_data[i_address_reg_b] = 'bx;
+                        else
+                        begin
+                            j = i_address_reg_b * width_b;
+                            for (i2 = 0; i2 < width_b; i2 = i2+1)
+                            begin
+                                j_plus_i2 = j + i2;
+                                temp_wa = mem_data[j_plus_i2 / width_a];
+                                temp_wa[j_plus_i2 % width_a] = {1'bx};
+                                mem_data[j_plus_i2 / width_a] = temp_wa;
+                            end
+                        end
+                        i_aclr_flag_b = 1;
+                    end
+                end
+                else if (i_byteena_aclr_b)
+                begin
+                    if (i_byteena_mask_reg_b != 'b1)
+                    begin
+                        if (enable_mem_data_b_reading)
+                            mem_data_b[i_address_reg_b] = 'bx;
+
+                        if (width_a == width_b)
+                            mem_data[i_address_reg_b] = 'bx;
+                        else
+                        begin
+                            j = i_address_reg_b * width_b;
+                            for (i2 = 0; i2 < width_b; i2 = i2+1)
+                            begin
+                                j_plus_i2 = j + i2;
+                                j_plus_i2_div_a = j_plus_i2 / width_a;
+                                temp_wa = mem_data[j_plus_i2_div_a];
+                                temp_wa[j_plus_i2 % width_a] = {1'bx};
+                                mem_data[j_plus_i2_div_a] = temp_wa;
+                            end
+                        end
+                        i_aclr_flag_b = 1;
+                    end
+                end
+                else if (i_address_aclr_b && (i_address_aclr_family_b == 0))
+                begin
+                    if (i_address_reg_b != 0)
+                    begin
+
+                        if (enable_mem_data_b_reading)
+                        begin
+                            for (i2 = 0; i2 < i_numwords_b; i2 = i2 + 1)
+                            begin
+                                mem_data_b[i2] = 'bx;
+                            end
+                        end
+
+                        wa_mult_x_iii = 'bx;
+                        for (i2 = 0; i2 < i_numwords_a; i2 = i2 + 1)
+                        begin
+                            mem_data[i2] = wa_mult_x_iii;
+                        end
+                        i_aclr_flag_b = 1;
+                    end
+                end
+
+                if (i_aclr_flag_b == 0)
+                begin
+                    port_b_bit_count_low = i_address_reg_b * width_b;
+                    port_a_bit_count_low = i_address_reg_a * width_a;
+                    port_a_bit_count_high = port_a_bit_count_low + width_a;
+                    i_data_write_time_b = $time;
+                    for (i2 = 0; i2 < width_b; i2 = i2 + 1)
+                    begin
+                        port_b_bit_count_high = port_b_bit_count_low + i2;
+                        temp_wa = mem_data[port_b_bit_count_high / width_a];
+                        temp_ecc_a = ecc_data[port_b_bit_count_high / width_a];
+                        i_original_data_b[i2] = temp_wa[port_b_bit_count_high % width_a];
+
+                        if ((i_wren_reg_a && (i_address_reg_a == i_address_reg_b)) && i_byteena_mask_reg_a[i2] && enable_non_corrupted_behav)
+                        begin
+                            temp_wa[port_b_bit_count_high % width_a] = i_data_reg_a[i2];
+                        end
+                        else if ((port_b_bit_count_high >= port_a_bit_count_low) && (port_b_bit_count_high < port_a_bit_count_high) &&
+                                ((same_clock_pulse0 && same_clock_pulse1) || (address_reg_b == "CLOCK0")) &&
+                                (i_core_clocken_a_reg) && (i_wren_reg_a) &&
+                                (i_byteena_mask_reg_a[port_b_bit_count_high % width_a]) && (i_byteena_mask_reg_b[i2]))
+                            temp_wa[port_b_bit_count_high % width_a] = {1'bx};
+                        else if (i_byteena_mask_reg_b[i2])
+                            temp_wa[port_b_bit_count_high % width_a] = i_data_reg_b[i2];
+
+                        mem_data[port_b_bit_count_high / width_a] = temp_wa;
+                        temp_wb[i2] = temp_wa[port_b_bit_count_high % width_a];
+                    end
+
+                    if (enable_mem_data_b_reading)
+                        mem_data_b[i_address_reg_b] = temp_wb;
+                        ecc_data_b[i_address_reg_b] = temp_ecc_b;
+
+                    if ((i_read_during_write_mode_port_b == "OLD_DATA") && (is_write_on_positive_edge == 1))
+                        i_read_flag_b = ~i_read_flag_b;
+
+                    if (((cread_during_write_mode_mixed_ports == "OLD_DATA") || (cread_during_write_mode_mixed_ports == "NEW_A_OLD_B"))&& (address_reg_b == "CLOCK0") && (is_write_on_positive_edge == 1))
+                        i_read_flag_a = ~i_read_flag_a;
+                end
+            end
+    end
+    end
+
+
+    // Port A reading
+
+    always @(i_read_flag_a)
+    begin
+        if ((operation_mode == "BIDIR_DUAL_PORT") ||
+            (operation_mode == "QUAD_PORT") ||
+            (operation_mode == "SINGLE_PORT") ||
+            (operation_mode == "ROM"))
+        begin
+            if (~good_to_go_a && (is_lutram == 0))
+            begin
+                i_q_tmp2_a = 0;
+                i_q_tmp2_ecc_a = 0;
+            end
+            else
+            begin
+                if (enable_input_x_prop)
+                begin
+                    if ((i_wren_reg_a === 1'bx && i_rden_reg_a === 1'b1 && operation_mode != "QUAD_PORT" && i_read_during_write_mode_port_a != "OLD_DATA") || (i_rden_reg_a === 1'bx) || i_core_clocken_a === 1'bx|| i_clocken0 === 1'bx || clock0 === 1'bx || clock1 === 1'bx)
+                    begin
+                        i_q_tmp2_a <= 'bx;
+                    end
+                    else if (i_rden_reg_a && (addressstall_a === 1'bx))
+                    begin
+                        i_q_tmp2_a <= 'bx;
+                    end
+                    else if (i_rden_reg_a && ((^address_a_dly === 1'bx) || (^address2_a_dly === 1'bx)))
+                    begin
+                        i_q_tmp2_a <= 'bx;
+                    end
+                end
+                
+                if (i_rden_reg_a)
+                begin
+                    // read from RAM content or flow through for write cycle
+                    if ((i_wren_reg_a === 1'b1) || (i_wren_reg_a === 1'bx && enable_input_x_prop && (operation_mode != "SINGLE_PORT")))
+                    begin
+                        if (i_core_clocken_a)
+                        begin
+                            if (i_read_during_write_mode_port_a == "NEW_DATA_NO_NBE_READ" || ((!(family_arria10 || family_c10gx) && i_read_during_write_mode_port_a == "NEW_DATA_WITH_NBE_READ")))
+                            begin
+                                if (!(family_arria10 || family_c10gx))
+                                begin
+                                    if (i_address_reg_a == i_address_reg_b && i_wren_reg_b && operation_mode == "BIDIR_DUAL_PORT")
+                                    begin
+                                        for (i=0; i <width_a; i=i+1)
+                                        begin
+                                            if (i_byteena_mask_reg_a[i])
+                                            begin
+                                                i_q_tmp2_a[i] = (i_data_reg_a[i] & i_byteena_mask_reg_a[i]);
+                                            end
+                                            else
+                                            begin
+                                                if (i_byteena_mask_reg_b[i])
+                                                begin
+                                                    i_q_tmp2_a[i] =  ('bx& ~i_byteena_mask_reg_a[i]);
+                                                end
+                                                else
+                                                begin
+                                                    i_q_tmp2_a[i] =(i_original_data_a[i]& ~i_byteena_mask_reg_a[i]);
+                                                end
+                                            end
+                                        end
+                                    end
+                                    else
+                                    begin
+                                        i_q_tmp2_a =(i_data_reg_a & i_byteena_mask_reg_a) | (mem_data[i_address_reg_a] & ~i_byteena_mask_reg_a) ^ i_byteena_mask_reg_a_x;
+                                        i_q_tmp2_ecc_a=(i_data_reg_a & i_byteena_mask_reg_a) | (mem_data[i_address_reg_a] & ~i_byteena_mask_reg_a) ^ i_byteena_mask_reg_a_x;
+                                    end
+                                end
+                                else
+                                begin
+                                    i_q_tmp2_a = ((i_data_reg_a & i_byteena_mask_reg_a) | ('bx & ~i_byteena_mask_reg_a));
+                                    i_q_tmp2_ecc_a = ((i_data_reg_a & i_byteena_mask_reg_a) | ('bx & ~i_byteena_mask_reg_a));
+                                end
+                            end
+                            else if (i_read_during_write_mode_port_a == "NEW_DATA_WITH_NBE_READ")
+                                begin
+                                    //NEW_DATA for lutram
+                                    if (is_lutram && clock0)
+                                        i_q_tmp2_a = mem_data[i_address_reg_a] ;
+                                    else
+                                        //NEW_DATA_NO_NBE_READ
+                                        i_q_tmp2_a = ((i_data_reg_a & i_byteena_mask_reg_a) | ('bx & ~i_byteena_mask_reg_a));
+                                end
+                            else if (operation_mode == "QUAD_PORT")
+                            begin
+                                if (i_address_reg_a2 == i_address_reg_a)
+                                begin
+                                    if ((i_address_reg_a2 === 'bx || i_address_reg_a === 'bx || i_wren_reg_a === 'bx || wren_a_dly === 'bx) && enable_input_x_prop)
+                                    begin
+                                        i_q_tmp2_a = 'bx;
+                                    end
+                                    else
+                                    begin
+                                        i_q_tmp2_a = ('bx & i_byteena_mask_reg_a) | (mem_data[i_address_reg_a2] & ~i_byteena_mask_reg_a);
+                                    end
+                                end
+                                else
+                                begin
+                                    i_q_tmp2_a = mem_data[i_address_reg_a2];
+                                end
+                            end
+                            // Case:545719 Starting from S10, SINGLE_PORT supports OLD_DATA (i.e. should exclude A10 and C10GX in Pro branch)
+                            else if (!(family_arria10 || family_c10gx) && operation_mode == "SINGLE_PORT" && i_read_during_write_mode_port_a == "OLD_DATA")
+                            begin
+                                i_q_tmp2_a = ((i_original_data_a & i_byteena_mask_reg_a) | ('bx & ~i_byteena_mask_reg_a));
+                            end
+                            else
+                            begin
+                                if (!(family_arria10 || family_c10gx) && enable_input_x_prop)
+                                begin
+                                    for (i=0; i <width_a; i=i+1)
+                                    begin
+                                        if (i_read_during_write_mode_port_a=="DONT_CARE" && is_lutram && operation_mode=="SINGLE_PORT")
+                                            i_q_tmp2_a[i]= mem_data[i_address_reg_a][i];
+                                        else if (i_byteena_mask_reg_a[i])
+                                            begin
+                                            i_q_tmp2_a[i] = 1'bx;
+                                            end
+                                        else
+                                            i_q_tmp2_a[i]= mem_data[i_address_reg_a][i];
+                                    end
+                                end
+                                else
+                                     i_q_tmp2_a = 'bx;
+                            end
+                        end
+                        else
+                        begin
+                            if(operation_mode == "QUAD_PORT")
+                                i_q_tmp2_a = mem_data[i_address_reg_a2];
+                            else
+                                i_q_tmp2_a = mem_data[i_address_reg_a];
+                                i_q_tmp2_ecc_a = ecc_data[i_address_reg_a];
+                        end
+                    end
+                    else
+                    begin
+                        if(operation_mode == "QUAD_PORT")
+                        begin
+                            if ((i_wren_reg_b === 1'bx && enable_input_x_prop) && i_address_reg_b == i_address_reg_a2)
+                                i_q_tmp2_a = mem_data[i_address_reg_a2] ^ i_byteena_mask_reg_a_out_b;
+                            else
+                                i_q_tmp2_a = mem_data[i_address_reg_a2];
+                        end
+                        else if ((i_wren_reg_b || (i_wren_reg_b === 1'bx && enable_input_x_prop)) && address_b_dly == address_a_dly && is_write_on_positive_edge == 1 && cread_during_write_mode_mixed_ports == "DONT_CARE" && operation_mode == "BIDIR_DUAL_PORT")
+                        begin
+                            i_q_tmp2_a = mem_data[i_address_reg_a] ^ i_byteena_mask_reg_a_out_b;
+                        end
+                        else
+                            i_q_tmp2_a = mem_data[i_address_reg_a];
+                            i_q_tmp2_ecc_a = ecc_data[i_address_reg_a];
+                    end
+
+                    if (is_write_on_positive_edge == 1)
+                    begin
+                        if (is_bidir_and_wrcontrol_addb_clk0 || (same_clock_pulse0 && same_clock_pulse1)) //TRUE DUAL PORT same clock
+                        begin
+                            // B write, A read
+                            if ((i_wren_reg_b & ~i_wren_reg_a) &
+                                ((((is_bidir_and_wrcontrol_addb_clk0 & i_clocken0_b) ||
+                                (is_bidir_and_wrcontrol_addb_clk1 & i_clocken1_b))) ||
+                                (((is_bidir_and_wrcontrol_addb_clk0 & i_core_clocken0_b) ||
+                                (is_bidir_and_wrcontrol_addb_clk1 & i_core_clocken1_b))))
+                                & (i_data_write_time_b == $time))
+                            begin
+                                if(operation_mode == "QUAD_PORT") begin
+                                    if (i_address_reg_a2 == i_address_reg_b) begin
+                                        add_reg_a_mult_wa = i_address_reg_a2 * width_a;
+                                        add_reg_b_mult_wb = i_address_reg_b2 * width_b;
+                                    end
+                                else begin
+                                    add_reg_a_mult_wa = i_address_reg_a * width_a;
+                                    add_reg_b_mult_wb = i_address_reg_b * width_b;
+                                    end
+                                end
+                                else begin
+                                    add_reg_a_mult_wa = i_address_reg_a * width_a;
+                                    add_reg_b_mult_wb = i_address_reg_b * width_b;
+                                end
+
+                                add_reg_a_mult_wa_pl_wa = add_reg_a_mult_wa + width_a;
+                                add_reg_b_mult_wb_pl_wb = add_reg_b_mult_wb + width_b;
+
+                                if (
+                                    ((add_reg_a_mult_wa >=
+                                        add_reg_b_mult_wb) &&
+                                    (add_reg_a_mult_wa <=
+                                        (add_reg_b_mult_wb_pl_wb - 1)))
+                                        ||
+                                    (((add_reg_a_mult_wa_pl_wa - 1) >=
+                                        add_reg_b_mult_wb) &&
+                                    ((add_reg_a_mult_wa_pl_wa - 1) <=
+                                        (add_reg_b_mult_wb_pl_wb - 1)))
+                                        ||
+                                    ((add_reg_b_mult_wb >=
+                                        add_reg_a_mult_wa) &&
+                                    (add_reg_b_mult_wb <=
+                                        (add_reg_a_mult_wa_pl_wa - 1)))
+                                        ||
+                                    (((add_reg_b_mult_wb_pl_wb - 1) >=
+                                        add_reg_a_mult_wa) &&
+                                    ((add_reg_b_mult_wb_pl_wb - 1) <=
+                                        (add_reg_a_mult_wa_pl_wa - 1)))
+                                    )
+                                        for (i3 = add_reg_a_mult_wa;
+                                                i3 < add_reg_a_mult_wa_pl_wa;
+                                                i3 = i3 + 1)
+                                        begin
+                                            if ((i3 >= add_reg_b_mult_wb) &&
+                                                (i3 <= (add_reg_b_mult_wb_pl_wb - 1)))
+                                            begin
+
+                                                if (cread_during_write_mode_mixed_ports == "OLD_DATA")
+                                                begin
+                                                    i_byteena_count = i3 - add_reg_b_mult_wb;
+                                                    i_q_tmp2_a_idx = (i3 - add_reg_a_mult_wa);
+                                                    i_q_tmp2_a[i_q_tmp2_a_idx] = i_original_data_b[i_byteena_count];
+                                                end
+                                                else if (cread_during_write_mode_mixed_ports == "NEW_A_OLD_B")
+                                                begin
+                                                    i_byteena_count = i3 - add_reg_b_mult_wb;
+                                                    i_q_tmp2_a_idx = (i3 - add_reg_a_mult_wa);
+                                                    i_q_tmp2_a[i_q_tmp2_a_idx] = i_q_tmp2_a[i_byteena_count];
+                                                end
+                                                else
+                                                begin
+                                                    i_byteena_count = i3 - add_reg_b_mult_wb;
+                                                    i_q_tmp2_a_idx = (i3 - add_reg_a_mult_wa);
+                                                    i_q_tmp2_a[i_q_tmp2_a_idx] = i_q_tmp2_a[i_q_tmp2_a_idx] ^ i_byteena_mask_reg_b_out_a[i_byteena_count];
+                                                end
+
+                                            end
+                                        end
+                            end
+                        end
+                    end
+                end
+
+                if ((is_lutram == 1) && i_address_aclr_a && (is_rom == 1) && (operation_mode == "ROM"))
+                    i_q_tmp2_a = mem_data[0];
+
+                if ((is_lutram != 1) &&
+                    (i_outdata_aclr_a || i_outdata_sclr_a_reg || i_force_reread_a) &&
+                    (outdata_reg_a != "CLOCK0") && (outdata_reg_a != "CLOCK1"))
+                    begin
+                        i_q_tmp2_a = 'b0;
+                        i_q_tmp2_ecc_a = {width_eccstatus{1'b0}};
+                    end
+            end // end good_to_go_a
+        end
+    end
+
+
+    // assigning the correct output values for i_q_tmp_a (non-registered output)
+    always @(i_q_tmp2_a or i_q_tmp2_ecc_a or i_wren_reg_a  or i_rden_reg_a or i_data_reg_a or i_address_aclr_a or
+             i_out_addr_a or i_byteena_mask_reg_a_out or i_numwords_a or i_outdata_aclr_a or i_outdata_sclr_a_reg or i_force_reread_a_signal or i_original_data_a or lutram_clocken0)
+    begin
+        if (i_out_addr_a >= i_numwords_a)
+        begin
+            if (i_wren_reg_a && i_core_clocken_a)
+            begin
+                i_q_tmp_a <= i_q_tmp2_a;
+                i_q_tmp_ecc_a <= i_q_tmp2_ecc_a;
+            end
+            else
+                i_q_tmp_a <= 'bx;
+
+            if (i_rden_reg_a == 1)
+            begin
+                $display("Warning : Address pointed at port A is out of bound!");
+                $display("Time: %0t  Instance: %m", $time);
+            end
+        end
+        else
+            begin
+                if (i_outdata_aclr_a_prev && ~ i_outdata_aclr_a &&
+                    (is_lutram != 1))
+                begin
+                    i_outdata_aclr_a_prev = i_outdata_aclr_a;
+                    i_force_reread_a <= 1;
+                end
+                else if (((i_outdata_sclr_a_prev && ~ i_outdata_sclr_a_reg)) &&
+                    (is_lutram != 1))
+                begin
+                    i_outdata_sclr_a_prev <= i_outdata_sclr_a_reg;
+                    i_force_reread_a <= 1;
+                end
+                else if (~i_address_aclr_a_prev && i_address_aclr_a && (is_sqp == 1 || is_rom == 1) && block_ram_output_unreg)
+                begin
+                    if (i_rden_reg_a)
+            begin
+                i_q_tmp_a <= 'bx;
+            end
+            else
+            begin
+                i_q_tmp_a <= i_q_tmp2_a;
+            end
+            i_force_reread_a1 <= 1;
+                end
+                else if ((i_force_reread_a == 0) && (i_force_reread_a1 == 0) && !(i_address_aclr_a_prev && ~i_address_aclr_a && (is_rom == 1) && block_ram_output_unreg))
+                begin
+                    i_q_tmp_a <= i_q_tmp2_a;
+                    i_q_tmp_ecc_a <= i_q_tmp2_ecc_a;
+                end
+            end
+        if (((i_outdata_aclr_a === 1'b1) && (block_ram_output_unreg) && enable_input_x_prop) || ((i_outdata_aclr_a) && (block_ram_output_unreg)))
+        begin
+            i_q_tmp_a <= 'b0;
+            i_outdata_aclr_a_prev <= 'b1;
+        end
+        if (((i_outdata_sclr_a_reg===1'b1) && (block_ram_output_unreg) && enable_input_x_prop) ||((i_outdata_sclr_a_reg) && (block_ram_output_unreg)))
+        begin
+            i_q_tmp_a <= 'b0;
+              //i_outdata_sclr_a_prev <= i_outdata_sclr_a_reg;
+        end
+        if (((i_outdata_sclr_a_reg===1'bx) && (block_ram_output_unreg) && enable_input_x_prop))
+        begin
+            i_q_tmp_a <= 'bx;
+              //i_outdata_sclr_a_prev <= i_outdata_sclr_a_reg;
+        end
+        if ((i_outdata_aclr_a === 1'bx) && (block_ram_output_unreg) && enable_input_x_prop)
+        begin
+            i_q_tmp_a <= 'bx;
+            i_outdata_aclr_a_prev <= 'b1;
+        end
+        if (enable_force_to_zero == "TRUE" && ~i_rden_reg_a)
+        begin
+            if (enable_input_x_prop && (i_core_clocken_a === 1'bx || i_clocken0=== 1'bx))
+            begin
+                i_q_tmp_a <= 'bx;
+            end
+            else
+            begin
+                i_q_tmp_a <= 0;
+            end
+        end
+        i_address_aclr_a_prev <= i_address_aclr_a;
+    end
+
+
+    // Port A outdata output registered
+    generate if (outdata_reg_a == "CLOCK1")
+        begin: clk1_on_outa_gen
+            always @(posedge clock1 or posedge i_outdata_aclr_a)
+            begin
+                if (i_outdata_aclr_a)
+                    i_q_reg_a <= 0;
+                else if (i_outdata_clken_a === 1'b1 )
+                begin
+                    i_q_reg_a <= i_q_tmp_a;
+                    i_q_reg_ecc_a <= i_q_tmp_ecc_a;
+                    
+                    if (i_core_clocken_a)
+                        i_address_aclr_a_flag <= 0;
+                    if (i_outdata_sclr_a === 1'bx && enable_input_x_prop)
+                         i_q_reg_a <= 'bx;
+                    else if (i_outdata_sclr_a === 1'b1)
+                        i_q_reg_a <= 0;
+                    else if (enable_force_to_zero == "TRUE" && ~i_rden_reg_a)
+                    begin
+                        if (enable_input_x_prop && (i_core_clocken_a === 1'bx))
+                        begin
+                            i_q_tmp_a <= 'bx;
+                            i_q_reg_a <= i_q_tmp_a;
+                        end
+                        else
+                        begin
+                            i_q_tmp_a <= 0;
+                            i_q_reg_a <= i_q_tmp_a;
+                        end
+                    end
+                end
+                else if (i_core_clocken_a)
+                    i_address_aclr_a_flag <= 0;
+                
+                if (enable_input_x_prop && ((i_outdata_clken_a === 1'bx && i_outdata_aclr_a === 1'b0) || i_outdata_aclr_a === 1'bx || i_outdata_sclr_a === 'bx))
+                begin
+                    i_q_reg_a <= 'bx;
+                end
+            end
+        end
+        else if (outdata_reg_a == "CLOCK0")
+        begin: clk0_on_outa_gen
+            always @(posedge clock0 or posedge i_outdata_aclr_a)
+            begin
+                if (i_outdata_aclr_a)
+                    i_q_reg_a <= 0;
+                else if (i_outdata_clken_a === 1'b1)
+                begin
+                    if ((i_address_aclr_a_flag == 1) && (!is_lutram))
+                    begin
+                        i_q_reg_a <= 'bx;
+                    end
+                    else
+                    begin
+                        i_q_reg_a <= i_q_tmp_a;
+                        i_q_reg_ecc_a <= i_q_tmp_ecc_a;
+                    end
+                    if (i_core_clocken_a)
+                        i_address_aclr_a_flag <= 0;
+                    if (i_outdata_sclr_a === 1'bx && enable_input_x_prop)
+                        i_q_reg_a <= 'bx;
+                    else if (i_outdata_sclr_a === 1'b1)
+                        i_q_reg_a <= 0;
+                    else if (enable_force_to_zero == "TRUE" && ~i_rden_reg_a)
+                    begin
+                        if (enable_input_x_prop && (i_core_clocken_a === 1'bx))
+                        begin
+                            i_q_tmp_a <= 'bx;
+                            i_q_reg_a <= i_q_tmp_a;
+                        end
+                        else
+                        begin
+                            i_q_tmp_a <= 0;
+                            i_q_reg_a <= i_q_tmp_a;
+                        end
+                    end
+                end
+                else if (i_core_clocken_a)
+                    i_address_aclr_a_flag <= 0;
+                
+                if (enable_input_x_prop && ((i_outdata_clken_a === 1'bx && i_outdata_aclr_a === 1'b0) || i_outdata_aclr_a === 1'bx || i_outdata_sclr_a === 'bx))
+                begin
+                    i_q_reg_a <= 'bx;
+                end
+            end
+        end
+    endgenerate
+
+    // Latch for address aclr till outclock enabled
+    always @(posedge i_address_aclr_a or posedge i_outdata_aclr_a)
+    begin
+        if (i_outdata_aclr_a)
+            i_address_aclr_a_flag <= 0;
+        else
+            if (i_rden_reg_a && (is_rom == 1 || is_sqp == 1))
+                i_address_aclr_a_flag <= 1;
+    end
+
+ reg [width_a - 1:0] a_dout_clr;
+ reg [width_b - 1:0] b_dout_clr;
+ initial
+ begin
+    a_dout_clr = 'b0;
+    b_dout_clr = 'b0;
+ end
+
+    // Port A : assigning the correct output values for q_a
+    assign q_a = (operation_mode == "DUAL_PORT") ?
+                    'b0 : (((outdata_reg_a == "CLOCK0") ||
+                            (outdata_reg_a == "CLOCK1")) ?
+            i_q_reg_a : ((i_outdata_aclr_a === 1'bx || i_outdata_sclr_a_reg === 1'bx) && enable_input_x_prop) ? 'bx : (i_outdata_aclr_a || i_outdata_sclr_a_reg) ? a_dout_clr : i_q_tmp_a);
+
+    // Port B reading
+    always @(i_read_flag_b)
+    begin
+        if ((operation_mode == "BIDIR_DUAL_PORT") ||
+            (operation_mode == "QUAD_PORT") ||
+            (operation_mode == "DUAL_PORT"))
+        begin
+            if (~good_to_go_b && (is_lutram == 0))
+            begin
+                i_q_tmp2_b = 0;
+                i_q_tmp2_ecc_b = 0;
+            end
+            else
+            begin
+                if (enable_input_x_prop)
+                begin
+                    if ((i_wren_reg_b === 1'bx && i_rden_reg_b === 1'b1 && operation_mode != "QUAD_PORT") || (i_rden_reg_b === 1'bx) || (i_core_clocken0_b === 1'bx && dual_port_addreg_b_clk1 != 1) || (i_core_clocken1_b === 1'bx && dual_port_addreg_b_clk1 == 1) || clock0 === 1'bx || clock1 === 1'bx)
+                    begin
+                        i_q_tmp2_b <= 'bx;
+                        i_q_tmp2_ecc_b <= 'bx;
+                    end
+                    else if (i_rden_reg_b && (addressstall_b === 1'bx))
+                    begin
+                        i_q_tmp2_b <= 'bx;
+                        i_q_tmp2_ecc_b <= 'bx;
+                    end
+                    else if (i_rden_reg_b && ((^address_b_dly) === 1'bx || (^address2_b_dly) === 1'bx ))
+                    begin
+                        i_q_tmp2_b <= 'bx;
+                        i_q_tmp2_ecc_b <= 'bx;
+                    end
+                    else if (i_rden_reg_b && eccencbypass === 1'bx)
+                    begin
+                        i_q_tmp2_ecc_b <= ecc_data[i_address_reg_b];
+                    end
+                end
+
+                if (i_rden_reg_b || (i_rden_reg_b_bypass))
+                begin
+                    //If width_a is equal to b, no address calculation is needed
+                    if (width_a == width_b)
+                    begin
+                        // read from memory or flow through for write cycle
+                        if ((i_wren_reg_b || (i_wren_reg_b === 1'bx && enable_input_x_prop)) && (((is_bidir_and_wrcontrol_addb_clk0 == 1) && i_core_clocken0_b) ||
+                            ((is_bidir_and_wrcontrol_addb_clk1 == 1) && i_core_clocken1_b)))
+                        begin
+                            if (i_read_during_write_mode_port_b == "NEW_DATA_NO_NBE_READ" || ((!(family_arria10 || family_c10gx) && i_read_during_write_mode_port_b == "NEW_DATA_WITH_NBE_READ")))
+                            begin
+                                if (!(family_arria10 || family_c10gx))
+                                begin
+                                    if((i_address_reg_b == i_address_reg_a && i_wren_reg_a && operation_mode=="BIDIR_DUAL_PORT"))
+                                    begin
+                                        for (i=0; i <width_a; i=i+1)
+                                        begin
+                                            if (i_byteena_mask_reg_b[i])
+                                            begin
+                                                temp_wb[i] = (i_data_reg_b[i] & i_byteena_mask_reg_b[i]);
+                                            end
+                                            else
+                                            begin
+                                                if (i_byteena_mask_reg_a[i])
+                                                begin
+                                                    temp_wb[i] = ('bx & ~i_byteena_mask_reg_b[i]);
+                                                end
+                                                else
+                                                begin
+                                                    temp_wb[i] =(i_original_data_b[i] & ~i_byteena_mask_reg_b[i]);
+                                                end
+                                            end
+                                        end
+                                    end
+                                    else
+                                    begin
+                                        temp_wb = (i_data_reg_b & i_byteena_mask_reg_b) | (mem_data[i_address_reg_b] & ~i_byteena_mask_reg_b) ^ i_byteena_mask_reg_b_x;
+                                        temp_ecc_b = (i_data_reg_b & i_byteena_mask_reg_b) | (mem_data[i_address_reg_b] & ~i_byteena_mask_reg_b) ^ i_byteena_mask_reg_b_x;
+                                    end
+                                end
+                                else
+                                begin
+                                    temp_wb = ((i_data_reg_b & i_byteena_mask_reg_b) | ('bx & ~i_byteena_mask_reg_b));
+                                    temp_ecc_b = ((i_data_reg_b & i_byteena_mask_reg_b) | ('b0 & ~i_byteena_mask_reg_b));
+                                end
+                            end
+                            else if (operation_mode == "QUAD_PORT")
+                            begin
+                                // At this point, port B read enable and write enable are high
+                                if (i_address_reg_b2 == i_address_reg_b & i_address_reg_b2 == i_address_reg_a & i_wren_reg_a)
+                                begin
+                                    if ((i_address_reg_a2 === 'bx || i_address_reg_a === 'bx || i_wren_reg_a === 'bx || wren_a_dly === 'bx) && enable_input_x_prop)
+                                    begin
+                                        temp_wb = 'bx;
+                                    end
+                                    // Port B performs same port and mixed port RDW, its masked output will be X while unmasked output will be old
+                                    // The masking here refers to port B byte enable, port A byte enable has no impact on port B output
+                                    if (enable_vcs_sqp_be_rdw)
+                                        temp_wb = ('bx & i_byteena_mask_reg_b) | (i_original_data_a & ~i_byteena_mask_reg_b);
+                                    else
+                                        temp_wb = ('bx & i_byteena_mask_reg_b) | (i_original_data_b & ~i_byteena_mask_reg_b);
+                                end
+                                else if (i_address_reg_b2 == i_address_reg_b)
+                                begin
+                                    if ((i_address_reg_b2 === 'bx || i_address_reg_b === 'bx || i_wren_reg_a === 'bx || wren_a_dly === 'bx) && enable_input_x_prop)
+                                    begin
+                                        temp_wb = 'bx;
+                                    end
+                                    else
+                                        // Port B performs same port RDW only, its masked output will be X while unmasked output will be old
+                                        temp_wb = ('bx & i_byteena_mask_reg_b) | (mem_data[i_address_reg_b2] & ~i_byteena_mask_reg_b);
+                                end
+                                else if (i_address_reg_b2 == i_address_reg_a & i_wren_reg_a)
+                                begin
+                                    // Port B performs mixed port RDW, its output will be old data
+                                    // Doesnt care about port A byte enable here since port B is reading old data
+                                    temp_wb = i_original_data_a;
+                                end
+                                else
+                                begin
+                                    // Port B doesnt perform same port nor mixed port RDW, its output will be data at Port B read address
+                                    temp_wb = mem_data[i_address_reg_b2];
+                                end
+                            end
+                            //No longer support "NEW_DATA_WITH_NBE_READ" and "OLD_DATA" for same port read during write
+                            else
+                            begin
+                                temp_wb = 'bx;
+                            end
+                        end
+                        else
+                        begin
+                            if(~i_rden_reg_b_bypass ||
+                            ((dual_port_addreg_b_clk0 && i_core_clocken0_b) ||
+                            (dual_port_addreg_b_clk0 && i_core_clocken0_b)))
+                            begin
+                                if(operation_mode == "QUAD_PORT")
+                                    temp_wb = mem_data[i_address_reg_b2];
+                                // Case:539025 Solve delta delay issue for SDP when Mixed-Port RDW is Dont_Care
+                                // Temporary gated with addressstall_a_dly and addressstall_b_dly, else this code will break addressstalls behaviour since
+                                // it is checking on address_a_dly and address_b_dly instead of i_address_reg_a and i_address_reg_b
+                                else if ((wren_a_dly || (wren_a_dly === 1'bx && enable_input_x_prop)) && !addressstall_a_dly && !addressstall_b_dly && address_b_dly == address_a_dly && is_write_on_positive_edge == 1 && same_clock_pulse0 && same_clock_pulse1 && cread_during_write_mode_mixed_ports == "DONT_CARE")
+                                begin
+                                    temp_wb = mem_data[i_address_reg_b] ^ i_byteena_mask_reg_a_out_b;
+                                    // Give ecc_status as Dont_Care for family S10 and above
+                                    temp_ecc_b = (family_c10gx || family_arria10)? 2'b00:2'bxx;
+                                end
+                                else if ((operation_mode == "BIDIR_DUAL_PORT" || (operation_mode == "DUAL_PORT" && cread_during_write_mode_mixed_ports == "DONT_CARE")) && ((i_wren_reg_a === 1'bx && enable_input_x_prop) || (i_wren_reg_a && enable_input_x_prop && (^i_address_reg_a === 1'bx))) && ((enable_input_x_prop && (^i_address_reg_a === 1'bx)) || (i_address_reg_a == i_address_reg_b)))
+                                begin
+                                    temp_wb = mem_data[i_address_reg_b] ^ i_byteena_mask_reg_a_out_b;
+                                    temp_ecc_b = (family_c10gx || family_arria10)? 2'b00:2'bxx;
+                                end
+                                else
+                                begin
+                                    temp_wb = mem_data[i_address_reg_b];
+                                    temp_ecc_b = ecc_data[i_address_reg_b];
+                                end
+                            end
+                        end
+
+                        if (is_write_on_positive_edge == 1)
+                        begin
+                            if ((dual_port_addreg_b_clk0 == 1) ||                               //SIMPLE DUAL PORT same clock
+                                (is_bidir_and_wrcontrol_addb_clk0 == 1) ||                      //TRUE DUAL PORT same clock
+                                (same_clock_pulse0 && same_clock_pulse1))                       //Different clock source, same pulse
+                            begin
+                                // A write, B read
+                                if ((i_wren_reg_a & ~i_wren_reg_b) && (i_core_clocken_a) && (i_data_write_time_a == $time))
+                                begin
+                                    if (operation_mode == "QUAD_PORT")
+                                    begin
+                                        // At this point, port A write enable and port B read enable are high, and port B write enable is low
+                                        if (i_address_reg_b2 == i_address_reg_a)
+                                        begin
+                                             // Port B performs mixed port RDW, its output will be old data
+                                             // Doesnt care about port A byte enable here since port B is reading old data
+                                             temp_wb = i_original_data_a;
+                                        end
+                                        else
+                                        begin
+                                             // Port A is writing to a different address compared to the address port B is reading from
+                                             // Port B doesnt perform same port nor mixed port RDW, its output will be data at Port B read address
+                                             temp_wb = mem_data[i_address_reg_b2];
+                                        end
+                                    end
+                                    else begin
+                                        if (i_address_reg_b == i_address_reg_a)
+                                        begin
+                                            if (lutram_dual_port_fast_read == 1)
+                                                temp_wb = (i_data_reg_a & i_byteena_mask_reg_a) | (i_q_tmp2_a & ~i_byteena_mask_reg_a) ^ i_byteena_mask_reg_a_x;
+                                            else
+                                                if (cread_during_write_mode_mixed_ports == "OLD_DATA" &&
+                                                    (mem_data[i_address_reg_b] === ((i_data_reg_a & i_byteena_mask_reg_a) | (mem_data[i_address_reg_a] & ~i_byteena_mask_reg_a) ^ i_byteena_mask_reg_a_x)))
+                                                begin
+                                                    temp_wb = i_original_data_a;
+                                                    temp_ecc_b = ecc_status_old;
+                                                end
+                                                else//DONT_CARE
+                                                begin
+                                                    temp_wb = mem_data[i_address_reg_b] ^ i_byteena_mask_reg_a_out_b;
+                                                    ////Case:516279 - Support ecc don't_care feature in family S10 and onwards, model ecc_status to don't care as well
+                                                    temp_ecc_b = (family_c10gx || family_arria10)? 2'b00:2'bxx;
+                                                end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    else
+                    begin
+                        if(operation_mode == "QUAD_PORT")
+                            j2 = i_address_reg_b2 * width_b;
+                        else
+                            j2 = i_address_reg_b * width_b;
+
+                        for (i5=0; i5<width_b; i5=i5+1)
+                        begin
+                            j2_plus_i5 = j2 + i5;
+                            temp_wa2b = mem_data[j2_plus_i5 / width_a];
+                            temp_wb[i5] = temp_wa2b[j2_plus_i5 % width_a];
+                        end
+
+                        if (i_wren_reg_b && ((is_bidir_and_wrcontrol_addb_clk0 && i_core_clocken0_b) ||
+                            (is_bidir_and_wrcontrol_addb_clk1 && i_core_clocken1_b)))
+                        begin
+                            if (i_read_during_write_mode_port_b == "NEW_DATA_NO_NBE_READ")
+                            begin
+                                if (!(family_arria10 || family_c10gx))
+                                    temp_wb =(i_data_reg_b & i_byteena_mask_reg_b) | (mem_data[i_address_reg_b] & ~i_byteena_mask_reg_b) ^ i_byteena_mask_reg_b_x;
+                                else
+                                    temp_wb = i_data_reg_b ^ i_byteena_mask_reg_b_out;
+                            end
+                            else
+                                temp_wb = 'bx;
+                        end
+
+                        if (is_write_on_positive_edge == 1)
+                        begin
+                            if (((address_reg_b == "CLOCK0") & dual_port_addreg_b_clk0) ||                      //SIMPLE DUAL PORT same clock
+                                ((wrcontrol_wraddress_reg_b == "CLOCK0") & is_bidir_and_wrcontrol_addb_clk0) || //TRUE DUAL PORT same clock
+                                (same_clock_pulse0 && same_clock_pulse1))                                       //Different clock source, same pulse
+                            begin
+                                // A write, B read
+                                if ((i_wren_reg_a & ~i_wren_reg_b) && (i_core_clocken_a) && (i_data_write_time_a == $time))
+                                begin
+                                    for (i5=0; i5<width_b; i5=i5+1)
+                                    begin
+                                        j2_plus_i5 = j2 + i5;
+                                        j2_plus_i5_div_a = j2_plus_i5 / width_a;
+
+                                        // if A write to the same Ram address B is reading from
+                                        if ((j2_plus_i5_div_a == i_address_reg_a) || (enable_input_x_prop && (^i_address_reg_a === 1'bx)))
+                                        begin
+                                            //Removed, Lutram doesn't support mixed port width
+                                            if(i_data_write_time_a == $time)
+                                            begin
+                                                if (cread_during_write_mode_mixed_ports == "OLD_DATA")
+                                                    temp_wa2b = (enable_input_x_prop && (^i_address_reg_a === 1'bx))? mem_data[j2_plus_i5_div_a] : i_original_data_a;
+                                                else
+                                                begin
+                                                    temp_wa2b = mem_data[j2_plus_i5_div_a];
+                                                    temp_wa2b = temp_wa2b ^ i_byteena_mask_reg_a_out_b;
+                                                end
+                                            end
+                                            else
+                                            begin
+                                                temp_wa2b = i_original_data_a;
+                                            end
+
+                                            temp_wb[i5] = temp_wa2b[j2_plus_i5 % width_a];
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    //end of width_a != width_b
+                    i_q_tmp2_b = temp_wb;
+                    i_q_tmp2_ecc_b = temp_ecc_b;
+                    i_rden_reg_b_bypass = 1'b0;
+                end
+
+                if ((is_lutram == 1) && i_address_aclr_b && (i_address_aclr_family_b == 0) && (operation_mode == "DUAL_PORT"))
+                begin
+                    for (init_i = 0; init_i < width_b; init_i = init_i + 1)
+                    begin
+                        init_temp = mem_data[init_i / width_a];
+                        i_q_tmp_b[init_i] = init_temp[init_i % width_a];
+                        i_q_tmp2_b[init_i] = init_temp[init_i % width_a];
+                    end
+                end
+                else if ((is_lutram == 1) && (operation_mode == "DUAL_PORT"))
+                begin
+                    j2 = i_address_reg_b * width_b;
+
+                    for (i5=0; i5<width_b; i5=i5+1)
+                    begin
+                        j2_plus_i5 = j2 + i5;
+                        temp_wa2b = mem_data[j2_plus_i5 / width_a];
+                        i_q_tmp2_b[i5] = temp_wa2b[j2_plus_i5 % width_a];
+                    end
+                end
+
+                if ((i_outdata_aclr_b || i_force_reread_b || i_outdata_sclr_b_reg ) &&
+                    (is_lutram != 1) &&
+                    (outdata_reg_b != "CLOCK0") && (outdata_reg_b != "CLOCK1"))
+                begin
+                    i_q_tmp2_b = 'b0;
+                    i_q_tmp2_ecc_b =  {width_eccstatus{1'b0}};
+                end
+            end
+        end
+    end
+
+
+    // assigning the correct output values for i_q_tmp_b (non-registered output)
+    always @(i_q_tmp2_b or i_q_tmp2_ecc_b or i_wren_reg_b or i_data_reg_b or i_address_aclr_b or
+                 i_out_addr_b or i_byteena_mask_reg_b_out or i_rden_reg_b or
+                 i_numwords_b or i_outdata_aclr_b  or i_outdata_sclr_b_reg or i_force_reread_b_signal or lutram_clocken0)
+    begin
+        if (i_out_addr_b >= i_numwords_b)
+        begin
+            if (i_wren_reg_b && ((i_core_clocken0_b && (is_bidir_and_wrcontrol_addb_clk0 == 1)) || (i_core_clocken1_b && (is_bidir_and_wrcontrol_addb_clk1 == 1))))
+            begin
+                i_q_tmp_b <= i_q_tmp2_b;
+                i_q_tmp_ecc_b <= i_q_tmp2_ecc_b;
+            end
+            else
+                i_q_tmp_b <= 'bx;
+            if (i_rden_reg_b == 1)
+            begin
+                $display("Warning : Address pointed at port B is out of bound!");
+                $display("Time: %0t  Instance: %m", $time);
+            end
+        end
+        else
+            if ((operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "QUAD_PORT"))
+            begin
+                if (i_outdata_aclr_b_prev && ~ i_outdata_aclr_b && (is_lutram != 1))
+                begin
+                    i_outdata_aclr_b_prev <= i_outdata_aclr_b;
+                    i_force_reread_b <= 1;
+                end
+                else if (i_outdata_sclr_b_prev && ~ i_outdata_sclr_b_reg && (is_lutram != 1))
+                begin
+                    i_outdata_sclr_b_prev <= i_outdata_sclr_b_reg;
+                    i_force_reread_b <= 1;
+                end
+                else if (is_sqp == 1 && ~i_address_aclr_b_prev && i_address_aclr_b)
+                begin
+                    if (i_rden_reg_b)
+                    begin
+                        i_q_tmp2_b <= 'bx;
+                    end
+                    else
+                    begin
+                        i_q_tmp2_b <= i_q_tmp_b;
+                    end
+                    i_force_reread_b1 <= 1;
+                end
+                else
+                begin
+                if( i_force_reread_b == 0 && !(i_address_aclr_b_prev && ~i_address_aclr_b))
+                    i_q_tmp_b <= i_q_tmp2_b;
+                end
+            end
+            else if (operation_mode == "DUAL_PORT")
+            begin
+                if (i_outdata_aclr_b_prev && ~ i_outdata_aclr_b && (is_lutram != 1))
+                begin
+                    i_outdata_aclr_b_prev <= i_outdata_aclr_b;
+                    i_force_reread_b <= 1;
+                end
+                else if (i_outdata_sclr_b_prev && ~ i_outdata_sclr_b_reg && (is_lutram != 1))
+                begin
+                    i_outdata_sclr_b_prev <= i_outdata_sclr_b_reg;
+                    i_force_reread_b <= 1;
+                end
+                else if (~i_address_aclr_b_prev && i_address_aclr_b && (i_address_aclr_family_b == 0) && s3_address_aclr_b)
+                begin
+                    if (i_rden_reg_b)
+                    begin
+                        i_q_tmp_b <= 'bx;
+                    end
+                    else
+                    begin
+                        i_q_tmp_b <= i_q_tmp2_b;
+                    end
+                    i_force_reread_b1 <= 1;
+                end
+                else if ((i_force_reread_b1 == 0) && !(i_address_aclr_b_prev && ~i_address_aclr_b && (i_address_aclr_family_b == 0) && s3_address_aclr_b))
+                begin
+                    if ((is_lutram == 1) && (is_write_on_positive_edge) && (cread_during_write_mode_mixed_ports == "OLD_DATA") && (width_a == width_b) && (i_address_reg_a == i_address_reg_b) && lutram_clocken0 && i_rden_reg_b)
+                        i_q_tmp_b <= i_original_data_a;
+                    else if ((lutram_clocken0 && i_rden_reg_b) || (enable_input_x_prop && (lutram_clocken0 && i_rden_reg_b)===1'bx))
+                    begin
+                    if (is_lutram && enable_input_x_prop && i_rden_reg_b === 1'bx)
+                        i_q_tmp_b <= 'bx;
+                    else        
+                        i_q_tmp_b <= (lutram_dont_care_give_x && (i_address_reg_b == i_address_reg_a))? 'bx: i_q_tmp2_b;
+                    end
+                    else
+                        i_q_tmp_b <= i_q_tmp2_b;
+                        i_q_tmp_ecc_b <= i_q_tmp2_ecc_b;
+                end
+            end
+
+        if ((i_outdata_aclr_b === 1'b1) && (s3_address_aclr_b))
+        begin
+            i_q_tmp_b <= 'b0;
+            i_q_tmp_ecc_b <= 'b0;
+            i_outdata_aclr_b_prev <= i_outdata_aclr_b;
+        end
+        else if ((i_outdata_aclr_b === 1'bx) && (s3_address_aclr_b) && enable_input_x_prop)
+        begin
+            i_q_tmp_b <= 'bx;
+            i_q_tmp_ecc_b <= 'bx;
+            i_outdata_aclr_b_prev <= 'b1;
+        end
+
+        if ((i_outdata_sclr_b === 1'b1) && (s3_address_aclr_b))
+        begin
+            if (i_outdata_clken_b)
+            begin
+               i_q_tmp_b <= 'b0;
+               i_q_tmp_ecc_b <= 'b0;
+            end
+        end
+        else if ((i_outdata_sclr_b === 1'bx) && (s3_address_aclr_b) && enable_input_x_prop)
+        begin
+            if (i_outdata_clken_b)
+            begin
+               i_q_tmp_b <= 'bx;
+               i_q_tmp_ecc_b <= 'bx;
+            end
+        end
+
+        if (enable_force_to_zero == "TRUE" && ~i_rden_reg_b)
+        begin
+            if (enable_input_x_prop && ((i_core_clocken0_b === 1'bx && dual_port_addreg_b_clk1 != 1) || (i_core_clocken1_b === 1'bx && dual_port_addreg_b_clk1 == 1)))
+            begin
+                i_q_tmp_b <= 'bx;
+                i_q_tmp_ecc_b <= 'bx;
+            end
+            else
+            begin
+                i_q_tmp_b <= 0;
+                i_q_tmp_ecc_b <= 0;
+            end
+        end
+        i_address_aclr_b_prev <= i_address_aclr_b;
+    end
+
+    generate if (outdata_reg_b == "CLOCK1")
+        begin: clk1_on_outb_fall_gen
+            always @(negedge clock1)
+            begin
+                if (i_core_clocken_a)
+                begin
+                    if ((width_a == width_b) && (i_out_addr_a == i_out_addr_b || (enable_input_x_prop && ^i_address_reg_a === 1'bx)) && (i_wren_reg_a || (enable_input_x_prop && i_wren_reg_a === 1'bx)) && (i_rden_reg_b || (enable_input_x_prop && i_rden_reg_b)))
+                    begin
+                        i_q_output_latch <= i_original_data_a;
+                    i_q_output_latch_ecc <= i_original_data_a;
+                    end
+                    else
+                    begin
+                        i_q_output_latch <= i_q_tmp2_b;
+                        i_q_output_latch_ecc <= i_q_tmp2_ecc_b;
+                    end
+                end
+            end
+        end
+        else if (outdata_reg_b == "CLOCK0")
+        begin: clk0_on_outb_fall_gen
+            always @(negedge clock0)
+            begin
+                if (i_core_clocken_a)
+                begin
+                    if ((width_a == width_b) && (i_out_addr_a == i_out_addr_b || (enable_input_x_prop && ^i_address_reg_a === 1'bx)) && (i_wren_reg_a || (enable_input_x_prop && i_wren_reg_a === 1'bx)) && (i_rden_reg_b || (enable_input_x_prop && i_rden_reg_b)))
+                    begin
+                        i_q_output_latch <= i_original_data_a;
+                        i_q_output_latch_ecc <= i_original_data_a;
+                    end
+                    else
+                    begin
+                        i_q_output_latch <= i_q_tmp2_b;
+                        i_q_output_latch_ecc <= i_q_tmp2_ecc_b;
+                    end
+                end
+            end
+        end
+    endgenerate
+
+    // Port B outdata output registered
+    generate if (outdata_reg_b == "CLOCK1")
+    begin: clk1_on_outb_rise_gen
+        always @(posedge clock1 or posedge i_outdata_aclr_b)
+        begin
+            if (i_outdata_aclr_b)
+            begin
+                i_q_reg_b <= 0;
+                i_q_reg_ecc_b <= 0;
+            end
+            else if (i_outdata_clken_b === 1'b1)
+            begin
+                if ((i_address_aclr_b_flag == 1) && (is_lutram != 1))
+                    i_q_reg_b <= 'bx;
+                if (i_outdata_sclr_b === 1'bx && enable_input_x_prop)
+                begin
+                    i_q_reg_b <= 'bx;
+                    i_q_reg_ecc_b <= 'bx;
+                end
+                else if (i_outdata_sclr_b === 1'b1)
+                begin
+                    i_q_reg_b <= 0;
+                    i_q_reg_ecc_b <= 0;
+                end
+                else if (enable_force_to_zero == "TRUE" && ~i_rden_reg_b)
+                begin
+                    if (enable_input_x_prop && (i_core_clocken_b === 1'bx))
+                    begin
+                        i_q_tmp_b <= 'bx;
+                        i_q_reg_b <= i_q_tmp_b;
+                        i_q_tmp_ecc_b <= 'bx;
+                        i_q_reg_ecc_b <= i_q_tmp_ecc_b;
+                    end
+                    else
+                    begin
+                        i_q_tmp_b <= 0;
+                        i_q_reg_b <= i_q_tmp_b;
+                        i_q_tmp_ecc_b <= 0;
+                        i_q_reg_ecc_b <= i_q_tmp_ecc_b;
+                    end
+                end
+                else if ((lutram_clocken0 && i_rden_reg_b) || (enable_input_x_prop && (lutram_clocken0 && i_rden_reg_b)===1'bx))
+                begin
+                   if (is_lutram && enable_input_x_prop && i_rden_reg_b === 1'bx)
+                      i_q_tmp_b <= 'bx;
+                   else
+                    i_q_reg_b <= (lutram_dont_care_give_x && (i_address_reg_b == i_address_reg_a))? 'bx : i_q_tmp_b;
+                end
+                else
+                begin
+                    i_q_reg_b <= i_q_tmp_b;
+                    i_q_reg_ecc_b <= i_q_tmp_ecc_b;
+                end
+            end
+
+            if (enable_input_x_prop && ((i_outdata_clken_b === 1'bx && i_outdata_aclr_b === 1'b0) || i_outdata_aclr_b === 1'bx || i_outdata_sclr_b === 'bx))
+            begin
+                i_q_reg_b <= 'bx;
+                i_q_ecc_reg_b <= 'bx;
+                i_q_reg_ecc_b <= 'bx;
+                i_q_ecc_status_reg_b <= 'bx;
+            end
+    end
+    end
+    else if (outdata_reg_b == "CLOCK0")
+    begin: clk0_on_outb_rise_gen
+        always @(posedge clock0 or posedge i_outdata_aclr_b)
+        begin
+
+            if (i_outdata_aclr_b)
+            begin
+                i_q_reg_b <= 0;
+                i_q_reg_ecc_b <= 0;
+            end
+            else if (i_outdata_clken_b === 1'b1)
+            begin
+                if ((is_lutram == 1) && (cread_during_write_mode_mixed_ports == "OLD_DATA"))
+                    i_q_reg_b <= i_q_output_latch;
+                else if (i_outdata_sclr_b === 1'bx && enable_input_x_prop)
+                begin
+                    i_q_reg_b <= 'bx;
+                    i_q_reg_ecc_b <= 'bx;
+                end
+                else if (i_outdata_sclr_b === 1'b1)
+                begin
+                    i_q_reg_b <= 0;
+                    i_q_reg_ecc_b <= 0;
+                end
+                else if (enable_force_to_zero == "TRUE" && ~i_rden_reg_b)
+                begin
+                    if (enable_input_x_prop && (i_core_clocken_b === 1'bx))
+                    begin
+                        i_q_tmp_b <= 'bx;
+                        i_q_reg_b <= i_q_tmp_b;
+                        i_q_tmp_ecc_b <= 'bx;
+                        i_q_reg_ecc_b <= i_q_tmp_ecc_b;
+                    end
+                    else
+                    begin
+                        i_q_tmp_b <= 0;
+                        i_q_reg_b <= i_q_tmp_b;
+                        i_q_tmp_ecc_b <= 0;
+                        i_q_reg_ecc_b <= i_q_tmp_ecc_b;
+                    end
+                end
+                else
+                begin
+                    if ((i_address_aclr_b_flag == 1) && (is_lutram != 1))
+                        i_q_reg_b <= 'bx;
+                    else if (family_stratix10 != 1 && enable_coherent_read == "TRUE" && enable_force_to_zero == "FALSE" && ~i_rden_reg_b)
+                    begin
+                        // For Agilex onwards, needs to hold register data when engage in coherent read stage 2, no FTZ and not reading
+                        i_q_reg_b <= i_q_reg_b;
+                        i_q_reg_ecc_b <= i_q_reg_ecc_b;
+                    end
+                    else if ((lutram_clocken0 && i_rden_reg_b)  || (enable_input_x_prop && (lutram_clocken0 && i_rden_reg_b)===1'bx))
+                    begin
+                       if (is_lutram && enable_input_x_prop && i_rden_reg_b === 1'bx)
+                          i_q_tmp2_b <= 'bx;
+                       else
+                        i_q_reg_b <= (lutram_dont_care_give_x && (i_address_reg_b == i_address_reg_a))? 'bx : i_q_tmp2_b;
+                    end
+                    else
+                    begin
+                        i_q_reg_b <= i_q_tmp2_b;
+                        i_q_reg_ecc_b <= i_q_tmp2_ecc_b;
+                    end
+                end
+            end
+
+            if (enable_input_x_prop && ((i_outdata_clken_b === 1'bx && i_outdata_aclr_b === 1'b0) || i_outdata_aclr_b === 1'bx || i_outdata_sclr_b === 'bx))
+            begin
+                i_q_reg_b <= 'bx;
+                i_q_ecc_reg_b <= 'bx;
+                i_q_reg_ecc_b <= 'bx;
+                i_q_ecc_status_reg_b <= 'bx;
+            end
+        end
+    end
+    endgenerate
+
+    generate if (outdata_reg_b == "CLOCK0" && ecc_pipeline_stage_enabled == "TRUE")
+    begin: clk0_on_ecc_pipeline_reg_rise_gen
+        always @(posedge clock0 or posedge i_outdata_aclr_b)
+        begin
+            if (i_outdata_aclr_b)
+            begin
+                i_q_ecc_reg_b <= 0;
+                i_q_ecc_status_reg_b <= 0;
+            end
+            else if (enable_force_to_zero == "TRUE" && ~i_rden_reg_b)
+            begin
+                i_q_reg_b <= 0;
+                i_q_ecc_reg_b <= i_q_reg_b;
+                i_q_reg_ecc_b <= 0;
+                i_q_ecc_status_reg_b <= i_q_reg_ecc_b;
+            end
+            else if (i_outdata_clken_b === 1'b1)
+            begin
+                if (i_outdata_sclr_b === 1'bx && enable_input_x_prop)
+                begin
+                    i_q_ecc_reg_b <= 'bx;
+                    i_q_ecc_status_reg_b <= 'bx;
+                end
+                else if (i_outdata_sclr_b === 1'b1)
+                begin
+                    i_q_ecc_reg_b <= 0;
+                    i_q_ecc_status_reg_b <= 0;
+                end
+                else
+                begin
+                    i_q_ecc_reg_b <= i_q_reg_b;
+                    i_q_ecc_status_reg_b <= i_q_reg_ecc_b;
+                end
+            end
+
+            if (enable_input_x_prop && ((i_outdata_clken_b === 1'bx && i_outdata_aclr_b === 1'b0) || i_outdata_aclr_b === 1'bx || i_outdata_sclr_b === 'bx))
+            begin
+                    i_q_reg_b <= 'bx;
+                    i_q_ecc_reg_b <= 'bx;
+                    i_q_reg_ecc_b <= 'bx;
+                    i_q_ecc_status_reg_b <= 'bx;
+            end
+        end
+    end
+    else if (outdata_reg_b == "CLOCK1" && ecc_pipeline_stage_enabled == "TRUE")
+    begin: clk1_on_ecc_pipeline_reg_rise_gen
+        always @(posedge clock1 or posedge i_outdata_aclr_b)
+        begin
+            if (i_outdata_aclr_b)
+            begin
+                i_q_ecc_reg_b <= 0;
+                i_q_ecc_status_reg_b <= 0;
+            end
+            else if (enable_force_to_zero == "TRUE" && ~i_rden_reg_b)
+            begin
+                i_q_reg_b <= 0;
+                i_q_ecc_reg_b <= i_q_reg_b;
+                i_q_reg_ecc_b <= 0;
+                i_q_ecc_status_reg_b <= i_q_reg_ecc_b;
+            end
+            else if (i_outdata_clken_b === 1'b1)
+            begin
+                if (i_outdata_sclr_b === 1'bx && enable_input_x_prop)
+                begin
+                    i_q_ecc_reg_b <= 'bx;
+                    i_q_ecc_status_reg_b <= 'bx;
+                end
+                else if (i_outdata_sclr_b === 1'b1)
+                begin
+                    i_q_ecc_reg_b <= 0;
+                    i_q_ecc_status_reg_b <= 0;
+                end
+                else
+                begin
+                    i_q_ecc_reg_b <= i_q_reg_b;
+                    i_q_ecc_status_reg_b <= i_q_reg_ecc_b;
+                end
+            end
+
+            if (enable_input_x_prop && ((i_outdata_clken_b === 1'bx && i_outdata_aclr_b === 1'b0) || i_outdata_aclr_b === 1'bx || i_outdata_sclr_b === 'bx))
+            begin
+                i_q_reg_b <= 'bx;
+                i_q_ecc_reg_b <= 'bx;
+                i_q_reg_ecc_b <= 'bx;
+                i_q_ecc_status_reg_b <= 'bx;
+            end
+        end
+    end
+    endgenerate
+
+
+
+
+    //Coherent Read Module
+    wire fwd_logic_flag;
+    wire [width_a - 1 : 0] fwd_logic_output;
+
+    wire dataout_b_clear   = (i_outdata_aclr_b === 1'b1 || i_outdata_aclr_b_reg === 1'b1 || i_outdata_sclr_b_reg === 1'b1)? 1'b1 : (((i_outdata_aclr_b === 1'bx || i_outdata_aclr_b_reg === 1'bx || i_outdata_sclr_b_reg === 1'bx) && enable_input_x_prop) ? 1'bx : 1'b0);
+
+    generate if (enable_coherent_read == "TRUE")
+    begin: coherent_read_gen
+    altera_syncram_derived_forwarding_logic forwarding_logic (
+    .wrdata_reg(i_data_reg_a),
+    .wren(wren_a_dly),
+    .rden(rden_b_dly),
+    .wraddr(address_a),
+    .rdaddr(address_b),
+    .clr (dataout_b_clear),
+    .ena(i_outdata_clken_b),
+    .wren_reg(i_wren_reg_a),
+    .rden_reg(i_rden_reg_b),
+    .wraddr_reg(i_address_reg_a),
+    .rdaddr_reg(i_address_reg_b),
+    .clock(clock0), //temporary put it as clock0 but should need pulse to allocate delay
+    .fwd_out(fwd_logic_output),
+    .fwd_flag(fwd_logic_flag)
+     );
+
+    defparam forwarding_logic.enable_force_to_zero = enable_force_to_zero;
+    defparam forwarding_logic.dwidth = width_a;
+    defparam forwarding_logic.awidth = widthad_a;
+    defparam forwarding_logic.fwd_is_one_lvl = (enable_coherent_read == "TRUE" && outdata_reg_b == "UNREGISTERED")? 1 : 0; // fwd_is_one_lvl = 1 means one level forwarding, fwd_is_one_lvl = 0 means two level forwarding
+    defparam forwarding_logic.clock_delay = (enable_coherent_read == "TRUE" && outdata_reg_b == "UNREGISTERED")? 2 : 0;
+
+    end
+    endgenerate
+
+
+    // Latch for address aclr till outclock enabled
+    always @(posedge i_address_aclr_b or posedge i_outdata_aclr_b)
+        if (i_outdata_aclr_b)
+            i_address_aclr_b_flag <= 0;
+        else
+        begin
+            if (i_rden_reg_b)
+                i_address_aclr_b_flag <= 1;
+        end
+
+    //Output for Coherent Read
+    wire forward_logic_sel = (enable_coherent_read == "TRUE" && fwd_logic_flag == 1'b1)? 1'b1 : 1'b0;
+
+    // Port B : assigning the correct output values for q_b
+    assign q_b = ((operation_mode == "SINGLE_PORT") ||
+                    (operation_mode == "ROM")) ?
+                        'b0 : ((forward_logic_sel == 1'b1)? fwd_logic_output :
+                        (((outdata_reg_b == "CLOCK0") || (outdata_reg_b == "CLOCK1")) ?
+                            ((ecc_pipeline_stage_enabled == "TRUE")?(i_q_ecc_reg_b) : (i_q_reg_b)):
+                            ((ecc_pipeline_stage_enabled == "TRUE")?(i_q_ecc_tmp_b) : (i_outdata_aclr_b === 1'b1)? 'b0 :(i_q_tmp_b)))); //i_q_ecc_tmp_b has 'x' output
+
+    assign eccstatus = (((outdata_reg_b == "CLOCK0") || (outdata_reg_b == "CLOCK1")) ?
+                            ((ecc_pipeline_stage_enabled == "TRUE")?(i_q_ecc_status_reg_b) : (i_q_reg_ecc_b)):
+                            ((ecc_pipeline_stage_enabled == "TRUE")?(i_q_ecc_status_tmp_b) : (i_outdata_aclr_b)? 'b0: (i_q_tmp_ecc_b)));
+
+
+endmodule // ALTERA_SYNCRAM
+
+module altera_syncram_derived_forwarding_logic (
+                                    wrdata_reg,
+                                    wren,
+                                    wraddr,
+                                    wren_reg,
+                                    clr,
+                                    rden_reg,
+                                    rden,
+                                    wraddr_reg,
+                                    rdaddr_reg,
+                                    rdaddr,
+                                    clock,
+                                    ena,
+                                    fwd_out,
+                                    fwd_flag
+                                   );
+
+// Define flag to enable X-Propagation
+`ifdef ENA_INPUT_X_PROP
+    parameter enable_input_x_prop = 1;
+`else
+    parameter enable_input_x_prop = 0;
+`endif
+
+parameter dwidth = 1;
+parameter awidth = 1;
+parameter fwd_is_one_lvl = 0;
+parameter enable_force_to_zero = "FALSE";
+parameter clock_delay= 0;
+
+output  [dwidth - 1 : 0]    fwd_out;
+output                      fwd_flag;
+input   [dwidth - 1 : 0]    wrdata_reg;
+input                       clock;
+input                       wren;
+input                       wren_reg;
+input                       rden;
+input                       rden_reg;
+input                       clr;
+input                       ena;
+input   [awidth - 1 : 0]    wraddr;
+input   [awidth - 1 : 0]    rdaddr;
+input   [awidth - 1 : 0]    wraddr_reg;
+input   [awidth - 1 : 0]    rdaddr_reg;
+
+// Register represents memory value
+reg     [dwidth - 1 : 0]    fwd_data_reg;
+
+// Matching comparators
+reg next_match;
+reg current_match;
+
+// Address comparators
+wire wraddr_to_rdaddr_reg_cmp;
+wire wraddr_reg_to_rdaddr_reg_cmp;
+
+// Matching flags
+wire match_share_conditions_check;
+wire next_match_check;
+wire current_match_check;
+
+// Wires represent the one-level and two-level forwarding outputs
+wire [dwidth - 1 : 0] fwd_one_lvl_output;
+wire [dwidth - 1 : 0] fwd_two_lvl_output;
+
+initial begin
+    fwd_data_reg  = 'b0;
+    next_match    = 'b0;
+    current_match = 'b0;
+end
+
+// Compare addresses
+assign wraddr_to_rdaddr_reg_cmp     = (wraddr     == rdaddr_reg)? 1'b1 : 1'b0;
+assign wraddr_reg_to_rdaddr_reg_cmp = (wraddr_reg == rdaddr_reg)? 1'b1 : 1'b0;
+
+// Set match_share_conditions_check = 1'b1 when:
+// 1) Two level forwarding
+//    AND
+// 2) wren is HIGH
+//    AND
+// 3) rden_reg is HIGH
+//    AND
+// 4) wraddr_to_rdaddr_reg_cmp is HIGH
+assign match_share_conditions_check   = (fwd_is_one_lvl == 1'b1) ? 1'b0 : ((wren == 1'b1)?
+                                        ((rden_reg == 1'b1)? ((wraddr_to_rdaddr_reg_cmp == 1'b1)? 1'b1 : 1'b0) : 1'b0) : 1'b0);
+
+// Set next_match_check = 1'b1 when:
+// 1) match_share_conditions_check is HIGH
+assign next_match_check    = (match_share_conditions_check == 1'b1)? 1'b1 : 1'b0;
+
+// Set current_match_check = 1'b1 when:
+// 1) match_share_conditions_check is HIGH
+//    OR
+// 2) a) wren_reg is HIGH
+//       AND
+//    b) wraddr_reg_to_rdaddr_reg_cmp is HIGH
+assign current_match_check = ((match_share_conditions_check == 1'b1)? 1'b1 :
+                             ((wren_reg == 1'b1)? ((wraddr_reg_to_rdaddr_reg_cmp == 1'b1)? 1'b1 : 1'b0) : 1'b0));
+
+// Outputs
+// Set fwd_flag = 1'b1 when:
+// 1) next_match is HIGH
+//    OR
+// 2) current_match is HIGH
+// 3) Any unknown input signal nor unknown matching (next match or current match) will not go through forwarding path
+assign fwd_flag = (($isunknown(wren_reg) || $isunknown(clr) || $isunknown(rden_reg)   || $isunknown(wraddr_reg)    || $isunknown(rdaddr_reg) ||
+                    $isunknown(clock)    || $isunknown(ena) || $isunknown(next_match) || $isunknown(current_match) || $isunknown(current_match_check))
+                    && enable_input_x_prop) ?
+                    1'b0 : ((clr == 1'b1)? 1'b0 : ((next_match == 1'b1)? 1'b1 : ((current_match == 1'b1)? 1'b1 : 1'b0)));
+assign fwd_one_lvl_output = (rden_reg   == 1'b1)? wrdata_reg : fwd_data_reg;
+assign fwd_two_lvl_output = (next_match == 1'b1)? wrdata_reg : fwd_data_reg;
+assign fwd_out  = ((fwd_is_one_lvl == 1)? fwd_one_lvl_output : fwd_two_lvl_output);
+
+// Processing
+buf #(clock_delay) (clk_fwd, clock);
+always @ (posedge clk_fwd) begin
+
+    // Read enable reg HIGH with clear LOW
+    if (rden_reg == 1'b1 && clr == 1'b0)
+    begin
+        if (ena == 1'b1)
+        begin
+            next_match    = next_match_check;
+            current_match = current_match_check;
+            fwd_data_reg  = wrdata_reg;
+        end
+    end
+
+    // Read enable reg HIGH with clear HIGH
+    /*if (rden_reg == 1'b1 && clr == 1'b1)
+    begin
+        if (ena == 1'b1)
+        begin
+            next_match    = next_match_check;
+            current_match = current_match_check;
+        end
+    end */
+
+    // Case:405332 Mimic silicon behavioural whereby clear (sclr and aclr) would not hold forwarding data
+    if (clr == 1'b1)
+    begin
+        next_match    = 1'b0;
+        current_match = 1'b0;
+    end
+
+    // FTZ DISABLED with read enable reg LOW and clear LOW
+    if (rden_reg == 1'b0 && clr == 1'b0 && enable_force_to_zero == "FALSE")
+    begin
+        if (ena == 1'b1)
+        begin
+            if (next_match != next_match_check)
+            begin
+                next_match = next_match_check;
+
+                // Assign write data reg to forward data reg for two level forwarding
+                if (fwd_is_one_lvl == 0)
+                begin
+                    fwd_data_reg = wrdata_reg;
+                end
+            end
+        end
+    end
+
+    // FTZ ENABLED with read enable reg LOW and clear LOW
+    if (rden_reg == 1'b0 && clr == 1'b0 && enable_force_to_zero == "TRUE")
+    begin
+        if (ena == 1'b1)
+        begin
+            // Clear forward data reg to match FTZ behaviour
+            fwd_data_reg = 'b0;
+
+            // Check next match for two level forwarding
+            if (fwd_is_one_lvl == 0)
+            begin
+                next_match   = 1'b0;
+            end
+        end
+    end
+end
+
+endmodule// END OF ALTERA_SYNCRAM_FORWARDING_LOGIC
+
 
 //START_MODULE_NAME------------------------------------------------------------
 //
@@ -31501,7 +35838,7 @@ endmodule   // End of altaccumulate
 
 module altmult_accum (  dataa, 
                         datab, 
-			            datac,
+                        datac,
                         scanina,
                         scaninb,
                         sourcea,
@@ -31533,23 +35870,23 @@ module altmult_accum (  dataa,
                         accum_saturation,
                         mult_is_saturated,
                         accum_is_saturated,
-			            coefsel0,
-		             	coefsel1,
-			            coefsel2,
-			            coefsel3);
+                        coefsel0,
+                        coefsel1,
+                        coefsel2,
+                        coefsel3);
 
     // ---------------------
     // PARAMETER DECLARATION
     // ---------------------
     parameter width_a                   = 2;
     parameter width_b                   = 2;
-	parameter width_c					= 22;
+    parameter width_c                   = 22;
     parameter width_result              = 5;
-    parameter number_of_multipliers		= 1;
+    parameter number_of_multipliers     = 1;
     parameter input_reg_a               = "CLOCK0";
     parameter input_aclr_a              = "ACLR3";
-    parameter multiplier1_direction		= "UNUSED";
-    parameter multiplier3_direction		= "UNUSED";
+    parameter multiplier1_direction     = "UNUSED";
+    parameter multiplier3_direction     = "UNUSED";
 
     parameter input_reg_b               = "CLOCK0";
     parameter input_aclr_b              = "ACLR3";
@@ -31632,69 +35969,69 @@ module altmult_accum (  dataa,
     parameter sload_for_limit = (width_result < width_upper_data)? width_result + int_extra_width : width_upper_data ;
     parameter accum_sat_for_limit = ((accumulator_saturation == "NO")? int_width_result - 1 : int_width_a + int_width_b - 33 );
     parameter int_width_extra_bit = (int_width_result - int_width_a - int_width_b > 0) ? int_width_result - int_width_a - int_width_b : 0;
-	//StratixV parameters
-  	parameter preadder_mode	= "SIMPLE";
-  	parameter loadconst_value = 0;
-  	parameter width_coef = 0;
-  	
-  	parameter loadconst_control_register = "CLOCK0";
-  	parameter loadconst_control_aclr	= "ACLR0";
- 	
-	parameter coefsel0_register = "CLOCK0";
-  	parameter coefsel1_register	= "CLOCK0";
-  	parameter coefsel2_register	= "CLOCK0";
-  	parameter coefsel3_register	= "CLOCK0";
-   	parameter coefsel0_aclr	= "ACLR0";
-   	parameter coefsel1_aclr	= "ACLR0";
-	parameter coefsel2_aclr	= "ACLR0";
-   	parameter coefsel3_aclr	= "ACLR0";
-	
-   	parameter preadder_direction_0	= "ADD";
-	parameter preadder_direction_1	= "ADD";
-	parameter preadder_direction_2	= "ADD";
-	parameter preadder_direction_3	= "ADD";
-	
-	parameter systolic_delay1 = "UNREGISTERED";
-	parameter systolic_delay3 = "UNREGISTERED";
-	parameter systolic_aclr1 = "NONE";
-	parameter systolic_aclr3 = "NONE";
-	
-	//coefficient storage
-	parameter coef0_0 = 0;
-	parameter coef0_1 = 0;
-	parameter coef0_2 = 0;
-	parameter coef0_3 = 0;
-	parameter coef0_4 = 0;
-	parameter coef0_5 = 0;
-	parameter coef0_6 = 0;
-	parameter coef0_7 = 0;
-	
-	parameter coef1_0 = 0;
-	parameter coef1_1 = 0;
-	parameter coef1_2 = 0;
-	parameter coef1_3 = 0;
-	parameter coef1_4 = 0;
-	parameter coef1_5 = 0;
-	parameter coef1_6 = 0;
-	parameter coef1_7 = 0;
-	
-	parameter coef2_0 = 0;
-	parameter coef2_1 = 0;
-	parameter coef2_2 = 0;
-	parameter coef2_3 = 0;
-	parameter coef2_4 = 0;
-	parameter coef2_5 = 0;
-	parameter coef2_6 = 0;
-	parameter coef2_7 = 0;
-	
-	parameter coef3_0 = 0;
-	parameter coef3_1 = 0;
-	parameter coef3_2 = 0;
-	parameter coef3_3 = 0;
-	parameter coef3_4 = 0;
-	parameter coef3_5 = 0;
-	parameter coef3_6 = 0;
-	parameter coef3_7 = 0;
+    //StratixV parameters
+    parameter preadder_mode = "SIMPLE";
+    parameter loadconst_value = 0;
+    parameter width_coef = 0;
+    
+    parameter loadconst_control_register = "CLOCK0";
+    parameter loadconst_control_aclr    = "ACLR0";
+    
+    parameter coefsel0_register = "CLOCK0";
+    parameter coefsel1_register = "CLOCK0";
+    parameter coefsel2_register = "CLOCK0";
+    parameter coefsel3_register = "CLOCK0";
+    parameter coefsel0_aclr = "ACLR0";
+    parameter coefsel1_aclr = "ACLR0";
+    parameter coefsel2_aclr = "ACLR0";
+    parameter coefsel3_aclr = "ACLR0";
+    
+    parameter preadder_direction_0  = "ADD";
+    parameter preadder_direction_1  = "ADD";
+    parameter preadder_direction_2  = "ADD";
+    parameter preadder_direction_3  = "ADD";
+    
+    parameter systolic_delay1 = "UNREGISTERED";
+    parameter systolic_delay3 = "UNREGISTERED";
+    parameter systolic_aclr1 = "NONE";
+    parameter systolic_aclr3 = "NONE";
+    
+    //coefficient storage
+    parameter coef0_0 = 0;
+    parameter coef0_1 = 0;
+    parameter coef0_2 = 0;
+    parameter coef0_3 = 0;
+    parameter coef0_4 = 0;
+    parameter coef0_5 = 0;
+    parameter coef0_6 = 0;
+    parameter coef0_7 = 0;
+    
+    parameter coef1_0 = 0;
+    parameter coef1_1 = 0;
+    parameter coef1_2 = 0;
+    parameter coef1_3 = 0;
+    parameter coef1_4 = 0;
+    parameter coef1_5 = 0;
+    parameter coef1_6 = 0;
+    parameter coef1_7 = 0;
+    
+    parameter coef2_0 = 0;
+    parameter coef2_1 = 0;
+    parameter coef2_2 = 0;
+    parameter coef2_3 = 0;
+    parameter coef2_4 = 0;
+    parameter coef2_5 = 0;
+    parameter coef2_6 = 0;
+    parameter coef2_7 = 0;
+    
+    parameter coef3_0 = 0;
+    parameter coef3_1 = 0;
+    parameter coef3_2 = 0;
+    parameter coef3_3 = 0;
+    parameter coef3_4 = 0;
+    parameter coef3_5 = 0;
+    parameter coef3_6 = 0;
+    parameter coef3_7 = 0;
 
 // LOCAL_PARAMETERS_END
 
@@ -31705,7 +36042,7 @@ module altmult_accum (  dataa,
     // data input ports
     input [width_a -1 : 0] dataa;
     input [width_b -1 : 0] datab;
-	input [width_c -1 : 0] datac;
+    input [width_c -1 : 0] datac;
     input [width_a -1 : 0] scanina;
     input [width_b -1 : 0] scaninb;
     input sourcea;
@@ -31742,12 +36079,12 @@ module altmult_accum (  dataa,
     input accum_round;
     input accum_saturation;
 
-	//StratixV only input ports
-	input [2:0]coefsel0;
-	input [2:0]coefsel1;
-	input [2:0]coefsel2;
-	input [2:0]coefsel3;
-	
+    //StratixV only input ports
+    input [2:0]coefsel0;
+    input [2:0]coefsel1;
+    input [2:0]coefsel2;
+    input [2:0]coefsel3;
+    
     // output ports
     output [width_result -1 : 0] result;
     output overflow;
@@ -32124,6 +36461,22 @@ module altmult_accum (  dataa,
         is_cycloneii = dev.FEATURE_FAMILY_CYCLONEII(intended_device_family);
         
         // Checking for invalid parameters, in case Wizard is bypassed (hand-modified).
+        
+        //ALTMULT_ADD EOL FAMILY CHECKS
+        if(dev.FEATURE_FAMILY_IS_ALTMULT_ADD_EOL(intended_device_family) == 1)
+        begin
+                $display ("Error: ALTMULT_ADD is EOL for %s device family", intended_device_family);
+                $display("Time: %0t  Instance: %m", $time);
+                $stop;
+        end
+        //Legality check, block new family from running pre_layout simulation using altera_mf (family with altera_mult_add flow)        
+        if(dev.FEATURE_FAMILY_HAS_ALTERA_MULT_ADD_FLOW(intended_device_family) == 1)
+        begin
+                $display ("Error: ALTMULT_ACCUM is not supported for %s device family", intended_device_family);
+                $display("Time: %0t  Instance: %m", $time);
+                $stop;
+        end
+        
         if ((dedicated_multiplier_circuitry != "AUTO") && 
             (dedicated_multiplier_circuitry != "YES") && 
             (dedicated_multiplier_circuitry != "NO"))
@@ -33469,21 +37822,21 @@ module altmult_accum (  dataa,
             if (multiplier_reg == "UNREGISTERED")
             begin
                 if (int_width_extra_bit > 0) begin
-    				mult_res_out    =  {{int_width_extra_bit {(sign_a_int | sign_b_int) & mult_out_latent [int_width_a+int_width_b -1]}}, mult_out_latent};
-    			end
-    			else begin
-    				mult_res_out    =  mult_out_latent;
-    			end
+                    mult_res_out    =  {{int_width_extra_bit {(sign_a_int | sign_b_int) & mult_out_latent [int_width_a+int_width_b -1]}}, mult_out_latent};
+                end
+                else begin
+                    mult_res_out    =  mult_out_latent;
+                end
                 mult_signed_out =  (sign_a_int | sign_b_int);
             end
             else
             begin
                 if (int_width_extra_bit > 0) begin
-        			mult_res_out    =  {{int_width_extra_bit {(sign_a_int | sign_b_int) & mult_res [int_width_a+int_width_b -1]}}, mult_res};
-        		end
-        		else begin
-        			mult_res_out    =  mult_res;
-        		end
+                    mult_res_out    =  {{int_width_extra_bit {(sign_a_int | sign_b_int) & mult_res [int_width_a+int_width_b -1]}}, mult_res};
+                end
+                else begin
+                    mult_res_out    =  mult_res;
+                end
                 mult_signed_out =  (sign_a_int | sign_b_int);
             end
 
@@ -33736,11 +38089,11 @@ module altmult_add (    dataa,
                         shift_right,
                         zero_loopback,
                         accum_sload,
-			            coefsel0,
-		             	coefsel1,
-			            coefsel2,
-			            coefsel3);
-			            
+                        coefsel0,
+                        coefsel1,
+                        coefsel2,
+                        coefsel3);
+                        
 
     // ---------------------
     // PARAMETER DECLARATION
@@ -33748,7 +38101,7 @@ module altmult_add (    dataa,
 
     parameter width_a               = 16;
     parameter width_b               = 16;
-	parameter width_c				= 22;
+    parameter width_c               = 22;
     parameter width_result          = 34;
     parameter number_of_multipliers = 1;
     parameter lpm_type              = "altmult_add";
@@ -33811,18 +38164,18 @@ module altmult_add (    dataa,
     parameter signed_pipeline_aclr_b     = "ACLR3";
 
     //C inputs
-    parameter input_register_c0	= "CLOCK0";
-	parameter input_aclr_c0		= "ACLR0";
-	
-   	parameter input_register_c1	= "CLOCK0";
-   	parameter input_aclr_c1	 	= "ACLR0";
-	
-	parameter input_register_c2	= "CLOCK0";
-    parameter input_aclr_c2		= "ACLR0";
-	
-	parameter input_register_c3	= "CLOCK0";
-	parameter input_aclr_c3		= "ACLR0";
-	
+    parameter input_register_c0 = "CLOCK0";
+    parameter input_aclr_c0     = "ACLR0";
+    
+    parameter input_register_c1 = "CLOCK0";
+    parameter input_aclr_c1     = "ACLR0";
+    
+    parameter input_register_c2 = "CLOCK0";
+    parameter input_aclr_c2     = "ACLR0";
+    
+    parameter input_register_c3 = "CLOCK0";
+    parameter input_aclr_c3     = "ACLR0";
+    
     // multiplier parameters
 
     parameter multiplier_register0 = "CLOCK0";
@@ -33951,70 +38304,70 @@ module altmult_add (    dataa,
     parameter accum_sload_pipeline_aclr = "NONE";
     parameter accum_direction = "ADD";
     parameter accumulator = "NO";
-	
-	//StratixV parameters
-  	parameter preadder_mode	= "SIMPLE";
-  	parameter loadconst_value = 0;
-  	parameter width_coef = 0;
-  	
-  	parameter loadconst_control_register = "CLOCK0";
-  	parameter loadconst_control_aclr	= "ACLR0";
- 	
-	parameter coefsel0_register = "CLOCK0";
-  	parameter coefsel1_register	= "CLOCK0";
-  	parameter coefsel2_register	= "CLOCK0";
-  	parameter coefsel3_register	= "CLOCK0";
-   	parameter coefsel0_aclr	= "ACLR0";
-   	parameter coefsel1_aclr	= "ACLR0";
-	parameter coefsel2_aclr	= "ACLR0";
-   	parameter coefsel3_aclr	= "ACLR0";
-	
-   	parameter preadder_direction_0	= "ADD";
-	parameter preadder_direction_1	= "ADD";
-	parameter preadder_direction_2	= "ADD";
-	parameter preadder_direction_3	= "ADD";
-	
-	parameter systolic_delay1 = "UNREGISTERED";
-	parameter systolic_delay3 = "UNREGISTERED";
-	parameter systolic_aclr1 = "NONE";
-	parameter systolic_aclr3 = "NONE";
-	
-	//coefficient storage
-	parameter coef0_0 = 0;
-	parameter coef0_1 = 0;
-	parameter coef0_2 = 0;
-	parameter coef0_3 = 0;
-	parameter coef0_4 = 0;
-	parameter coef0_5 = 0;
-	parameter coef0_6 = 0;
-	parameter coef0_7 = 0;
-	
-	parameter coef1_0 = 0;
-	parameter coef1_1 = 0;
-	parameter coef1_2 = 0;
-	parameter coef1_3 = 0;
-	parameter coef1_4 = 0;
-	parameter coef1_5 = 0;
-	parameter coef1_6 = 0;
-	parameter coef1_7 = 0;
-	
-	parameter coef2_0 = 0;
-	parameter coef2_1 = 0;
-	parameter coef2_2 = 0;
-	parameter coef2_3 = 0;
-	parameter coef2_4 = 0;
-	parameter coef2_5 = 0;
-	parameter coef2_6 = 0;
-	parameter coef2_7 = 0;
-	
-	parameter coef3_0 = 0;
-	parameter coef3_1 = 0;
-	parameter coef3_2 = 0;
-	parameter coef3_3 = 0;
-	parameter coef3_4 = 0;
-	parameter coef3_5 = 0;
-	parameter coef3_6 = 0;
-	parameter coef3_7 = 0;
+    
+    //StratixV parameters
+    parameter preadder_mode = "SIMPLE";
+    parameter loadconst_value = 0;
+    parameter width_coef = 0;
+    
+    parameter loadconst_control_register = "CLOCK0";
+    parameter loadconst_control_aclr    = "ACLR0";
+    
+    parameter coefsel0_register = "CLOCK0";
+    parameter coefsel1_register = "CLOCK0";
+    parameter coefsel2_register = "CLOCK0";
+    parameter coefsel3_register = "CLOCK0";
+    parameter coefsel0_aclr = "ACLR0";
+    parameter coefsel1_aclr = "ACLR0";
+    parameter coefsel2_aclr = "ACLR0";
+    parameter coefsel3_aclr = "ACLR0";
+    
+    parameter preadder_direction_0  = "ADD";
+    parameter preadder_direction_1  = "ADD";
+    parameter preadder_direction_2  = "ADD";
+    parameter preadder_direction_3  = "ADD";
+    
+    parameter systolic_delay1 = "UNREGISTERED";
+    parameter systolic_delay3 = "UNREGISTERED";
+    parameter systolic_aclr1 = "NONE";
+    parameter systolic_aclr3 = "NONE";
+    
+    //coefficient storage
+    parameter coef0_0 = 0;
+    parameter coef0_1 = 0;
+    parameter coef0_2 = 0;
+    parameter coef0_3 = 0;
+    parameter coef0_4 = 0;
+    parameter coef0_5 = 0;
+    parameter coef0_6 = 0;
+    parameter coef0_7 = 0;
+    
+    parameter coef1_0 = 0;
+    parameter coef1_1 = 0;
+    parameter coef1_2 = 0;
+    parameter coef1_3 = 0;
+    parameter coef1_4 = 0;
+    parameter coef1_5 = 0;
+    parameter coef1_6 = 0;
+    parameter coef1_7 = 0;
+    
+    parameter coef2_0 = 0;
+    parameter coef2_1 = 0;
+    parameter coef2_2 = 0;
+    parameter coef2_3 = 0;
+    parameter coef2_4 = 0;
+    parameter coef2_5 = 0;
+    parameter coef2_6 = 0;
+    parameter coef2_7 = 0;
+    
+    parameter coef3_0 = 0;
+    parameter coef3_1 = 0;
+    parameter coef3_2 = 0;
+    parameter coef3_3 = 0;
+    parameter coef3_4 = 0;
+    parameter coef3_5 = 0;
+    parameter coef3_6 = 0;
+    parameter coef3_7 = 0;
     // output parameters
   
     parameter output_register = "CLOCK0";
@@ -34034,7 +38387,7 @@ module altmult_add (    dataa,
     // data input ports
     input [number_of_multipliers * width_a -1 : 0] dataa;
     input [number_of_multipliers * width_b -1 : 0] datab;
-    input [width_c -1 : 0] datac;
+    input [number_of_multipliers * width_c -1 : 0] datac;
 
     input [width_a -1 : 0] scanina;
     input [width_b -1 : 0] scaninb;
@@ -34086,12 +38439,12 @@ module altmult_add (    dataa,
     input zero_loopback;
     input accum_sload;
 
-	//StratixV only input ports
-	input [2:0]coefsel0;
-	input [2:0]coefsel1;
-	input [2:0]coefsel2;
-	input [2:0]coefsel3;
-	
+    //StratixV only input ports
+    input [2:0]coefsel0;
+    input [2:0]coefsel1;
+    input [2:0]coefsel2;
+    input [2:0]coefsel3;
+    
     // output ports
     output [width_result -1 : 0] result;
     output [width_a -1 : 0] scanouta;
@@ -34118,7 +38471,7 @@ module altmult_add (    dataa,
     parameter int_width_preadder = ((preadder_mode == "INPUT" || preadder_mode == "SQUARE" || preadder_mode == "COEF" )?((width_a > width_b)? width_a + 1 : width_b + 1):width_a);
     
     parameter int_width_a = ((preadder_mode == "INPUT" || preadder_mode == "SQUARE" || preadder_mode == "COEF" )?((width_a > width_b)? width_a + 1 : width_b + 1):
-    						((multiplier01_saturation == "NO") && (multiplier23_saturation == "NO") &&
+                            ((multiplier01_saturation == "NO") && (multiplier23_saturation == "NO") &&
                             (multiplier01_rounding == "NO") && (multiplier23_rounding == "NO") &&
                             (output_rounding == "NO") && (output_saturation == "NO") && 
                             (chainout_rounding == "NO") && (chainout_saturation == "NO") &&
@@ -34126,8 +38479,8 @@ module altmult_add (    dataa,
                             (width_a < 18)? 18 : width_a);
     // Represent the internal used width_b
     parameter int_width_b = ((preadder_mode == "SQUARE" )?((width_a > width_b)? width_a + 1 : width_b + 1):
-    						(preadder_mode == "COEF" || preadder_mode == "CONSTANT")?width_coef:
-    						((multiplier01_saturation == "NO") && (multiplier23_saturation == "NO") &&
+                            (preadder_mode == "COEF" || preadder_mode == "CONSTANT")?width_coef:
+                            ((multiplier01_saturation == "NO") && (multiplier23_saturation == "NO") &&
                             (multiplier01_rounding == "NO") && (multiplier23_rounding == "NO") &&
                             (output_rounding == "NO") && (output_saturation == "NO") &&
                             (chainout_rounding == "NO") && (chainout_saturation == "NO") &&
@@ -34494,7 +38847,7 @@ module altmult_add (    dataa,
     //tri0 loadconst_int;
     //tri0 negate_int;
     //tri0 accum_int;
-	tri0 [2:0]coeffsel_a_int;
+    tri0 [2:0]coeffsel_a_int;
     tri0 [2:0]coeffsel_b_int;
     tri0 [2:0]coeffsel_c_int;
     tri0 [2:0]coeffsel_d_int;
@@ -34509,7 +38862,7 @@ module altmult_add (    dataa,
     tri0 input_reg_b1_wire_clr;
     tri0 input_reg_b2_wire_clr;
     tri0 input_reg_b3_wire_clr;
-	
+    
     tri0 input_reg_c0_wire_clr;
     tri0 input_reg_c1_wire_clr;
     tri0 input_reg_c2_wire_clr;
@@ -34553,7 +38906,7 @@ module altmult_add (    dataa,
     tri0 accumsload_reg_wire_clr;
     tri0 accumsload_pipe_wire_clr;
     // end Stratix III only aclr signals
-	
+    
     // Stratix V only aclr signals
     tri0 coeffsela_reg_wire_clr;
     tri0 coeffselb_reg_wire_clr;
@@ -34597,7 +38950,7 @@ module altmult_add (    dataa,
     tri1 input_reg_b1_wire_en;
     tri1 input_reg_b2_wire_en;
     tri1 input_reg_b3_wire_en;
-	
+    
     tri1 input_reg_c0_wire_en;
     tri1 input_reg_c1_wire_en;
     tri1 input_reg_c2_wire_en;
@@ -34641,7 +38994,7 @@ module altmult_add (    dataa,
     tri1 accumsload_reg_wire_en;
     tri1 accumsload_pipe_wire_en;
     // end Stratix III only ena signals
-	
+    
     // Stratix V only ena signals
     tri1 coeffsela_reg_wire_en;
     tri1 coeffselb_reg_wire_en;
@@ -34745,6 +39098,11 @@ module altmult_add (    dataa,
     wire [26:0] coeffsel_b_pre;
     wire [26:0] coeffsel_c_pre;
     wire [26:0] coeffsel_d_pre;
+    
+    // For fixing warning,
+    wire systolic1_reg_wire_clk, systolic3_reg_wire_clk;
+    wire systolic1_reg_wire_clr, systolic3_reg_wire_clr;
+    wire systolic1_reg_wire_en, systolic3_reg_wire_en;
     // end Stratix V only clock signals
      
     wire multiplier_reg0_wire_clk;
@@ -34893,7 +39251,8 @@ module altmult_add (    dataa,
     
     wire stratixii_block;
     wire stratixiii_block;
-	wire stratixv_block;
+    wire stratixv_block;
+    wire altera_mult_add_block;
     
     //accumulator overflow fix
     integer x;
@@ -34955,7 +39314,7 @@ module altmult_add (    dataa,
 
         temp_mult_zero = 0;
         temp_mult = 0;
-	
+    
         op_a = mult_a_wire >> (multiplier * int_width_a); 
         op_b = mult_b_wire >> (multiplier * int_width_b); 
      
@@ -35009,7 +39368,7 @@ module altmult_add (    dataa,
         do_multiply_loopback = temp_mult;
     end
     endfunction
-	
+    
     function [(int_width_a + int_width_b  - 1):0] do_multiply_stratixv;
         input [32 : 0] multiplier;
         input signa_wire;
@@ -35028,7 +39387,7 @@ module altmult_add (    dataa,
 
         temp_mult_zero = 0;
         temp_mult = 0;
-	
+    
         op_a = preadder_sum1a; 
         op_b = preadder_sum2a; 
      
@@ -35204,12 +39563,12 @@ module altmult_add (    dataa,
         temp_sub = 0;
 
         op_a = mult_a_wire >> (adder * int_width_a); 
-   		op_b = mult_b_wire >> (adder * int_width_b); 
+        op_b = mult_b_wire >> (adder * int_width_b); 
         op_a[2*int_width_result - 1:width_a] = {(2*int_width_result - width_a){op_a[width_a - 1] & (signa_wire | signb_wire)}}; 
         op_b[2*int_width_result - 1:width_b] = {(2*int_width_result - width_b){op_b[width_b - 1] & (signa_wire | signb_wire)}};  
 
         temp_sub = op_a - op_b;
-	    do_preadder_sub = temp_sub;
+        do_preadder_sub = temp_sub;
     end
     endfunction 
     
@@ -35226,7 +39585,7 @@ module altmult_add (    dataa,
         temp_add = 0;
 
         op_a = mult_a_wire >> (adder * int_width_a); 
-   		op_b = mult_b_wire >> (adder * int_width_b); 
+        op_b = mult_b_wire >> (adder * int_width_b); 
         op_a[2*int_width_result - 1:width_a] = {(2*int_width_result - width_a){op_a[width_a - 1] & (signa_wire | signb_wire)}}; 
         op_b[2*int_width_result - 1:width_b] = {(2*int_width_result - width_b){op_b[width_b - 1] & (signa_wire | signb_wire)}}; 
         
@@ -35240,6 +39599,92 @@ module altmult_add (    dataa,
     // --------------------------------------------------------------
     initial
     begin
+        //Legality check, block unsupported family from running pre_layout simulation using altera_mf (family with altera_mult_add flow)
+        if(dev.FEATURE_FAMILY_IS_ALTMULT_ADD_EOL(intended_device_family) == 1)
+        begin
+                $display ("Error: ALTMULT_ADD is EOL for %s device family", intended_device_family);
+                $display("Time: %0t  Instance: %m", $time);
+                $stop;
+        end
+        
+        //Legality check, block new family from running pre_layout simulation using altera_mf (family with altera_mult_add flow) 
+        if(dev.FEATURE_FAMILY_HAS_ALTERA_MULT_ADD_FLOW(intended_device_family) == 1)
+        begin 
+            if(accumulator != "NO")
+            begin
+                $display ("Error: Accumulator mode is not supported in altera_mf for %s device family", intended_device_family);
+                $display("Time: %0t  Instance: %m", $time);
+                $stop;
+            end
+        
+            if(port_addnsub1 != "PORT_UNUSED" || port_addnsub3 != "PORT_UNUSED")
+            begin
+                $display ("Error: Dynamic adder is not supported in altera_mf for %s device family", intended_device_family);
+                $display("Time: %0t  Instance: %m", $time);
+                $stop;
+            end
+            if(chainout_adder != "NO")
+            begin
+                $display ("Error: Chain adder is not supported in altera_mf for %s device family", intended_device_family);
+                $display("Time: %0t  Instance: %m", $time);
+                $stop;
+            end
+            if(systolic_delay1 != "UNREGISTERED" || systolic_delay3 != "UNREGISTERED")
+            begin
+                $display ("Error: Systolic mode is not supported in altera_mf for %s device family", intended_device_family);
+                $display("Time: %0t  Instance: %m", $time);
+                $stop;
+            end
+            if(input_source_a0 != "DATAA" || input_source_a1 != "DATAA" || input_source_a2 != "DATAA" || input_source_a3 != "DATAA")
+            begin
+                $display ("Error: INPUT_SOURCE_A is set to an unsupported value. Only DATAA input is supported in altera_mf for %s device family", intended_device_family);
+                $display("Time: %0t  Instance: %m", $time);
+                $stop;
+            end
+            if(input_source_b0 != "DATAB" || input_source_b1 != "DATAB" || input_source_b2 != "DATAB" || input_source_b3 != "DATAB")
+            begin
+                $display ("Error: INPUT_SOURCE_B is set to an unsupported value. Only DATAB input is supported in altera_mf for %s device family", intended_device_family);
+                $display("Time: %0t  Instance: %m", $time);
+                $stop;
+            end
+            if(preadder_mode != "SIMPLE")
+            begin
+                $display ("Error: PREADDER_MODE is set to an unsupported value. Only SIMPLE mode is supported in altera_mf for %s device family", intended_device_family);
+                $display("Time: %0t  Instance: %m", $time);
+                $stop;
+            end
+            if(output_rounding != "NO" || chainout_rounding != "NO" ||
+               adder1_rounding != "NO" || adder3_rounding != "NO" ||
+               multiplier01_rounding != "NO" || multiplier23_rounding != "NO")
+            begin
+                $display ("Error: Rounding is not supported in altera_mf for %s device family", intended_device_family);
+                $display("Time: %0t  Instance: %m", $time);
+                $stop;
+            end
+            if(output_saturation != "NO" || chainout_saturation != "NO" ||
+               port_mult0_is_saturated != "UNUSED" || port_mult1_is_saturated != "UNUSED" || port_mult2_is_saturated != "UNUSED" || port_mult3_is_saturated != "UNUSED" ||
+               multiplier01_saturation != "NO" || multiplier23_saturation != "NO" ||
+               port_output_is_overflow != "PORT_UNUSED")
+            begin
+                $display ("Error: Saturation is not supported in altera_mf for %s device family", intended_device_family);
+                $display("Time: %0t  Instance: %m", $time);
+                $stop;
+            end 
+            if(shift_mode != "NO")
+            begin
+                $display ("Error: Shift is not supported in altera_mf for %s device family", intended_device_family);
+                $display("Time: %0t  Instance: %m", $time);
+                $stop;
+            end
+            if(signed_pipeline_register_a != "UNREGISTERED" || signed_pipeline_register_b!= "UNREGISTERED" ||
+                addnsub_multiplier_pipeline_register1 != "UNREGISTERED" || addnsub_multiplier_pipeline_register3 != "UNREGISTERED" ||
+                accum_sload_pipeline_register != "UNREGISTERED")
+            begin
+                $display ("Warning: Pipeline register is not supported in altera_mf for %s device family", intended_device_family);
+                $display("Time: %0t  Instance: %m", $time);
+            end
+        end
+
         // Checking for invalid parameters, in case Wizard is bypassed (hand-modified).
         if (number_of_multipliers > 4)
         begin
@@ -35265,7 +39710,7 @@ module altmult_add (    dataa,
             $display("Time: %0t  Instance: %m", $time);
             $stop;
         end
-		if (width_c < 0)
+        if (width_c < 0)
         begin
             $display("Error: width_c must be greater than 0.");
             $display("Time: %0t  Instance: %m", $time);
@@ -35648,14 +40093,6 @@ module altmult_add (    dataa,
                 $stop;
             end
         end
-        
-		if(dev.FEATURE_FAMILY_STRATIXV(intended_device_family) ==1 && preadder_mode != "SIMPLE")
-		begin
-				$display ("Error: Stratix V simulation model not support other mode beside simple mode in the current Quartus II Version");
-                $display("Time: %0t  Instance: %m", $time);
-                $stop;
-		end
-		
      
               
         temp_sum_reg = 0;
@@ -35794,9 +40231,9 @@ module altmult_add (    dataa,
         coeffsel_d_reg = 0;
         adder1_res_reg_0 = 0;
         adder1_res_reg_1 = 0;
-		round_sat_in_reg = 0;
-		chainin_reg = 0;
-		
+        round_sat_in_reg = 0;
+        chainin_reg = 0;
+        
         for ( num_stor = extra_latency; num_stor >= 0; num_stor = num_stor - 1 )
         begin
             result_pipe[num_stor] = {int_width_result{1'b0}};
@@ -35816,9 +40253,11 @@ module altmult_add (    dataa,
 
     assign stratixii_block = dev.FEATURE_FAMILY_BASE_STRATIXII(intended_device_family) || (stratixiii_block && (dedicated_multiplier_circuitry=="NO"));
     assign stratixiii_block = dev.FEATURE_FAMILY_STRATIXIII(intended_device_family) && (dedicated_multiplier_circuitry!="NO");
-	
-	//SPR 356362: Force stratixv_block to false as StratixV does not support simulation atom
-    assign stratixv_block = dev.FEATURE_FAMILY_STRATIXV(intended_device_family) && (dedicated_multiplier_circuitry!="NO") && 1'b0; 
+    
+    //SPR 356362: Force stratixv_block to false as StratixV does not support simulation atom
+    assign stratixv_block = dev.FEATURE_FAMILY_STRATIXV(intended_device_family) && (dedicated_multiplier_circuitry!="NO") && 1'b0;
+    
+    assign altera_mult_add_block = dev.FEATURE_FAMILY_HAS_ALTERA_MULT_ADD_FLOW(intended_device_family);
     
     assign signa_z = signa;
     assign signb_z = signb;
@@ -35948,8 +40387,8 @@ module altmult_add (    dataa,
                                                                 (((chainout_adder == "YES") && (width_result > width_a + width_b + 8)) ?
                                                                 chainout_new_datab_int[number_of_multipliers * int_width_b-1:0] :
                                                                 new_datab_int[number_of_multipliers * int_width_b - 1:0]) : datab[number_of_multipliers * width_b - 1:0])); 
-	
-	assign datac_int[int_width_c-1:0] = ((stratixv_block == 1 && (preadder_mode == "INPUT"))? datac[int_width_c - 1:0]: 0);
+    
+    assign datac_int[int_width_c-1:0] = ((stratixv_block == 1 && (preadder_mode == "INPUT"))? datac[int_width_c - 1:0]: 0);
     
     assign addnsub1_round_pre = addnsub1_round;
     assign addnsub3_round_pre = addnsub3_round;
@@ -36042,7 +40481,7 @@ module altmult_add (    dataa,
                                     (input_register_b3 == "CLOCK2")? clock2:
                                     (input_register_b3 == "CLOCK3")? clock3: 1'b0;
                                    
-	assign input_reg_c0_wire_clk =  (input_register_c0 == "CLOCK0")? clock0:
+    assign input_reg_c0_wire_clk =  (input_register_c0 == "CLOCK0")? clock0:
                                     (input_register_c0 == "UNREGISTERED")? 1'b0:
                                     (input_register_c0 == "CLOCK1")? clock1:
                                     (input_register_c0 == "CLOCK2")? clock2: 1'b0;
@@ -36063,7 +40502,7 @@ module altmult_add (    dataa,
     assign input_reg_c3_wire_clk =  (input_register_c3 == "CLOCK0")? clock0:
                                     (input_register_c3 == "UNREGISTERED")? 1'b0:
                                     (input_register_c3 == "CLOCK1")? clock1:
-                                    (input_register_c3 == "CLOCK2")? clock2: 1'b0;	                            
+                                    (input_register_c3 == "CLOCK2")? clock2: 1'b0;                              
 
     assign addsub1_reg_wire_clk =   (addnsub_multiplier_register1 == "CLOCK0")? clock0:
                                     (addnsub_multiplier_register1 == "UNREGISTERED")? 1'b0: 
@@ -36363,32 +40802,32 @@ module altmult_add (    dataa,
                                         (accum_sload_pipeline_register == "CLOCK2") ? clock2 :
                                         (accum_sload_pipeline_register == "CLOCK3") ? clock3 : 1'b0;
                                     
-	assign coeffsela_reg_wire_clk =  (coefsel0_register == "CLOCK0") ? clock0 :
+    assign coeffsela_reg_wire_clk =  (coefsel0_register == "CLOCK0") ? clock0 :
                                      (coefsel0_register == "UNREGISTERED") ? 1'b0:
                                      (coefsel0_register == "CLOCK1") ? clock1 :
                                      (coefsel0_register == "CLOCK2") ? clock2 : 1'b0;                                                                           
                                      
-	assign coeffselb_reg_wire_clk =  (coefsel1_register == "CLOCK0") ? clock0 :
+    assign coeffselb_reg_wire_clk =  (coefsel1_register == "CLOCK0") ? clock0 :
                                      (coefsel1_register == "UNREGISTERED") ? 1'b0:
                                      (coefsel1_register == "CLOCK1") ? clock1 :
                                      (coefsel1_register == "CLOCK2") ? clock2 : 1'b0;                                                                                                                
                                      
-	assign coeffselc_reg_wire_clk =  (coefsel2_register == "CLOCK0") ? clock0 :
+    assign coeffselc_reg_wire_clk =  (coefsel2_register == "CLOCK0") ? clock0 :
                                      (coefsel2_register == "UNREGISTERED") ? 1'b0:
                                      (coefsel2_register == "CLOCK1") ? clock1 :
                                      (coefsel2_register == "CLOCK2") ? clock2 : 1'b0;                                                                           
                                      
-	assign coeffseld_reg_wire_clk =  (coefsel3_register == "CLOCK0") ? clock0 :
+    assign coeffseld_reg_wire_clk =  (coefsel3_register == "CLOCK0") ? clock0 :
                                      (coefsel3_register == "UNREGISTERED") ? 1'b0:
                                      (coefsel3_register == "CLOCK1") ? clock1 :
                                      (coefsel3_register == "CLOCK2") ? clock2 : 1'b0;                                                                                                                                                     
 
-	assign systolic1_reg_wire_clk =  (systolic_delay1 == "CLOCK0") ? clock0 :
+    assign systolic1_reg_wire_clk =  (systolic_delay1 == "CLOCK0") ? clock0 :
                                      (systolic_delay1 == "UNREGISTERED") ? 1'b0:
                                      (systolic_delay1 == "CLOCK1") ? clock1 :
                                      (systolic_delay1 == "CLOCK2") ? clock2 : 1'b0;                                                                                                                                                                                          
 
-	assign systolic3_reg_wire_clk =  (systolic_delay3 == "CLOCK0") ? clock0 :
+    assign systolic3_reg_wire_clk =  (systolic_delay3 == "CLOCK0") ? clock0 :
                                      (systolic_delay3 == "UNREGISTERED") ? 1'b0:
                                      (systolic_delay3 == "CLOCK1") ? clock1 :
                                      (systolic_delay3 == "CLOCK2") ? clock2 : 1'b0;                                                                                                                                                                                                                               
@@ -36455,7 +40894,7 @@ module altmult_add (    dataa,
                                     (input_register_b3 == "CLOCK2")? ena2:
                                     (input_register_b3 == "CLOCK3")? ena3: 1'b1;
 
-	assign input_reg_c0_wire_en =   (input_register_c0 == "CLOCK0")? ena0:
+    assign input_reg_c0_wire_en =   (input_register_c0 == "CLOCK0")? ena0:
                                     (input_register_c0 == "UNREGISTERED")? 1'b1: 
                                     (input_register_c0 == "CLOCK1")? ena1:
                                     (input_register_c0 == "CLOCK2")? ena2: 1'b1;                            
@@ -36776,32 +41215,32 @@ module altmult_add (    dataa,
                                         (accum_sload_pipeline_register == "CLOCK2") ? ena2 :
                                         (accum_sload_pipeline_register == "CLOCK3") ? ena3 : 1'b1;
 
-	assign coeffsela_reg_wire_en =  (coefsel0_register == "CLOCK0") ? ena0:
+    assign coeffsela_reg_wire_en =  (coefsel0_register == "CLOCK0") ? ena0:
                                     (coefsel0_register == "UNREGISTERED") ? 1'b1:
                                     (coefsel0_register == "CLOCK1") ? ena1:
                                     (coefsel0_register == "CLOCK2") ? ena2: 1'b1;                                                                            
                                     
-	assign coeffselb_reg_wire_en =  (coefsel1_register == "CLOCK0") ? ena0:
+    assign coeffselb_reg_wire_en =  (coefsel1_register == "CLOCK0") ? ena0:
                                     (coefsel1_register == "UNREGISTERED") ? 1'b1:
                                     (coefsel1_register == "CLOCK1") ? ena1:
                                     (coefsel1_register == "CLOCK2") ? ena2: 1'b1;                                                                            
                                     
-	assign coeffselc_reg_wire_en =  (coefsel2_register == "CLOCK0") ? ena0:
+    assign coeffselc_reg_wire_en =  (coefsel2_register == "CLOCK0") ? ena0:
                                     (coefsel2_register == "UNREGISTERED") ? 1'b1:
                                     (coefsel2_register == "CLOCK1") ? ena1:
                                     (coefsel2_register == "CLOCK2") ? ena2: 1'b1;                                                                            
                                     
-	assign coeffseld_reg_wire_en =  (coefsel3_register == "CLOCK0") ? ena0:
+    assign coeffseld_reg_wire_en =  (coefsel3_register == "CLOCK0") ? ena0:
                                     (coefsel3_register == "UNREGISTERED") ? 1'b1:
                                     (coefsel3_register == "CLOCK1") ? ena1:
                                     (coefsel3_register == "CLOCK2") ? ena2: 1'b1;                                                                                                                                                                                        
 
-	assign systolic1_reg_wire_en =  (systolic_delay1 == "CLOCK0") ? ena0:
+    assign systolic1_reg_wire_en =  (systolic_delay1 == "CLOCK0") ? ena0:
                                     (systolic_delay1 == "UNREGISTERED") ? 1'b1:
                                     (systolic_delay1 == "CLOCK1") ? ena1:
                                     (systolic_delay1 == "CLOCK2") ? ena2: 1'b1;                                                                                                                                                                                        
                                     
-	assign systolic3_reg_wire_en =  (systolic_delay3 == "CLOCK0") ? ena0:
+    assign systolic3_reg_wire_en =  (systolic_delay3 == "CLOCK0") ? ena0:
                                     (systolic_delay3 == "UNREGISTERED") ? 1'b1:
                                     (systolic_delay3 == "CLOCK1") ? ena1:
                                     (systolic_delay3 == "CLOCK2") ? ena2: 1'b1;                                                                                                                                                                                                                            
@@ -36870,7 +41309,7 @@ module altmult_add (    dataa,
                                     (input_aclr_b3 == "ACLR1")? aclr1:
                                     (input_aclr_b3 == "ACLR2")? aclr2: 1'b0;
 
-	assign input_reg_c0_wire_clr =  (input_aclr_c0 == "UNREGISTERED")? 1'b0: 
+    assign input_reg_c0_wire_clr =  (input_aclr_c0 == "UNREGISTERED")? 1'b0: 
                                     (input_aclr_c0 == "ACLR0")? aclr0:
                                     (input_aclr_c0 == "ACLR1")? aclr1: 1'b0;
 
@@ -37202,27 +41641,27 @@ module altmult_add (    dataa,
                                         (accum_sload_pipeline_aclr == "ACLR2") ? aclr2 :
                                         (accum_sload_pipeline_aclr == "ACLR3") ? aclr3 : 1'b0;
                                    
-	assign coeffsela_reg_wire_clr =  (coefsel0_aclr == "ACLR0") ? aclr0 :
+    assign coeffsela_reg_wire_clr =  (coefsel0_aclr == "ACLR0") ? aclr0 :
                                      (coefsel0_aclr == "NONE") ? 1'b0:
                                      (coefsel0_aclr == "ACLR1") ? aclr1 : 1'b0;                                                                             
                                      
-	assign coeffselb_reg_wire_clr =  (coefsel1_aclr == "ACLR0") ? aclr0 :
+    assign coeffselb_reg_wire_clr =  (coefsel1_aclr == "ACLR0") ? aclr0 :
                                      (coefsel1_aclr == "NONE") ? 1'b0:
                                      (coefsel1_aclr == "ACLR1") ? aclr1 : 1'b0;                                                                             
                                      
-	assign coeffselc_reg_wire_clr =  (coefsel2_aclr == "ACLR0") ? aclr0 :
+    assign coeffselc_reg_wire_clr =  (coefsel2_aclr == "ACLR0") ? aclr0 :
                                      (coefsel2_aclr == "NONE") ? 1'b0:
                                      (coefsel2_aclr == "ACLR1") ? aclr1 : 1'b0;  
                                      
-	assign coeffseld_reg_wire_clr =  (coefsel3_aclr == "ACLR0") ? aclr0 :
+    assign coeffseld_reg_wire_clr =  (coefsel3_aclr == "ACLR0") ? aclr0 :
                                      (coefsel3_aclr == "NONE") ? 1'b0:
                                      (coefsel3_aclr == "ACLR1") ? aclr1 : 1'b0;                                                                                                                                                        
                                      
-	assign systolic1_reg_wire_clr =  (systolic_aclr1 == "ACLR0") ? aclr0 :
+    assign systolic1_reg_wire_clr =  (systolic_aclr1 == "ACLR0") ? aclr0 :
                                      (systolic_aclr1 == "NONE") ? 1'b0:
                                      (systolic_aclr1 == "ACLR1") ? aclr1 : 1'b0;                                                                                                                                                                                             
                                      
-	assign systolic3_reg_wire_clr =  (systolic_aclr3 == "ACLR0") ? aclr0 :
+    assign systolic3_reg_wire_clr =  (systolic_aclr3 == "ACLR0") ? aclr0 :
                                      (systolic_aclr3 == "NONE") ? 1'b0:
                                      (systolic_aclr3 == "ACLR1") ? aclr1 : 1'b0;                                                                                                                                                                                                                                  
 
@@ -37411,7 +41850,7 @@ module altmult_add (    dataa,
                 mult_b_reg[(4*int_width_b)-1:3*int_width_b] <= mult_b_pre[(4*int_width_b)-1:3*int_width_b];
 
     end
-	
+    
     // -------------------------------------------------------------------------------------
     // This block contains 1 register and 1 combinatorial block (to set mult_c[int_width_c-1:0])
     // Signal Registered : mult_c_pre[int_width_c-1:0]
@@ -38358,19 +42797,19 @@ module altmult_add (    dataa,
 
     always @(preadder_res_0)
     begin
-	preadder0_result  <= preadder_res_0; 
+    preadder0_result  <= preadder_res_0; 
     end
    
     always @(mult_a_wire[(int_width_a *1) -1 : (int_width_a*0)] or mult_b_wire[(int_width_b  *1) -1 : (int_width_b *0)] or
             sign_a_wire )
     begin
-    	if(stratixv_block && (preadder_mode == "COEF" || preadder_mode == "INPUT" || preadder_mode == "SQUARE" ))
-    	begin
-			if(preadder_direction_0 == "ADD")
-		        preadder_res_0 = do_preadder_add (0, sign_a_wire, sign_a_wire);
-			else
-				preadder_res_0 = do_preadder_sub (0, sign_a_wire, sign_a_wire);	
-		end
+        if(stratixv_block && (preadder_mode == "COEF" || preadder_mode == "INPUT" || preadder_mode == "SQUARE" ))
+        begin
+            if(preadder_direction_0 == "ADD")
+                preadder_res_0 = do_preadder_add (0, sign_a_wire, sign_a_wire);
+            else
+                preadder_res_0 = do_preadder_sub (0, sign_a_wire, sign_a_wire); 
+        end
     end
     
     // --------------------------------------------------------
@@ -38382,19 +42821,19 @@ module altmult_add (    dataa,
 
     always @(preadder_res_1)
     begin
-	preadder1_result  <= preadder_res_1; 
+    preadder1_result  <= preadder_res_1; 
     end
    
     always @(mult_a_wire[(int_width_a *2) -1 : (int_width_a*1)] or mult_b_wire[(int_width_b  *2) -1 : (int_width_b *1)] or
             sign_a_wire )
     begin
-    	if(stratixv_block && (preadder_mode == "COEF" || preadder_mode == "INPUT" || preadder_mode == "SQUARE" ))
-    	begin
-			if(preadder_direction_1 == "ADD")
-		        preadder_res_1 = do_preadder_add (1, sign_a_wire, sign_a_wire);
-			else
-				preadder_res_1 = do_preadder_sub (1, sign_a_wire, sign_a_wire);	
-		end
+        if(stratixv_block && (preadder_mode == "COEF" || preadder_mode == "INPUT" || preadder_mode == "SQUARE" ))
+        begin
+            if(preadder_direction_1 == "ADD")
+                preadder_res_1 = do_preadder_add (1, sign_a_wire, sign_a_wire);
+            else
+                preadder_res_1 = do_preadder_sub (1, sign_a_wire, sign_a_wire); 
+        end
     end
     
     // --------------------------------------------------------
@@ -38406,19 +42845,19 @@ module altmult_add (    dataa,
 
     always @(preadder_res_2)
     begin
-	preadder2_result  <= preadder_res_2; 
+    preadder2_result  <= preadder_res_2; 
     end
    
     always @(mult_a_wire[(int_width_a *3) -1 : (int_width_a*2)] or mult_b_wire[(int_width_b  *3) -1 : (int_width_b *2)] or
             sign_a_wire )
     begin
-    	if(stratixv_block && (preadder_mode == "COEF" || preadder_mode == "INPUT" || preadder_mode == "SQUARE" ))
-    	begin
-			if(preadder_direction_2 == "ADD")
-		        preadder_res_2 = do_preadder_add (2, sign_a_wire, sign_a_wire);
-			else
-				preadder_res_2 = do_preadder_sub (2, sign_a_wire, sign_a_wire);	
-		end
+        if(stratixv_block && (preadder_mode == "COEF" || preadder_mode == "INPUT" || preadder_mode == "SQUARE" ))
+        begin
+            if(preadder_direction_2 == "ADD")
+                preadder_res_2 = do_preadder_add (2, sign_a_wire, sign_a_wire);
+            else
+                preadder_res_2 = do_preadder_sub (2, sign_a_wire, sign_a_wire); 
+        end
     end
     
     // --------------------------------------------------------
@@ -38430,19 +42869,19 @@ module altmult_add (    dataa,
 
     always @(preadder_res_3)
     begin
-	preadder3_result  <= preadder_res_3; 
+    preadder3_result  <= preadder_res_3; 
     end
    
     always @(mult_a_wire[(int_width_a *4) -1 : (int_width_a*3)] or mult_b_wire[(int_width_b  *4) -1 : (int_width_b *3)] or
             sign_a_wire)
     begin
-    	if(stratixv_block && (preadder_mode == "COEF" || preadder_mode == "INPUT" || preadder_mode == "SQUARE" ))
-    	begin
-			if(preadder_direction_3 == "ADD")
-		        preadder_res_3 = do_preadder_add (3, sign_a_wire, sign_a_wire);
-			else
-				preadder_res_3 = do_preadder_sub (3, sign_a_wire, sign_a_wire);
-		end
+        if(stratixv_block && (preadder_mode == "COEF" || preadder_mode == "INPUT" || preadder_mode == "SQUARE" ))
+        begin
+            if(preadder_direction_3 == "ADD")
+                preadder_res_3 = do_preadder_add (3, sign_a_wire, sign_a_wire);
+            else
+                preadder_res_3 = do_preadder_sub (3, sign_a_wire, sign_a_wire);
+        end
     end
     
   
@@ -38561,10 +43000,10 @@ module altmult_add (    dataa,
         end
         else if(stratixv_block)
         begin
-        	if(systolic_delay1 == output_register)
-        		mult0_result  <= systolic_register1;
-        	else
-        		mult0_result  <= mult_res_0;
+            if(systolic_delay1 == output_register)
+                mult0_result  <= systolic_register1;
+            else
+                mult0_result  <= mult_res_0;
         end
         else
         begin
@@ -38572,7 +43011,7 @@ module altmult_add (    dataa,
         end
         
     end
-	
+    
     assign systolic_register1 = (systolic_delay1 == "UNREGISTERED")? mult_res_0
                                 : mult_res_reg_0;
     always @(posedge systolic1_reg_wire_clk or posedge systolic1_reg_wire_clr)
@@ -38588,9 +43027,9 @@ module altmult_add (    dataa,
                 mult_res_reg_0[(int_width_a + int_width_b - 1) : 0] <= mult_res_0;
             end
         end
-	end
-	
-	assign chainin_register1 = (systolic_delay1 == "UNREGISTERED")? 0
+    end
+    
+    assign chainin_register1 = (systolic_delay1 == "UNREGISTERED")? 0
                                 : chainin_reg;
     always @(posedge systolic1_reg_wire_clk or posedge systolic1_reg_wire_clr)
     begin
@@ -38605,7 +43044,7 @@ module altmult_add (    dataa,
                 chainin_reg[(width_chainin - 1) : 0] <= chainin_int;
             end
         end
-	end
+    end
    
     // this block simulates the pipeline register after the multiplier (for non-StratixIII families)
     // and the pipeline register after the 1st level adder (for Stratix III)
@@ -38649,39 +43088,39 @@ module altmult_add (    dataa,
     always @(mult_a_wire[(int_width_a *1) -1 : (int_width_a*0)] or mult_b_wire[(int_width_b  *1) -1 : (int_width_b *0)] or mult_c_wire[int_width_c-1:0] or
             preadder_res_wire[int_width_preadder - 1:0] or sign_a_wire or sign_b_wire)
     begin
-    	if(stratixv_block)
-    	begin
-    		preadder_sum1a = 0;
-    		preadder_sum2a = 0;
-			if(preadder_mode == "CONSTANT")
-			begin
-				preadder_sum1a = mult_a_wire >> (0 * int_width_a);
-				preadder_sum2a = coeffsel_a_pre;
-			end
-			else if(preadder_mode == "COEF")
-			begin
-				preadder_sum1a = preadder_res_wire[int_width_preadder - 1:0];
-				preadder_sum2a = coeffsel_a_pre;
-			end
-			else if(preadder_mode == "INPUT")
-			begin
-				preadder_sum1a = preadder_res_wire[int_width_preadder - 1:0];
-				preadder_sum2a = mult_c_wire;
-			end
-			else if(preadder_mode == "SQUARE")
-			begin
-				preadder_sum1a = preadder_res_wire[int_width_preadder - 1:0];
-				preadder_sum2a = preadder_res_wire[int_width_preadder - 1:0];
-			end
-			else
-			begin 
-				preadder_sum1a = mult_a_wire >> (0 * width_a);
-				preadder_sum2a = mult_b_wire >> (0 * width_b);
-			end	
-	    	mult_res_0 = do_multiply_stratixv(0, sign_a_wire, sign_b_wire);
-	    end
-    	else
-	        mult_res_0 = do_multiply (0, sign_a_wire, sign_b_wire);
+        if(stratixv_block)
+        begin
+            preadder_sum1a = 0;
+            preadder_sum2a = 0;
+            if(preadder_mode == "CONSTANT")
+            begin
+                preadder_sum1a = mult_a_wire >> (0 * int_width_a);
+                preadder_sum2a = coeffsel_a_pre;
+            end
+            else if(preadder_mode == "COEF")
+            begin
+                preadder_sum1a = preadder_res_wire[int_width_preadder - 1:0];
+                preadder_sum2a = coeffsel_a_pre;
+            end
+            else if(preadder_mode == "INPUT")
+            begin
+                preadder_sum1a = preadder_res_wire[int_width_preadder - 1:0];
+                preadder_sum2a = mult_c_wire;
+            end
+            else if(preadder_mode == "SQUARE")
+            begin
+                preadder_sum1a = preadder_res_wire[int_width_preadder - 1:0];
+                preadder_sum2a = preadder_res_wire[int_width_preadder - 1:0];
+            end
+            else
+            begin 
+                preadder_sum1a = mult_a_wire >> (0 * width_a);
+                preadder_sum2a = mult_b_wire >> (0 * width_b);
+            end 
+            mult_res_0 = do_multiply_stratixv(0, sign_a_wire, sign_b_wire);
+        end
+        else
+            mult_res_0 = do_multiply (0, sign_a_wire, sign_b_wire);
     end
   
     // ------------------------------------------------------------------------
@@ -38831,32 +43270,32 @@ module altmult_add (    dataa,
     always @(mult_a_wire[(int_width_a *2) -1 : (int_width_a*1)] or mult_b_wire[(int_width_b  *2) -1 : (int_width_b *1)] or 
             preadder_res_wire[(((int_width_preadder) *2) - 1) : (int_width_preadder)] or sign_a_wire or sign_b_wire)
     begin
-    	if(stratixv_block)
-    	begin
-    		preadder_sum1a = 0;
-    		preadder_sum2a = 0;
-			if(preadder_mode == "CONSTANT" )
-			begin
-				preadder_sum1a = mult_a_wire >> (1 * int_width_a);
-				preadder_sum2a = coeffsel_b_pre;
-			end
-			else if(preadder_mode == "COEF")
-			begin
-				preadder_sum1a = preadder_res_wire[(((int_width_preadder) *2) - 1) : (int_width_preadder)];
-				preadder_sum2a = coeffsel_b_pre;
-			end
-			else if(preadder_mode == "SQUARE")
-			begin
-				preadder_sum1a = preadder_res_wire[(((int_width_preadder) *2) - 1) : (int_width_preadder)];
-				preadder_sum2a = preadder_res_wire[(((int_width_preadder) *2) - 1) : (int_width_preadder)];
-			end
-			else
-			begin 
-				preadder_sum1a = mult_a_wire >> (1 * int_width_a);
-				preadder_sum2a = mult_b_wire >> (1 * int_width_b);
-			end	
-	    	mult_res_1 = do_multiply_stratixv(1, sign_a_wire, sign_b_wire);
-	    end
+        if(stratixv_block)
+        begin
+            preadder_sum1a = 0;
+            preadder_sum2a = 0;
+            if(preadder_mode == "CONSTANT" )
+            begin
+                preadder_sum1a = mult_a_wire >> (1 * int_width_a);
+                preadder_sum2a = coeffsel_b_pre;
+            end
+            else if(preadder_mode == "COEF")
+            begin
+                preadder_sum1a = preadder_res_wire[(((int_width_preadder) *2) - 1) : (int_width_preadder)];
+                preadder_sum2a = coeffsel_b_pre;
+            end
+            else if(preadder_mode == "SQUARE")
+            begin
+                preadder_sum1a = preadder_res_wire[(((int_width_preadder) *2) - 1) : (int_width_preadder)];
+                preadder_sum2a = preadder_res_wire[(((int_width_preadder) *2) - 1) : (int_width_preadder)];
+            end
+            else
+            begin 
+                preadder_sum1a = mult_a_wire >> (1 * int_width_a);
+                preadder_sum2a = mult_b_wire >> (1 * int_width_b);
+            end 
+            mult_res_1 = do_multiply_stratixv(1, sign_a_wire, sign_b_wire);
+        end
         else if(input_source_b0 == "LOOPBACK")
             mult_res_1 = do_multiply_loopback (1, sign_a_wire, sign_b_wire);
         else
@@ -38978,9 +43417,9 @@ module altmult_add (    dataa,
         end
         else if(stratixv_block)
         begin
-        	if(systolic_delay1 == output_register)
-        		mult2_result  <= systolic_register3;
-        	else
+            if(systolic_delay1 == output_register)
+                mult2_result  <= systolic_register3;
+            else
                 mult2_result  <= mult_res_2;
         end
         else
@@ -38988,7 +43427,7 @@ module altmult_add (    dataa,
             mult2_result  <= mult_res_2; 
         end
     end
-	
+    
     assign systolic_register3 = (systolic_delay3 == "UNREGISTERED")? mult_res_2
                                 : mult_res_reg_2;
     always @(posedge systolic3_reg_wire_clk or posedge systolic3_reg_wire_clr)
@@ -39004,8 +43443,8 @@ module altmult_add (    dataa,
                 mult_res_reg_2[(int_width_a + int_width_b - 1) : 0] <= mult_res_2;
             end
         end
-	end
-	
+    end
+    
     // simulate the register after the multiplier (for non-Stratix III families)
     // and simulate the register after the 1st adder for Stratix III family
     always @(posedge multiplier_reg2_wire_clk or posedge multiplier_reg2_wire_clr)
@@ -39045,34 +43484,34 @@ module altmult_add (    dataa,
     always @(mult_a_wire[(int_width_a *3) -1 : (int_width_a*2)] or mult_b_wire[(int_width_b  *3) -1 : (int_width_b *2)] or
             preadder_res_wire[((int_width_preadder) *3) -1 : (2*(int_width_preadder))] or sign_a_wire or sign_b_wire)
     begin
-    	if(stratixv_block)
-    	begin
-    		preadder_sum1a = 0;
-    		preadder_sum2a = 0;
-			if(preadder_mode == "CONSTANT")
-			begin
-				preadder_sum1a = mult_a_wire >> (2 * int_width_a);
-				preadder_sum2a = coeffsel_c_pre;
-			end
-			else if(preadder_mode == "COEF")
-			begin
-				preadder_sum1a = preadder_res_wire[((int_width_preadder) *3) -1 : (2*(int_width_preadder))];
-				preadder_sum2a = coeffsel_c_pre;
-			end
-			else if(preadder_mode == "SQUARE")
-			begin
-				preadder_sum1a = preadder_res_wire[((int_width_preadder) *3) -1 : (2*(int_width_preadder))];
-				preadder_sum2a = preadder_res_wire[((int_width_preadder) *3) -1 : (2*(int_width_preadder))];
-			end
-			else
-			begin 
-				preadder_sum1a = mult_a_wire >> (2 * int_width_a);
-				preadder_sum2a = mult_b_wire >> (2 * int_width_b);
-			end	
-    		mult_res_2 = do_multiply_stratixv (2, sign_a_wire, sign_b_wire);
-    	end
-    	else
-        	mult_res_2 = do_multiply (2, sign_a_wire, sign_b_wire);
+        if(stratixv_block)
+        begin
+            preadder_sum1a = 0;
+            preadder_sum2a = 0;
+            if(preadder_mode == "CONSTANT")
+            begin
+                preadder_sum1a = mult_a_wire >> (2 * int_width_a);
+                preadder_sum2a = coeffsel_c_pre;
+            end
+            else if(preadder_mode == "COEF")
+            begin
+                preadder_sum1a = preadder_res_wire[((int_width_preadder) *3) -1 : (2*(int_width_preadder))];
+                preadder_sum2a = coeffsel_c_pre;
+            end
+            else if(preadder_mode == "SQUARE")
+            begin
+                preadder_sum1a = preadder_res_wire[((int_width_preadder) *3) -1 : (2*(int_width_preadder))];
+                preadder_sum2a = preadder_res_wire[((int_width_preadder) *3) -1 : (2*(int_width_preadder))];
+            end
+            else
+            begin 
+                preadder_sum1a = mult_a_wire >> (2 * int_width_a);
+                preadder_sum2a = mult_b_wire >> (2 * int_width_b);
+            end 
+            mult_res_2 = do_multiply_stratixv (2, sign_a_wire, sign_b_wire);
+        end
+        else
+            mult_res_2 = do_multiply (2, sign_a_wire, sign_b_wire);
     end
 
 
@@ -39224,70 +43663,70 @@ module altmult_add (    dataa,
     always @(mult_a_wire[(int_width_a *4) -1 : (int_width_a*3)] or mult_b_wire[(int_width_b  *4) -1 : (int_width_b *3)] or
             preadder_res_wire[((int_width_preadder) *4) -1 : 3*(int_width_preadder)] or sign_a_wire or sign_b_wire)
     begin
-    	if(stratixv_block)
-    	begin
-    		preadder_sum1a = 0;
-    		preadder_sum2a = 0;
-			if(preadder_mode == "CONSTANT")
-			begin
-				preadder_sum1a = mult_a_wire >> (3 * int_width_a);
-				preadder_sum2a = coeffsel_d_pre;
-			end
-			else if(preadder_mode == "COEF")
-			begin
-				preadder_sum1a = preadder_res_wire[((int_width_preadder) *4) -1 : 3*(int_width_preadder)];
-				preadder_sum2a = coeffsel_d_pre;
-			end
-			else if(preadder_mode == "SQUARE")
-			begin
-				preadder_sum1a = preadder_res_wire[((int_width_preadder) *4) -1 : 3*(int_width_preadder)];
-				preadder_sum2a = preadder_res_wire[((int_width_preadder) *4) -1 : 3*(int_width_preadder)];
-			end
-			else
-			begin 
-				preadder_sum1a = mult_a_wire >> (3 * int_width_a);
-				preadder_sum2a = mult_b_wire >> (3 * int_width_b);
-			end	
-    		mult_res_3 = do_multiply_stratixv (3, sign_a_wire, sign_b_wire);
-    	end
-    	else
-        	mult_res_3 = do_multiply (3, sign_a_wire, sign_b_wire);
+        if(stratixv_block)
+        begin
+            preadder_sum1a = 0;
+            preadder_sum2a = 0;
+            if(preadder_mode == "CONSTANT")
+            begin
+                preadder_sum1a = mult_a_wire >> (3 * int_width_a);
+                preadder_sum2a = coeffsel_d_pre;
+            end
+            else if(preadder_mode == "COEF")
+            begin
+                preadder_sum1a = preadder_res_wire[((int_width_preadder) *4) -1 : 3*(int_width_preadder)];
+                preadder_sum2a = coeffsel_d_pre;
+            end
+            else if(preadder_mode == "SQUARE")
+            begin
+                preadder_sum1a = preadder_res_wire[((int_width_preadder) *4) -1 : 3*(int_width_preadder)];
+                preadder_sum2a = preadder_res_wire[((int_width_preadder) *4) -1 : 3*(int_width_preadder)];
+            end
+            else
+            begin 
+                preadder_sum1a = mult_a_wire >> (3 * int_width_a);
+                preadder_sum2a = mult_b_wire >> (3 * int_width_b);
+            end 
+            mult_res_3 = do_multiply_stratixv (3, sign_a_wire, sign_b_wire);
+        end
+        else
+            mult_res_3 = do_multiply (3, sign_a_wire, sign_b_wire);
     end
     
     //------------------------------
     // Assign statements for coefficient storage
     //------------------------------
     assign coeffsel_a_pre = (coeffsel_a_wire == 0)? coef0_0 :
-    						(coeffsel_a_wire == 1)? coef0_1 :
-    						(coeffsel_a_wire == 2)? coef0_2 :
-    						(coeffsel_a_wire == 3)? coef0_3 :
-    						(coeffsel_a_wire == 4)? coef0_4 :
-    						(coeffsel_a_wire == 5)? coef0_5 :
-    						(coeffsel_a_wire == 6)? coef0_6 : coef0_7 ;
-    						
-	assign coeffsel_b_pre = (coeffsel_b_wire == 0)? coef1_0 :
-    						(coeffsel_b_wire == 1)? coef1_1 :
-    						(coeffsel_b_wire == 2)? coef1_2 :
-    						(coeffsel_b_wire == 3)? coef1_3 :
-    						(coeffsel_b_wire == 4)? coef1_4 :
-    						(coeffsel_b_wire == 5)? coef1_5 :
-    						(coeffsel_b_wire == 6)? coef1_6 : coef1_7 ;
-    						
-	assign coeffsel_c_pre = (coeffsel_c_wire == 0)? coef2_0 :
-    						(coeffsel_c_wire == 1)? coef2_1 :
-    						(coeffsel_c_wire == 2)? coef2_2 :
-    						(coeffsel_c_wire == 3)? coef2_3 :
-    						(coeffsel_c_wire == 4)? coef2_4 :
-    						(coeffsel_c_wire == 5)? coef2_5 :
-    						(coeffsel_c_wire == 6)? coef2_6 : coef2_7 ;
-    						
-	assign coeffsel_d_pre = (coeffsel_d_wire == 0)? coef3_0 :
-    						(coeffsel_d_wire == 1)? coef3_1 :
-    						(coeffsel_d_wire == 2)? coef3_2 :
-    						(coeffsel_d_wire == 3)? coef3_3 :
-    						(coeffsel_d_wire == 4)? coef3_4 :
-    						(coeffsel_d_wire == 5)? coef3_5 :
-    						(coeffsel_d_wire == 6)? coef3_6 : coef3_7 ;    						    						    						
+                            (coeffsel_a_wire == 1)? coef0_1 :
+                            (coeffsel_a_wire == 2)? coef0_2 :
+                            (coeffsel_a_wire == 3)? coef0_3 :
+                            (coeffsel_a_wire == 4)? coef0_4 :
+                            (coeffsel_a_wire == 5)? coef0_5 :
+                            (coeffsel_a_wire == 6)? coef0_6 : coef0_7 ;
+                            
+    assign coeffsel_b_pre = (coeffsel_b_wire == 0)? coef1_0 :
+                            (coeffsel_b_wire == 1)? coef1_1 :
+                            (coeffsel_b_wire == 2)? coef1_2 :
+                            (coeffsel_b_wire == 3)? coef1_3 :
+                            (coeffsel_b_wire == 4)? coef1_4 :
+                            (coeffsel_b_wire == 5)? coef1_5 :
+                            (coeffsel_b_wire == 6)? coef1_6 : coef1_7 ;
+                            
+    assign coeffsel_c_pre = (coeffsel_c_wire == 0)? coef2_0 :
+                            (coeffsel_c_wire == 1)? coef2_1 :
+                            (coeffsel_c_wire == 2)? coef2_2 :
+                            (coeffsel_c_wire == 3)? coef2_3 :
+                            (coeffsel_c_wire == 4)? coef2_4 :
+                            (coeffsel_c_wire == 5)? coef2_5 :
+                            (coeffsel_c_wire == 6)? coef2_6 : coef2_7 ;
+                            
+    assign coeffsel_d_pre = (coeffsel_d_wire == 0)? coef3_0 :
+                            (coeffsel_d_wire == 1)? coef3_1 :
+                            (coeffsel_d_wire == 2)? coef3_2 :
+                            (coeffsel_d_wire == 3)? coef3_3 :
+                            (coeffsel_d_wire == 4)? coef3_4 :
+                            (coeffsel_d_wire == 5)? coef3_5 :
+                            (coeffsel_d_wire == 6)? coef3_6 : coef3_7 ;                                                                                 
     //------------------------------
     // Continuous assign statements
     //------------------------------
@@ -39316,11 +43755,11 @@ module altmult_add (    dataa,
                                                             (input_source_a3 == "SCANA")? mult_a_wire[(3*int_width_a)-1:2*int_width_a] :
                                                             (sourcea_wire[3] == 1)? mult_a_wire[(3*int_width_a)-1:2*int_width_a] : dataa_int[(4*int_width_a)-1:3*int_width_a];
 
-    assign scanouta = (stratixiii_block == 0) ?
+    assign scanouta = (altera_mult_add_block == 1) ? 'bz : (stratixiii_block == 0) ?
                         mult_a_wire[(number_of_multipliers * int_width_a) - 1 : ((number_of_multipliers-1) * int_width_a) + (int_width_a - width_a)]
                         : scanouta_wire[int_width_a - 1: 0];
 
-    assign scanoutb = (chainout_adder == "YES" && (width_result > width_a + width_b + 8))? 
+    assign scanoutb = (altera_mult_add_block == 1) ? 'bz : (chainout_adder == "YES" && (width_result > width_a + width_b + 8))? 
                         mult_b_wire[(number_of_multipliers * int_width_b) - 1  - (int_width_b - width_b) : ((number_of_multipliers-1) * int_width_b)]:
                         mult_b_wire[(number_of_multipliers * int_width_b) - 1 : ((number_of_multipliers-1) * int_width_b) + (int_width_b - width_b)];
 
@@ -39337,7 +43776,7 @@ module altmult_add (    dataa,
                                             (input_source_b0 == "SCANB")? ((mult0_source_scanin_en == 1'b0)? i_scaninb : datab_int[int_width_b-1:0]) :
                                             (sourceb_wire[0] == 1)? scaninb_z : 
                                             mult_b_pre_temp[int_width_b-1:0];
-	
+    
     assign mult_b_pre[(2*int_width_b)-1:int_width_b] =  (stratixv_block == 1)? datab_int[(2*width_b)-1 : width_b ]:
                                                         (input_source_b1 == "DATAB") ? 
                                                         ((input_source_b0 == "LOOPBACK") ? datab_int[int_width_b -1 :0] :
@@ -39410,7 +43849,7 @@ module altmult_add (    dataa,
     assign zeroloopback_int = (input_source_b0 == "LOOPBACK") ? zero_loopback : 1'b0;
     
     assign accumsload_int = (stratixv_block == 1)? accum_sload :
-    						(accumulator == "YES") ? 
+                            (accumulator == "YES") ? 
                             (((output_rounding == "VARIABLE") && (chainout_adder == "NO")) ? output_round : accum_sload)
                             : 1'b0;
                             
@@ -39602,7 +44041,7 @@ module altmult_add (    dataa,
                         begin
                             if (accumulator == "YES") //|| accum_wire == 1)
                             begin
-                    	        acc_feedback_reg <= round_sat_in_result[2*int_width_result-1 : 0];
+                                acc_feedback_reg <= round_sat_in_result[2*int_width_result-1 : 0];
                             end
                         end
                          
@@ -39626,7 +44065,7 @@ module altmult_add (    dataa,
                     end
                     if (accumulator == "YES") //|| accum_wire == 1)
                     begin
-                    	acc_feedback_reg <= round_sat_blk_res[2*int_width_result-1 : 0];
+                        acc_feedback_reg <= round_sat_blk_res[2*int_width_result-1 : 0];
                     end
                     
                     loopback_wire_reg <= round_sat_blk_res[int_width_result + (int_width_b - width_b) - 1 : int_width_b - width_b];
@@ -39963,7 +44402,7 @@ module altmult_add (    dataa,
                                                         ((stratixv_block)?(acc_feedback_reg[2*int_width_result - 1 : 0] & ({2*int_width_result{~accumsload_wire}})):(acc_feedback_reg[2*int_width_result - 1 : 0] & ({2*int_width_result{~accumsload_pipe_wire}})))) :
                                                         0;
                                                         
-	assign load_const_value = ((loadconst_value > 63) ||(loadconst_value < 0) ) ?   0: (1 << loadconst_value);
+    assign load_const_value = ((loadconst_value > 63) ||(loadconst_value < 0) ) ?   0: (1 << loadconst_value);
     
     assign accumsload_sel = (accumsload_wire) ? load_const_value : acc_feedback ;   
     
@@ -39982,9 +44421,9 @@ module altmult_add (    dataa,
                 adder1_res_reg_0[2*int_width_result - 1: 0] <= adder1_res_wire;
             end
         end
-	end       
-	
-	assign adder1_systolic_register1 = (systolic_delay3 == "UNREGISTERED")? adder1_res_wire
+    end       
+    
+    assign adder1_systolic_register1 = (systolic_delay3 == "UNREGISTERED")? adder1_res_wire
                                 : adder1_res_reg_1;
     always @(posedge output_reg_wire_clk or posedge output_reg_wire_clr)
     begin
@@ -39999,10 +44438,10 @@ module altmult_add (    dataa,
                 adder1_res_reg_1[2*int_width_result - 1: 0] <= adder1_systolic_register0;
             end
         end
-	end  	                                               
+    end                                                    
     
-	assign adder1_systolic = (number_of_multipliers == 2)? adder1_res_wire : adder1_systolic_register1;
-	
+    assign adder1_systolic = (number_of_multipliers == 2)? adder1_res_wire : adder1_systolic_register1;
+    
     // 2nd stage adder/accumulator in Stratix III
     always @(adder1_res_wire[int_width_result - 1 : 0] or adder3_res_wire[int_width_result - 1 : 0] or sign_a_wire or sign_b_wire or accumsload_sel or adder1_systolic or
                 acc_feedback[2*int_width_result - 1 : 0] or adder1_res_wire or adder3_res_wire or mult_res_0 or mult_res_1 or mult_res_2 or mult_res_3)
@@ -40016,15 +44455,15 @@ module altmult_add (    dataa,
             begin
                 if(accumsload_wire)
                 begin
-            	    round_sat_in_result = adder1_systolic + adder3_res_ext + accumsload_sel;
-            	end
-            	else
-            	begin
-            	    if(accumulator == "YES")
-            	        round_sat_in_result = adder1_systolic + adder3_res_ext + accumsload_sel;
-            	    else
-            	        round_sat_in_result = adder1_systolic + adder3_res_ext ;
-            	end
+                    round_sat_in_result = adder1_systolic + adder3_res_ext + accumsload_sel;
+                end
+                else
+                begin
+                    if(accumulator == "YES")
+                        round_sat_in_result = adder1_systolic + adder3_res_ext + accumsload_sel;
+                    else
+                        round_sat_in_result = adder1_systolic + adder3_res_ext ;
+                end
             end
             else if (accumulator == "NO")
             begin
@@ -40340,9 +44779,7 @@ module altmult_add (    dataa,
             end            
                       
             // prevent the previous overflow_status being taken into consideration when determining the overflow
-            if ((overflow_status == 1'b1) && (port_output_is_overflow == "PORT_UNSUED"))
-                overflow_status_bit_pos = int_width_a + int_width_b - 1;
-            else if ((overflow_status == 1'b0) && (port_output_is_overflow == "PORT_UNUSED") && (chainout_adder == "NO"))
+            if ((overflow_status == 1'b0) && (port_output_is_overflow == "PORT_UNUSED") && (chainout_adder == "NO"))
                 overflow_status_bit_pos = int_width_result + int_mult_diff_bit - 1;
             else
                 overflow_status_bit_pos = int_width_result + 1;
@@ -43026,7 +47463,6 @@ module altddio_out (
     sset,       // synchronous set
     sclr,       // synchronous clear
     oe,         // output enable for dataout
-    hrbypass,   // halfrate bypass port
     dataout,    // DDR data output,
     oe_out      // DDR OE output,
 );
@@ -43051,7 +47487,6 @@ input aclr;
 input sset;
 input sclr;
 input oe;
-input hrbypass;
 
 // OUTPUT PORT DECLARATION
 output [width-1:0] dataout;
@@ -43078,7 +47513,6 @@ tri0 aset; // default aset to 0
 tri0 aclr; // default aclr to 0
 tri0 sset; // default sset to 0
 tri0 sclr; // default sclr to 0
-tri0 hrbypass; // default sclr to 0
 tri1 outclocken; // default outclocken to 1
 tri1 oe;   // default oe to 1
 
@@ -43174,9 +47608,19 @@ begin
         end
         else
         begin
-            dataout_h <= datain_h;
-            dataout_l <= datain_l;
-            dataout_tmp <= datain_h;
+            if (is_inverted_output_ddio &&
+            (invert_output == "ON"))
+            begin
+                dataout_h <= ~datain_h;
+                dataout_l <= ~datain_l;
+                dataout_tmp <= ~datain_h;
+            end
+            else
+            begin
+                dataout_h <= datain_h;
+                dataout_l <= datain_l;
+                dataout_tmp <= datain_h;
+            end
 
             // register the output enable signal
             oe_rgd <= oe;
@@ -43207,7 +47651,7 @@ begin
             oe_reg_ext <= oe_rgd;
         end
 
-        dataout_tmp <= dataout_l;
+        dataout_tmp <= dataout_l;           
     end
 end
 
@@ -43217,11 +47661,7 @@ begin
     // if output is enabled
     if (output_enable == 1'b1)
     begin
-        if (is_inverted_output_ddio &&
-            (invert_output == "ON"))
-            dataout = ~dataout_tmp;
-        else
-            dataout = dataout_tmp;
+        dataout = dataout_tmp;
     end    
     else // output is disabled
         dataout = {width{1'bZ}};
@@ -43405,7 +47845,7 @@ endmodule // altddio_bidir
 // MODULE DECLARATION
 module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
                 wraddressstall, rdaddressstall, byteena,
-                outclock, outclocken, aclr, q);
+                outclock, outclocken, aclr, sclr, q);
 
 // PARAMETER DECLARATION
     parameter width = 1;
@@ -43427,12 +47867,19 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
     parameter rdcontrol_aclr = "ON";
     parameter outdata_reg = "UNREGISTERED";
     parameter outdata_aclr = "ON";
+    parameter outdata_sclr = "ON";
     parameter maximum_depth = 2048;
     parameter intended_device_family = "Stratix";
     parameter ram_block_type = "AUTO";
     parameter width_byteena = 1;
     parameter byte_size = 0;
     parameter read_during_write_mode_mixed_ports = "DONT_CARE";
+
+`ifdef ENA_INPUT_X_PROP_ALTDPRAM
+    parameter enable_input_x_prop_altdpram = 1;
+`else
+    parameter enable_input_x_prop_altdpram = 0;
+`endif
 
 // LOCAL_PARAMETERS_BEGIN
 
@@ -43443,11 +47890,6 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
     parameter i_width_byteena = ((width_byteena == 0) && (i_byte_size != 0)) ? width / byte_size : width_byteena;
     parameter i_read_during_write = ((rdaddress_reg == "INCLOCK") && (wrcontrol_reg == "INCLOCK") && (outdata_reg == "INCLOCK")) ?
                                     read_during_write_mode_mixed_ports : "NEW_DATA";
-    parameter write_at_low_clock = ((wrcontrol_reg == "INCLOCK") &&
-                                    (((lpm_hint == "USE_EAB=ON") && (use_eab != "OFF")) || 
-                                    (use_eab == "ON") || 
-                                    (is_lutram == 1))) ?
-                                    1 : 0;
 
 // LOCAL_PARAMETERS_END
 
@@ -43462,6 +47904,7 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
     input  outclock;             // Output or read clock
     input  outclocken;           // Clock enable for outclock
     input  aclr;                 // Asynchronous clear input
+    input  sclr;                 // Synchronous clear input
     input  wraddressstall;              // Address stall input for write port
     input  rdaddressstall;              // Address stall input for read port
     input  [i_width_byteena-1:0] byteena; // Byteena mask input
@@ -43493,11 +47936,15 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
     reg [width-1:0] i_lutram_output_reg_inclk;
     reg [width-1:0] i_lutram_output_reg_outclk;
     reg [width-1:0] i_old_data;
+    reg [width-1:0] i_byteena_data;
     reg rden_low_output_0;
     reg first_clk_rising_edge;
     reg is_stxiii_style_ram;
     reg is_stxv_style_ram;
-
+    reg is_rising_edge_write_ena;
+    reg is_write_at_low_clock;
+    reg i_inclock_output_unreg;
+    
 // INTERNAL WIRE DECLARATION
     wire aclr_on_wraddress;
     wire aclr_on_wrcontrol;
@@ -43505,6 +47952,7 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
     wire aclr_on_rdcontrol;
     wire aclr_on_indata;
     wire aclr_on_outdata;
+    wire sclr_on_outdata;
     wire [width-1:0] data_tmp;
     wire [width-1:0] previous_read_data;
     wire [width-1:0] new_read_data;
@@ -43523,6 +47971,7 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
     tri1 outclocken;
     tri1 rden;
     tri0 aclr;
+    tri0 sclr;
     tri0 wraddressstall;
     tri0 rdaddressstall;
     tri1 [i_width_byteena-1:0] i_byteena;
@@ -43556,7 +48005,17 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
 
         is_stxiii_style_ram = dev.FEATURE_FAMILY_STRATIXIII(intended_device_family);
         is_stxv_style_ram = dev.FEATURE_FAMILY_STRATIXV(intended_device_family);
+    is_rising_edge_write_ena = dev.FEATURE_FAMILY_STRATIXV(intended_device_family) 
+            || dev.FEATURE_FAMILY_ARRIAV(intended_device_family) 
+            || dev.FEATURE_FAMILY_ARRIA10(intended_device_family) 
+            || dev.FEATURE_FAMILY_CYCLONE10GX(intended_device_family);
 
+        is_write_at_low_clock = ((wrcontrol_reg == "INCLOCK") &&
+                (((lpm_hint == "USE_EAB=ON") && (use_eab != "OFF")) || 
+                (use_eab == "ON") || 
+                (is_lutram == 1))) &&
+                (is_rising_edge_write_ena != 1)?
+                1 : 0;
         if ((indata_aclr == "ON") && ((is_stxv_style_ram == 1) || (is_stxiii_style_ram == 1)))
         begin
             $display("Warning: %s device family does not support aclr on input data. Aclr on this port will be ignored.", intended_device_family);
@@ -43605,16 +48064,8 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
                 mem_data[i] = 0;
         else
         begin
-`ifdef NO_PLI
-            $readmemh(lpm_file, mem_data);
-`else
-    `ifdef USE_RIF
-            $readmemh(lpm_file, mem_data);
-    `else
             mem.convert_to_ver_file(lpm_file, width, ram_initf);
             $readmemh(ram_initf, mem_data);
-    `endif            
-`endif
         end
 
         // Power-up conditions
@@ -43631,10 +48082,12 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
         i_byteena_mask = {width{1'b1}};
         i_byteena_mask_at_low = {width{1'b1}};
         i_byteena_mask_x = {width{1'bx}};
+    i_byteena_data = 0;
         wren_at_low = 0;
         wren_at_high = 0;
         i_lutram_output_reg_inclk = 0;
         i_lutram_output_reg_outclk = 0;
+        i_inclock_output_unreg = 1;
         wraddress_at_low = 0;
         wraddress_at_high = 0;
         i_old_data = 0;
@@ -43684,10 +48137,33 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
         else if ((inclocken == 1) && (rdaddressstall == 0))
             rdaddress_at_inclock <= rdaddress;
 
+    if (enable_input_x_prop_altdpram && (intended_device_family == "Stratix 10"))
+    begin
+        if (is_write_at_low_clock == 0)
+        begin   
+            if (wren === 1'bx || inclock === 1'bx || inclocken === 1'bx)
+            begin
+            mem_data[wraddress] <= 'bx;
+            end                     
+            else if (wren === 1'b1 && wraddressstall === 1'bx)
+            begin
+            mem_data[wraddress] <= 'bx;
+            end
+            else if (wren === 1'b1 && (^wraddress) === 1'bx)
+            begin
+            for (i = 0; i < i_numwords; i = i + 1)
+            begin
+                mem_data[i] <= 'bx;
+            end
+            end
+        end
+    end
+
         if ((aclr == 1) && (rdcontrol_aclr == "ON") && (rdcontrol_reg != "UNREGISTERED") )
             rden_at_inclock <= 0;
         else if (inclocken == 1)
             rden_at_inclock <= rden;
+        i_inclock_output_unreg <= 1;
 
         if ((aclr == 1) && (outdata_aclr == "ON") && (outdata_reg == "INCLOCK") )
             mem_output_at_inclock <= 0;
@@ -43695,6 +48171,37 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
         begin
             mem_output_at_inclock <= mem_output;
         end
+
+    if (enable_input_x_prop_altdpram && (intended_device_family == "Stratix 10"))
+    begin
+            if (rden_at_inclock === 1'bx || inclock === 1'bx || inclocken === 1'bx)
+            begin
+            i_inclock_output_unreg <= 'bx;
+            mem_output_at_inclock <= 'bx;
+            i_lutram_output_reg_inclk <= 'bx;
+            end                     
+            else if (rden_at_inclock === 1'b1 && (rdaddressstall === 1'bx || (^rdaddress_tmp) === 1'bx))
+            begin
+            i_inclock_output_unreg <= 'bx;
+            mem_output_at_inclock <= 'bx;
+                    i_lutram_output_reg_inclk <= 'bx;
+            end
+            else if (aclr_on_outdata === 1'bx && ((outdata_reg == "INCLOCK") || (outdata_reg == "UNREGISTERED")))
+        begin
+            i_inclock_output_unreg <= 'bx;
+            mem_output_at_inclock <= 'bx;
+                i_lutram_output_reg_inclk <= 'bx;
+            end
+            else if (outclocken === 1'b1)
+            begin
+            if (sclr_on_outdata === 1'bx && ((outdata_reg == "INCLOCK") || (outdata_reg == "UNREGISTERED")))
+            begin
+                i_inclock_output_unreg <= 'bx;
+                mem_output_at_inclock <= 'bx;
+                        i_lutram_output_reg_inclk <= 'bx;
+            end
+            end
+    end
 
         if (inclocken == 1)
         begin
@@ -43708,7 +48215,7 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
             begin
                 for (iter_byteena = 0; iter_byteena < width; iter_byteena = iter_byteena + 1)
                 begin
-                    i_byteena_mask[iter_byteena] <= i_byteena[iter_byteena/i_byte_size];
+                    i_byteena_mask[iter_byteena] <= i_byteena[iter_byteena/i_byte_size] !== 1'bx ? i_byteena[iter_byteena/i_byte_size] : (((is_stxv_style_ram == 1) || (is_stxiii_style_ram == 1)) && (enable_input_x_prop_altdpram == 1)) ? 1'bx : 1'b1;
                     i_byteena_mask_out[iter_byteena] <= (i_byteena[iter_byteena/i_byte_size])? 1'b0 : 1'bx;
                     i_byteena_mask_x[iter_byteena] <= ((i_byteena[iter_byteena/i_byte_size]) || (i_byteena[iter_byteena/i_byte_size] == 1'b0)) ? 1'bx : 1'b0;
                 end
@@ -43745,12 +48252,12 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
     begin
         if ((is_stxv_style_ram == 1) || (is_stxiii_style_ram == 1))
         begin
-                if (inclocken == 1)
-                begin
+        if (inclocken == 1)
+        begin
                     data_write_at_low <= data_write_at_high;
                     wraddress_at_low <= wraddress_at_high;
                     wren_at_low <= wren_at_high;
-                end
+        end
 
         end
         else
@@ -43780,6 +48287,27 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
         if (inclocken == 1)
             rdaddress_at_inclock_low <= rdaddress_at_inclock;
 
+    if (enable_input_x_prop_altdpram && (intended_device_family == "Stratix 10"))
+    begin 
+        if (is_write_at_low_clock == 1)
+        begin
+            if (wren === 1'bx || inclock === 1'bx || inclocken === 1'bx)
+            begin
+            mem_data[wraddress] <= 'bx;
+            end                             
+            else if (wren === 1'b1 && wraddressstall === 1'bx)
+            begin
+            mem_data[wraddress] <= 'bx;
+            end
+            else if (wren === 1'b1 && (^wraddress) === 1'bx)
+            begin
+            for (i = 0; i < i_numwords; i = i + 1)
+            begin
+                mem_data[i] <= 'bx;
+            end
+            end
+        end
+    end
 
     end
 
@@ -43804,10 +48332,43 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
         end
         else if (outclocken == 1)
         begin
-            mem_output_at_outclock <= mem_output;
-            i_lutram_output_reg_outclk <= mem_data[rdaddress_tmp];
-        end
-            
+           if ((sclr == 1) && (outdata_sclr == "ON") && (outdata_reg == "OUTCLOCK"))
+           begin
+               mem_output_at_outclock <= 0;
+               i_lutram_output_reg_outclk <= 0;
+           end
+           else
+           begin
+               mem_output_at_outclock <= mem_output;
+               i_lutram_output_reg_outclk <= mem_data[rdaddress_tmp];
+           end
+        end 
+    if (enable_input_x_prop_altdpram && (intended_device_family == "Stratix 10"))
+    begin
+            if (rden_at_outclock === 1'bx || outclock === 1'bx || outclocken === 1'bx)
+            begin
+            mem_output_at_outclock <= 'bx;
+                    i_lutram_output_reg_outclk <= 'bx;
+            end                     
+            else if (rden_at_outclock === 1'b1 && (rdaddressstall === 1'bx || (^rdaddress_tmp) === 1'bx))
+            begin
+            mem_output_at_outclock <= 'bx;
+                    i_lutram_output_reg_outclk <= 'bx;
+            end
+            else if (aclr_on_outdata === 1'bx && (outdata_reg == "OUTCLOCK"))
+            begin
+            mem_output_at_outclock <= 'bx;
+                    i_lutram_output_reg_outclk <= 'bx;
+            end
+            else if (outclocken === 1'b1)
+            begin
+            if (sclr_on_outdata === 1'bx && (outdata_reg == "OUTCLOCK"))
+            begin
+            mem_output_at_outclock <= 'bx;
+                        i_lutram_output_reg_outclk <= 'bx;
+            end
+            end
+    end    
     end
 
     // Asynchronous Logic
@@ -43816,7 +48377,27 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
     begin
         if (wren_tmp == 1)
         begin
-            if ((is_stxv_style_ram == 1) || (is_stxiii_style_ram == 1))
+        if (enable_input_x_prop_altdpram && (intended_device_family == "Stratix 10") && (^byteena_tmp) === 1'bx)
+        begin
+        i_old_data = mem_data[wraddress_tmp];
+        for (iter_byteena = 0; iter_byteena < width; iter_byteena = iter_byteena + 1)
+        begin
+            if (byteena_tmp[iter_byteena] === 1'b1)
+            begin
+            i_byteena_data[iter_byteena] = data_tmp[iter_byteena];
+            end
+            else if (byteena_tmp[iter_byteena] === 1'bx)
+            begin
+            i_byteena_data[iter_byteena] = 1'bx;
+            end
+            else
+            begin
+            i_byteena_data[iter_byteena] = i_old_data[iter_byteena];
+            end
+        end
+        mem_data[wraddress_tmp] <= i_byteena_data;
+        end
+            else if ((is_stxv_style_ram == 1) || (is_stxiii_style_ram == 1))
             begin
                 i_old_data <= mem_data[wraddress_tmp];
                 mem_data[wraddress_tmp] <= ((data_tmp & byteena_tmp) | (mem_data[wraddress_tmp] & ~byteena_tmp));
@@ -43857,8 +48438,11 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
     assign aclr_on_outdata = ((outdata_aclr == "ON") ?
                                 aclr : 1'b0);
 
+    assign sclr_on_outdata = ((outdata_sclr == "ON") ?
+                                sclr : 1'b0);
+
     assign data_tmp = ((indata_reg == "INCLOCK") ?
-                            (write_at_low_clock ?
+                            ((is_write_at_low_clock == 1) ?
                             ((aclr_on_indata == 1) ?
                             {width{1'b0}} : data_write_at_low)
                             : ((aclr_on_indata == 1) ?
@@ -43866,7 +48450,7 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
                             : data);
 
     assign wraddress_tmp = ((wraddress_reg == "INCLOCK") ?
-                            (write_at_low_clock ?
+                            ((is_write_at_low_clock == 1) ?
                             ((aclr_on_wraddress == 1) ?
                             {widthad{1'b0}} : wraddress_at_low)
                             : ((aclr_on_wraddress == 1) ?
@@ -43874,7 +48458,7 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
                             : wraddress);
 
     assign wren_tmp = ((wrcontrol_reg == "INCLOCK") ?
-                        (write_at_low_clock ?
+                        ((is_write_at_low_clock == 1) ?
                         ((aclr_on_wrcontrol == 1) ?
                         1'b0 : wren_at_low)
                         : ((aclr_on_wrcontrol == 1) ? 
@@ -43898,7 +48482,7 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
                         ((aclr_on_rdcontrol == 1) ? 1'b0 : rden_at_outclock)
                         : rden));
 
-    assign byteena_tmp = i_byteena_mask_at_low;
+    assign byteena_tmp = (is_write_at_low_clock)? i_byteena_mask_at_low : i_byteena_mask;
 
     assign previous_read_data = mem_output;
 
@@ -43907,7 +48491,7 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
                                 : ((rden_low_output_0) ?
                                 {width{1'b0}} : previous_read_data));
 
-    assign i_lutram_output_unreg = mem_data[rdaddress_tmp];
+    assign i_lutram_output_unreg = (i_inclock_output_unreg === 1'bx) ? {width{1'bx}} : mem_data[rdaddress_tmp];
     
     assign i_lutram_output = ((outdata_reg == "INCLOCK")) ? 
                                 i_lutram_output_reg_inclk : 
@@ -43919,6 +48503,8 @@ module altdpram (wren, data, wraddress, inclock, inclocken, rden, rdaddress,
                 mem_output_at_inclock : mem_output));
 
 endmodule // altdpram
+
+
 
 // START_MODULE_NAME------------------------------------------------------------
 //
@@ -44008,7 +48594,7 @@ module altsyncram   (
     // ECC STATUS RELATED PARAMETERS
     parameter enable_ecc = "FALSE";
     parameter width_eccstatus = 3;
-	parameter ecc_pipeline_stage_enabled = "FALSE";
+    parameter ecc_pipeline_stage_enabled = "FALSE";
 
     // GLOBAL PARAMETERS
     parameter operation_mode                     = "BIDIR_DUAL_PORT";
@@ -44018,7 +48604,303 @@ module altsyncram   (
     parameter init_file                          = "UNUSED";
     parameter init_file_layout                   = "UNUSED";
     parameter maximum_depth                      = 0;
-    parameter intended_device_family             = "Stratix";
+    parameter intended_device_family             = "Arria 10";
+
+    parameter lpm_hint                           = "UNUSED";
+    parameter lpm_type                           = "altsyncram";
+    parameter implement_in_les                   = "OFF";
+    parameter power_up_uninitialized             = "FALSE";
+
+//Simulation model selection sim-only parameter
+    parameter family_c10gx = ((intended_device_family == "Cyclone 10 GX") || (intended_device_family == "CYCLONE 10 GX") || (intended_device_family == "CYCLONE10GX") || (intended_device_family == "cyclone10gx") || (intended_device_family == "C10GX") || (intended_device_family == "c10gx")) ? 1 : 0;
+    parameter family_arria10 = ((intended_device_family == "Arria 10") || (intended_device_family == "ARRIA 10") || (intended_device_family == "arria 10") || (intended_device_family == "Arria10") || (intended_device_family == "ARRIA10") || (intended_device_family == "arria10")) ? 1 : 0;
+
+    input  wren_a;
+    input  wren_b;
+    input  rden_a;
+    input  rden_b;
+    input  [width_a-1:0] data_a;
+    input  [width_b-1:0] data_b;
+    input  [widthad_a-1:0] address_a;
+    input  [widthad_b-1:0] address_b;
+    input  clock0;
+    input  clock1;
+    input  clocken0;
+    input  clocken1;
+    input  clocken2;
+    input  clocken3;
+    input  aclr0;
+    input  aclr1;
+    input [width_byteena_a-1:0] byteena_a;
+    input [width_byteena_b-1:0] byteena_b;
+    input addressstall_a;
+    input addressstall_b;
+    output [width_a-1:0] q_a;
+    output [width_b-1:0] q_b;
+    output [width_eccstatus-1:0] eccstatus; 
+
+
+// INTERNAL TRI DECLARATION
+
+    tri0 wren_a;
+    tri0 wren_b;
+    tri1 rden_a;
+    tri1 rden_b;
+    tri1 clock0;
+    tri1 clocken0;
+    tri1 clocken1;
+    tri1 clocken2;
+    tri1 clocken3;
+    tri0 aclr0;
+    tri0 aclr1;
+    tri0 addressstall_a;
+    tri0 addressstall_b;
+    tri1 [width_byteena_a-1:0] byteena_a;
+    tri1 [width_byteena_b-1:0] byteena_b;
+    
+// In Pro, always divert to altera_syncram
+/* generate
+if((family_arria10) || (family_c10gx))begin:m_arria10 */
+    altera_syncram_derived   altera_syncram_inst(
+                    .wren_a(wren_a),
+                    .wren_b(wren_b),
+                    .rden_a(rden_a),
+                    .rden_b(rden_b),
+                    .data_a(data_a),
+                    .data_b(data_b),
+                    .address_a(address_a),
+                    .address_b(address_b),
+                    .clock0(clock0),
+                    .clock1(clock1),
+                    .clocken0(clocken0),
+                    .clocken1(clocken1),
+                    .clocken2(clocken2),
+                    .clocken3(clocken3),
+                    .aclr0(aclr0),
+                    .aclr1(aclr1),
+                    .byteena_a(byteena_a),
+                    .byteena_b(byteena_b),
+                    .addressstall_a(addressstall_a),
+                    .addressstall_b(addressstall_b),
+                    .q_a(q_a),
+                    .q_b(q_b),
+                    .eccstatus(eccstatus),
+                    .address2_a(1'b1),
+                    .address2_b(1'b1),
+                    .eccencparity({8{1'b1}}),
+                    .eccencbypass(1'b0),
+                    .sclr(1'b0)
+                   );
+
+    defparam
+        altera_syncram_inst.width_a                             = width_a,
+        altera_syncram_inst.widthad_a                           = widthad_a,
+        altera_syncram_inst.numwords_a                          = numwords_a,
+        altera_syncram_inst.outdata_reg_a                       = outdata_reg_a,
+        altera_syncram_inst.address_aclr_a                      = address_aclr_a,
+        altera_syncram_inst.outdata_aclr_a                      = outdata_aclr_a,
+        altera_syncram_inst.width_byteena_a                     = width_byteena_a,
+        altera_syncram_inst.width_b                             = width_b,
+        altera_syncram_inst.widthad_b                           = widthad_b,
+        altera_syncram_inst.numwords_b                          = numwords_b,
+        altera_syncram_inst.rdcontrol_reg_b                     = rdcontrol_reg_b,
+        altera_syncram_inst.address_reg_b                       = address_reg_b,
+        altera_syncram_inst.outdata_reg_b                       = outdata_reg_b,
+        altera_syncram_inst.outdata_aclr_b                      = outdata_aclr_b,
+        altera_syncram_inst.indata_reg_b                        = indata_reg_b,
+        altera_syncram_inst.wrcontrol_wraddress_reg_b           = wrcontrol_wraddress_reg_b,
+        altera_syncram_inst.byteena_reg_b                       = byteena_reg_b,
+        altera_syncram_inst.address_aclr_b                      = address_aclr_b,
+        altera_syncram_inst.width_byteena_b                     = width_byteena_b,
+        altera_syncram_inst.clock_enable_input_a                = clock_enable_input_a,
+        altera_syncram_inst.clock_enable_output_a               = clock_enable_output_a,
+        altera_syncram_inst.clock_enable_input_b                = clock_enable_input_b,
+        altera_syncram_inst.clock_enable_output_b               = clock_enable_output_b,
+        altera_syncram_inst.clock_enable_core_a                 = clock_enable_core_a,
+        altera_syncram_inst.clock_enable_core_b                 = clock_enable_core_b,
+        altera_syncram_inst.read_during_write_mode_port_a       = read_during_write_mode_port_a,
+        altera_syncram_inst.read_during_write_mode_port_b       = read_during_write_mode_port_b,
+        altera_syncram_inst.enable_ecc                          = enable_ecc,
+        altera_syncram_inst.width_eccstatus                     = width_eccstatus,
+        altera_syncram_inst.ecc_pipeline_stage_enabled          = ecc_pipeline_stage_enabled,
+        altera_syncram_inst.operation_mode                      = operation_mode,
+        altera_syncram_inst.byte_size                           = byte_size, 
+        altera_syncram_inst.read_during_write_mode_mixed_ports  = read_during_write_mode_mixed_ports,
+        altera_syncram_inst.ram_block_type                      = ram_block_type,
+        altera_syncram_inst.init_file                           = init_file,
+        altera_syncram_inst.init_file_layout                    = init_file_layout,
+        altera_syncram_inst.maximum_depth                       = maximum_depth,
+        altera_syncram_inst.intended_device_family              = intended_device_family,
+        altera_syncram_inst.lpm_hint                            = lpm_hint,
+        altera_syncram_inst.lpm_type                            = lpm_type,
+        altera_syncram_inst.implement_in_les                    = implement_in_les,
+        altera_syncram_inst.power_up_uninitialized              = power_up_uninitialized;
+/* end
+else begin:m_default
+    altsyncram_body   altsyncram_inst(
+                    .wren_a(wren_a),
+                    .wren_b(wren_b),
+                    .rden_a(rden_a),
+                    .rden_b(rden_b),
+                    .data_a(data_a),
+                    .data_b(data_b),
+                    .address_a(address_a),
+                    .address_b(address_b),
+                    .clock0(clock0),
+                    .clock1(clock1),
+                    .clocken0(clocken0),
+                    .clocken1(clocken1),
+                    .clocken2(clocken2),
+                    .clocken3(clocken3),
+                    .aclr0(aclr0),
+                    .aclr1(aclr1),
+                    .byteena_a(byteena_a),
+                    .byteena_b(byteena_b),
+                    .addressstall_a(addressstall_a),
+                    .addressstall_b(addressstall_b),
+                    .q_a(q_a),
+                    .q_b(q_b),
+            .eccstatus(eccstatus)
+                   );
+
+    defparam
+        altsyncram_inst.width_a                                 = width_a,
+        altsyncram_inst.widthad_a                               = widthad_a,
+        altsyncram_inst.numwords_a                              = numwords_a,
+        altsyncram_inst.outdata_reg_a                           = outdata_reg_a,
+        altsyncram_inst.address_aclr_a                          = address_aclr_a,
+        altsyncram_inst.outdata_aclr_a                          = outdata_aclr_a,
+        altsyncram_inst.indata_aclr_a                           = indata_aclr_a,
+        altsyncram_inst.wrcontrol_aclr_a                        = wrcontrol_aclr_a,
+        altsyncram_inst.byteena_aclr_a                          = byteena_aclr_a,
+        altsyncram_inst.width_byteena_a                         = width_byteena_a,
+        altsyncram_inst.width_b                                 = width_b,
+        altsyncram_inst.widthad_b                               = widthad_b,
+        altsyncram_inst.numwords_b                              = numwords_b,
+        altsyncram_inst.rdcontrol_reg_b                         = rdcontrol_reg_b,
+        altsyncram_inst.address_reg_b                           = address_reg_b,
+        altsyncram_inst.outdata_reg_b                           = outdata_reg_b,
+        altsyncram_inst.outdata_aclr_b                          = outdata_aclr_b,
+        altsyncram_inst.rdcontrol_aclr_b                        = rdcontrol_aclr_b,
+        altsyncram_inst.indata_reg_b                            = indata_reg_b,
+        altsyncram_inst.wrcontrol_wraddress_reg_b               = wrcontrol_wraddress_reg_b,
+        altsyncram_inst.byteena_reg_b                           = byteena_reg_b,
+        altsyncram_inst.indata_aclr_b                           = indata_aclr_b,
+        altsyncram_inst.wrcontrol_aclr_b                        = wrcontrol_aclr_b,
+        altsyncram_inst.address_aclr_b                          = address_aclr_b,
+        altsyncram_inst.byteena_aclr_b                          = byteena_aclr_b,
+        altsyncram_inst.width_byteena_b                         = width_byteena_b,
+        altsyncram_inst.clock_enable_input_a                    = clock_enable_input_a,
+        altsyncram_inst.clock_enable_output_a                   = clock_enable_output_a,
+        altsyncram_inst.clock_enable_input_b                    = clock_enable_input_b,
+        altsyncram_inst.clock_enable_output_b                   = clock_enable_output_b,
+        altsyncram_inst.clock_enable_core_a                     = clock_enable_core_a,
+        altsyncram_inst.clock_enable_core_b                     = clock_enable_core_b,
+        altsyncram_inst.read_during_write_mode_port_a           = read_during_write_mode_port_a,
+        altsyncram_inst.read_during_write_mode_port_b           = read_during_write_mode_port_b,
+        altsyncram_inst.enable_ecc                              = enable_ecc,
+        altsyncram_inst.width_eccstatus                         = width_eccstatus,
+        altsyncram_inst.ecc_pipeline_stage_enabled              = ecc_pipeline_stage_enabled,
+        altsyncram_inst.operation_mode                          = operation_mode,
+        altsyncram_inst.byte_size                               = byte_size, 
+        altsyncram_inst.read_during_write_mode_mixed_ports      = read_during_write_mode_mixed_ports,
+        altsyncram_inst.ram_block_type                          = ram_block_type,
+        altsyncram_inst.init_file                               = init_file,
+        altsyncram_inst.init_file_layout                        = init_file_layout,
+        altsyncram_inst.maximum_depth                           = maximum_depth,
+        altsyncram_inst.intended_device_family                  = intended_device_family,
+        altsyncram_inst.lpm_hint                                = lpm_hint,
+        altsyncram_inst.lpm_type                                = lpm_type,
+        altsyncram_inst.implement_in_les                        = implement_in_les,
+        altsyncram_inst.power_up_uninitialized                  = power_up_uninitialized;
+end
+endgenerate */
+        
+endmodule // ALTSYNCRAM
+    
+module altsyncram_body   (
+                    wren_a,
+                    wren_b,
+                    rden_a,
+                    rden_b,
+                    data_a,
+                    data_b,
+                    address_a,
+                    address_b,
+                    clock0,
+                    clock1,
+                    clocken0,
+                    clocken1,
+                    clocken2,
+                    clocken3,
+                    aclr0,
+                    aclr1,
+                    byteena_a,
+                    byteena_b,
+                    addressstall_a,
+                    addressstall_b,
+                    q_a,
+                    q_b,
+                    eccstatus
+                    );
+
+// GLOBAL PARAMETER DECLARATION
+
+    // PORT A PARAMETERS
+    parameter width_a          = 1;
+    parameter widthad_a        = 1;
+    parameter numwords_a       = 0;
+    parameter outdata_reg_a    = "UNREGISTERED";
+    parameter address_aclr_a   = "NONE";
+    parameter outdata_aclr_a   = "NONE";
+    parameter indata_aclr_a    = "NONE";
+    parameter wrcontrol_aclr_a = "NONE";
+    parameter byteena_aclr_a   = "NONE";
+    parameter width_byteena_a  = 1;
+
+    // PORT B PARAMETERS
+    parameter width_b                   = 1;
+    parameter widthad_b                 = 1;
+    parameter numwords_b                = 0;
+    parameter rdcontrol_reg_b           = "CLOCK1";
+    parameter address_reg_b             = "CLOCK1";
+    parameter outdata_reg_b             = "UNREGISTERED";
+    parameter outdata_aclr_b            = "NONE";
+    parameter rdcontrol_aclr_b          = "NONE";
+    parameter indata_reg_b              = "CLOCK1";
+    parameter wrcontrol_wraddress_reg_b = "CLOCK1";
+    parameter byteena_reg_b             = "CLOCK1";
+    parameter indata_aclr_b             = "NONE";
+    parameter wrcontrol_aclr_b          = "NONE";
+    parameter address_aclr_b            = "NONE";
+    parameter byteena_aclr_b            = "NONE";
+    parameter width_byteena_b           = 1;
+
+    // STRATIX II RELATED PARAMETERS
+    parameter clock_enable_input_a  = "NORMAL";
+    parameter clock_enable_output_a = "NORMAL";
+    parameter clock_enable_input_b  = "NORMAL";
+    parameter clock_enable_output_b = "NORMAL";
+
+    parameter clock_enable_core_a = "USE_INPUT_CLKEN";
+    parameter clock_enable_core_b = "USE_INPUT_CLKEN";
+    parameter read_during_write_mode_port_a = "NEW_DATA_NO_NBE_READ";
+    parameter read_during_write_mode_port_b = "NEW_DATA_NO_NBE_READ";
+
+    // ECC STATUS RELATED PARAMETERS
+    parameter enable_ecc = "FALSE";
+    parameter width_eccstatus = 3;
+    parameter ecc_pipeline_stage_enabled = "FALSE";
+
+    // GLOBAL PARAMETERS
+    parameter operation_mode                     = "BIDIR_DUAL_PORT";
+    parameter byte_size                          = 0;
+    parameter read_during_write_mode_mixed_ports = "DONT_CARE";
+    parameter ram_block_type                     = "AUTO";
+    parameter init_file                          = "UNUSED";
+    parameter init_file_layout                   = "UNUSED";
+    parameter maximum_depth                      = 0;
+    parameter intended_device_family             = "Arria 10";
 
     parameter lpm_hint                           = "UNUSED";
     parameter lpm_type                           = "altsyncram";
@@ -44046,7 +48928,7 @@ module altsyncram   (
     parameter check_simultaneous_read_write =   (((operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "DUAL_PORT")) && 
                                                 ((ram_block_type == "M-RAM") || 
                                                     (ram_block_type == "MEGARAM") || 
-                                                    ((ram_block_type == "AUTO") && (read_during_write_mode_mixed_ports == "DONT_CARE")) ||
+                                                    ((ram_block_type == "AUTO") && ((read_during_write_mode_mixed_ports == "DONT_CARE") || (read_during_write_mode_mixed_ports == "CONSTRAINED_DONT_CARE"))) ||
                                                     ((is_lutram == 1) && ((read_during_write_mode_mixed_ports != "OLD_DATA") || (outdata_reg_b == "UNREGISTERED")))))? 1 : 0;
 
     parameter dual_port_addreg_b_clk0 = (((operation_mode == "DUAL_PORT") && (address_reg_b == "CLOCK0"))? 1: 0);
@@ -44058,11 +48940,29 @@ module altsyncram   (
     parameter i_lutram_read = (((is_lutram == 1) && (read_during_write_mode_port_a == "DONT_CARE")) ||
                                 ((is_lutram == 1) && (outdata_reg_a == "UNREGISTERED") && (operation_mode == "SINGLE_PORT")))? 1 : 0;
 
-    parameter enable_mem_data_b_reading =  (sim_show_memory_data_in_port_b_layout == "ON") && ((operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "DUAL_PORT")) ? 1 : 0;
+   parameter enable_mem_data_b_reading =  (sim_show_memory_data_in_port_b_layout == "ON") && ((operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "DUAL_PORT")) ? 1 : 0;
 
    parameter family_arriav = ((intended_device_family == "Arria V") || (intended_device_family == "ARRIA V") || (intended_device_family == "arria v") || (intended_device_family == "ArriaV") || (intended_device_family == "ARRIAV") || (intended_device_family == "arriav") || (intended_device_family == "Arria V (GS)") || (intended_device_family == "ARRIA V (GS)") || (intended_device_family == "arria v (gs)") || (intended_device_family == "ArriaV(GS)") || (intended_device_family == "ARRIAV(GS)") || (intended_device_family == "arriav(gs)") || (intended_device_family == "Arria V (GX)") || (intended_device_family == "ARRIA V (GX)") || (intended_device_family == "arria v (gx)") || (intended_device_family == "ArriaV(GX)") || (intended_device_family == "ARRIAV(GX)") || (intended_device_family == "arriav(gx)") || (intended_device_family == "Arria V (GS/GX)") || (intended_device_family == "ARRIA V (GS/GX)") || (intended_device_family == "arria v (gs/gx)") || (intended_device_family == "ArriaV(GS/GX)") || (intended_device_family == "ARRIAV(GS/GX)") || (intended_device_family == "arriav(gs/gx)") || (intended_device_family == "Arria V (GX/GS)") || (intended_device_family == "ARRIA V (GX/GS)") || (intended_device_family == "arria v (gx/gs)") || (intended_device_family == "ArriaV(GX/GS)") || (intended_device_family == "ARRIAV(GX/GS)") || (intended_device_family == "arriav(gx/gs)")) ? 1 : 0;
+
+   parameter family_cyclonev = ((intended_device_family == "Cyclone V") || (intended_device_family == "CYCLONE V") || (intended_device_family == "cyclone v") || (intended_device_family == "CycloneV") || (intended_device_family == "CYCLONEV") || (intended_device_family == "cyclonev") || (intended_device_family == "Cyclone V (GS)") || (intended_device_family == "CYCLONE V (GS)") || (intended_device_family == "cyclone v (gs)") || (intended_device_family == "CycloneV(GS)") || (intended_device_family == "CYCLONEV(GS)") || (intended_device_family == "cyclonev(gs)") || (intended_device_family == "Cyclone V (GX)") || (intended_device_family == "CYCLONE V (GX)") || (intended_device_family == "cyclone v (gx)") || (intended_device_family == "CycloneV(GX)") || (intended_device_family == "CYCLONEV(GX)") || (intended_device_family == "cyclonev(gx)") || (intended_device_family == "Cyclone V (GS/GX)") || (intended_device_family == "CYCLONE V (GS/GX)") || (intended_device_family == "cyclone v (gs/gx)") || (intended_device_family == "CycloneV(GS/GX)") || (intended_device_family == "CYCLONEV(GS/GX)") || (intended_device_family == "cyclonev(gs/gx)") || (intended_device_family == "Cyclone V (GX/GS)") || (intended_device_family == "CYCLONE V (GX/GS)") || (intended_device_family == "cyclone v (gx/gs)") || (intended_device_family == "CycloneV(GX/GS)") || (intended_device_family == "CYCLONEV(GX/GS)") || (intended_device_family == "cyclonev(gx/gs)")) ? 1 : 0;
    
-   parameter family_stratixv = ((intended_device_family == "Stratix V") || (intended_device_family == "STRATIX V") || (intended_device_family == "stratix v") || (intended_device_family == "StratixV") || (intended_device_family == "STRATIXV") || (intended_device_family == "stratixv") || (intended_device_family == "Stratix V (GS)") || (intended_device_family == "STRATIX V (GS)") || (intended_device_family == "stratix v (gs)") || (intended_device_family == "StratixV(GS)") || (intended_device_family == "STRATIXV(GS)") || (intended_device_family == "stratixv(gs)") || (intended_device_family == "Stratix V (GX)") || (intended_device_family == "STRATIX V (GX)") || (intended_device_family == "stratix v (gx)") || (intended_device_family == "StratixV(GX)") || (intended_device_family == "STRATIXV(GX)") || (intended_device_family == "stratixv(gx)") || (intended_device_family == "Stratix V (GS/GX)") || (intended_device_family == "STRATIX V (GS/GX)") || (intended_device_family == "stratix v (gs/gx)") || (intended_device_family == "StratixV(GS/GX)") || (intended_device_family == "STRATIXV(GS/GX)") || (intended_device_family == "stratixv(gs/gx)") || (intended_device_family == "Stratix V (GX/GS)") || (intended_device_family == "STRATIX V (GX/GS)") || (intended_device_family == "stratix v (gx/gs)") || (intended_device_family == "StratixV(GX/GS)") || (intended_device_family == "STRATIXV(GX/GS)") || (intended_device_family == "stratixv(gx/gs)") || (family_arriav == 1)) ? 1 : 0;
+   parameter family_base_arriav = ((family_arriav == 1) || (family_cyclonev == 1)) ? 1 : 0 ;
+
+   parameter family_c10gx = ((intended_device_family == "Cyclone 10 GX") || (intended_device_family == "CYCLONE 10 GX") || (intended_device_family == "CYCLONE10GX") || (intended_device_family == "cyclone10gx") || (intended_device_family == "C10GX") || (intended_device_family == "c10gx")) ? 1 : 0;
+
+   parameter family_arria10 = ((intended_device_family == "Arria 10") || (intended_device_family == "ARRIA 10") || (intended_device_family == "arria 10") || (intended_device_family == "Arria10") || (intended_device_family == "ARRIA10") || (intended_device_family == "arria10")) ? 1 : 0;
+   
+   parameter family_stratix10 = ((intended_device_family == "Stratix 10") || (intended_device_family == "STRATIX 10") || (intended_device_family == "stratix 10") || (intended_device_family == "Stratix10") || (intended_device_family == "STRATIX10") || (intended_device_family == "stratix10")) ? 1 : 0;
+   
+   parameter family_in_pro = 1;
+   
+   parameter family_arriavi = ((intended_device_family == "Arria VI") || (intended_device_family == "ARRIA VI") || (intended_device_family == "arria vi") || (intended_device_family == "ArriaVI") || (intended_device_family == "ARRIAVI") || (intended_device_family == "arriavi") || (intended_device_family == "arria vi")) ? 1 : 0;
+
+   parameter family_nightfury = ((intended_device_family == "Nightfury") || (intended_device_family == "NIGHTFURY") || (intended_device_family == "nightfury") || (intended_device_family == "Night Fury")  || (intended_device_family == "NIGHT FURY") || (intended_device_family == "night fury") || (family_arriavi == 1) || (family_arria10 == 1) || (family_stratix10 == 1) || (family_c10gx == 1) || (family_in_pro == 1)) ? 1 : 0;
+   
+   parameter family_arriavgz = ((intended_device_family == "Arria V GZ") || (intended_device_family == "ARRIA V GZ") || (intended_device_family == "arria v gz") || (intended_device_family == "ArriaVGZ")  || (intended_device_family == "ARRIAVGZ")  || (intended_device_family == "arriavgz")) ? 1 : 0;
+
+   parameter family_stratixv = ((intended_device_family == "Stratix V") || (intended_device_family == "STRATIX V") || (intended_device_family == "stratix v") || (intended_device_family == "StratixV") || (intended_device_family == "STRATIXV") || (intended_device_family == "stratixv") || (intended_device_family == "Stratix V (GS)") || (intended_device_family == "STRATIX V (GS)") || (intended_device_family == "stratix v (gs)") || (intended_device_family == "StratixV(GS)") || (intended_device_family == "STRATIXV(GS)") || (intended_device_family == "stratixv(gs)") || (intended_device_family == "Stratix V (GX)") || (intended_device_family == "STRATIX V (GX)") || (intended_device_family == "stratix v (gx)") || (intended_device_family == "StratixV(GX)") || (intended_device_family == "STRATIXV(GX)") || (intended_device_family == "stratixv(gx)") || (intended_device_family == "Stratix V (GS/GX)") || (intended_device_family == "STRATIX V (GS/GX)") || (intended_device_family == "stratix v (gs/gx)") || (intended_device_family == "StratixV(GS/GX)") || (intended_device_family == "STRATIXV(GS/GX)") || (intended_device_family == "stratixv(gs/gx)") || (intended_device_family == "Stratix V (GX/GS)") || (intended_device_family == "STRATIX V (GX/GS)") || (intended_device_family == "stratix v (gx/gs)") || (intended_device_family == "StratixV(GX/GS)") || (intended_device_family == "STRATIXV(GX/GS)") || (intended_device_family == "stratixv(gx/gs)") || (family_base_arriav == 1)  || (family_nightfury == 1) || (family_arriavgz == 1) || (family_c10gx == 1)) ? 1 : 0;
     
    parameter family_hardcopyiv = ((intended_device_family == "HardCopy IV") || (intended_device_family == "HARDCOPY IV") || (intended_device_family == "hardcopy iv") || (intended_device_family == "HardCopyIV") || (intended_device_family == "HARDCOPYIV") || (intended_device_family == "hardcopyiv") || (intended_device_family == "HardCopy IV (GX)") || (intended_device_family == "HARDCOPY IV (GX)") || (intended_device_family == "hardcopy iv (gx)") || (intended_device_family == "HardCopy IV (E)") || (intended_device_family == "HARDCOPY IV (E)") || (intended_device_family == "hardcopy iv (e)") || (intended_device_family == "HardCopyIV(GX)") || (intended_device_family == "HARDCOPYIV(GX)") || (intended_device_family == "hardcopyiv(gx)") || (intended_device_family == "HardCopyIV(E)") || (intended_device_family == "HARDCOPYIV(E)") || (intended_device_family == "hardcopyiv(e)") || (intended_device_family == "HCXIV") || (intended_device_family == "hcxiv") || (intended_device_family == "HardCopy IV (GX/E)") || (intended_device_family == "HARDCOPY IV (GX/E)") || (intended_device_family == "hardcopy iv (gx/e)") || (intended_device_family == "HardCopy IV (E/GX)") || (intended_device_family == "HARDCOPY IV (E/GX)") || (intended_device_family == "hardcopy iv (e/gx)") || (intended_device_family == "HardCopyIV(GX/E)") || (intended_device_family == "HARDCOPYIV(GX/E)") || (intended_device_family == "hardcopyiv(gx/e)") || (intended_device_family == "HardCopyIV(E/GX)") || (intended_device_family == "HARDCOPYIV(E/GX)") || (intended_device_family == "hardcopyiv(e/gx)")) ? 1 : 0 ;
    
@@ -44073,9 +48973,11 @@ module altsyncram   (
    parameter family_arriaiigz = ((intended_device_family == "Arria II GZ") || (intended_device_family == "ARRIA II GZ") || (intended_device_family == "arria ii gz") || (intended_device_family == "ArriaII GZ") || (intended_device_family == "ARRIAII GZ") || (intended_device_family == "arriaii gz") || (intended_device_family == "Arria IIGZ") || (intended_device_family == "ARRIA IIGZ") || (intended_device_family == "arria iigz") || (intended_device_family == "ArriaIIGZ") || (intended_device_family == "ARRIAIIGZ") || (intended_device_family == "arriaii gz")) ? 1 : 0 ;
    parameter family_arriaiigx = ((intended_device_family == "Arria II GX") || (intended_device_family == "ARRIA II GX") || (intended_device_family == "arria ii gx") || (intended_device_family == "ArriaIIGX") || (intended_device_family == "ARRIAIIGX") || (intended_device_family == "arriaiigx") || (intended_device_family == "Arria IIGX") || (intended_device_family == "ARRIA IIGX") || (intended_device_family == "arria iigx") || (intended_device_family == "ArriaII GX") || (intended_device_family == "ARRIAII GX") || (intended_device_family == "arriaii gx") || (intended_device_family == "Arria II") || (intended_device_family == "ARRIA II") || (intended_device_family == "arria ii") || (intended_device_family == "ArriaII") || (intended_device_family == "ARRIAII") || (intended_device_family == "arriaii") || (intended_device_family == "Arria II (GX/E)") || (intended_device_family == "ARRIA II (GX/E)") || (intended_device_family == "arria ii (gx/e)") || (intended_device_family == "ArriaII(GX/E)") || (intended_device_family == "ARRIAII(GX/E)") || (intended_device_family == "arriaii(gx/e)") || (intended_device_family == "PIRANHA") || (intended_device_family == "piranha")) ? 1 : 0 ;
 
-   parameter family_stratixiii = ((intended_device_family == "Stratix III") || (intended_device_family == "STRATIX III") || (intended_device_family == "stratix iii") || (intended_device_family == "StratixIII") || (intended_device_family == "STRATIXIII") || (intended_device_family == "stratixiii") || (intended_device_family == "Titan") || (intended_device_family == "TITAN") || (intended_device_family == "titan") || (intended_device_family == "SIII") || (intended_device_family == "siii") || (intended_device_family == "Stratix IV") || (intended_device_family == "STRATIX IV") || (intended_device_family == "stratix iv") || (intended_device_family == "TGX") || (intended_device_family == "tgx") || (intended_device_family == "StratixIV") || (intended_device_family == "STRATIXIV") || (intended_device_family == "stratixiv") || (intended_device_family == "Stratix IV (GT)") || (intended_device_family == "STRATIX IV (GT)") || (intended_device_family == "stratix iv (gt)") || (intended_device_family == "Stratix IV (GX)") || (intended_device_family == "STRATIX IV (GX)") || (intended_device_family == "stratix iv (gx)") || (intended_device_family == "Stratix IV (E)") || (intended_device_family == "STRATIX IV (E)") || (intended_device_family == "stratix iv (e)") || (intended_device_family == "StratixIV(GT)") || (intended_device_family == "STRATIXIV(GT)") || (intended_device_family == "stratixiv(gt)") || (intended_device_family == "StratixIV(GX)") || (intended_device_family == "STRATIXIV(GX)") || (intended_device_family == "stratixiv(gx)") || (intended_device_family == "StratixIV(E)") || (intended_device_family == "STRATIXIV(E)") || (intended_device_family == "stratixiv(e)") || (intended_device_family == "StratixIIIGX") || (intended_device_family == "STRATIXIIIGX") || (intended_device_family == "stratixiiigx") || (intended_device_family == "Stratix IV (GT/GX/E)") || (intended_device_family == "STRATIX IV (GT/GX/E)") || (intended_device_family == "stratix iv (gt/gx/e)") || (intended_device_family == "Stratix IV (GT/E/GX)") || (intended_device_family == "STRATIX IV (GT/E/GX)") || (intended_device_family == "stratix iv (gt/e/gx)") || (intended_device_family == "Stratix IV (E/GT/GX)") || (intended_device_family == "STRATIX IV (E/GT/GX)") || (intended_device_family == "stratix iv (e/gt/gx)") || (intended_device_family == "Stratix IV (E/GX/GT)") || (intended_device_family == "STRATIX IV (E/GX/GT)") || (intended_device_family == "stratix iv (e/gx/gt)") || (intended_device_family == "StratixIV(GT/GX/E)") || (intended_device_family == "STRATIXIV(GT/GX/E)") || (intended_device_family == "stratixiv(gt/gx/e)") || (intended_device_family == "StratixIV(GT/E/GX)") || (intended_device_family == "STRATIXIV(GT/E/GX)") || (intended_device_family == "stratixiv(gt/e/gx)") || (intended_device_family == "StratixIV(E/GX/GT)") || (intended_device_family == "STRATIXIV(E/GX/GT)") || (intended_device_family == "stratixiv(e/gx/gt)") || (intended_device_family == "StratixIV(E/GT/GX)") || (intended_device_family == "STRATIXIV(E/GT/GX)") || (intended_device_family == "stratixiv(e/gt/gx)") || (intended_device_family == "Stratix IV (GX/E)") || (intended_device_family == "STRATIX IV (GX/E)") || (intended_device_family == "stratix iv (gx/e)") || (intended_device_family == "StratixIV(GX/E)") || (intended_device_family == "STRATIXIV(GX/E)") || (intended_device_family == "stratixiv(gx/e)") || (family_arriaiigx == 1) || (family_hardcopyiv == 1) || (family_hardcopyiii == 1) || (family_stratixv == 1) || (family_arriaiigz == 1) || (family_arriav == 1)) ? 1 : 0 ;
+   parameter family_stratixiii = ((intended_device_family == "Stratix III") || (intended_device_family == "STRATIX III") || (intended_device_family == "stratix iii") || (intended_device_family == "StratixIII") || (intended_device_family == "STRATIXIII") || (intended_device_family == "stratixiii") || (intended_device_family == "Titan") || (intended_device_family == "TITAN") || (intended_device_family == "titan") || (intended_device_family == "SIII") || (intended_device_family == "siii") || (intended_device_family == "Stratix IV") || (intended_device_family == "STRATIX IV") || (intended_device_family == "stratix iv") || (intended_device_family == "TGX") || (intended_device_family == "tgx") || (intended_device_family == "StratixIV") || (intended_device_family == "STRATIXIV") || (intended_device_family == "stratixiv") || (intended_device_family == "Stratix IV (GT)") || (intended_device_family == "STRATIX IV (GT)") || (intended_device_family == "stratix iv (gt)") || (intended_device_family == "Stratix IV (GX)") || (intended_device_family == "STRATIX IV (GX)") || (intended_device_family == "stratix iv (gx)") || (intended_device_family == "Stratix IV (E)") || (intended_device_family == "STRATIX IV (E)") || (intended_device_family == "stratix iv (e)") || (intended_device_family == "StratixIV(GT)") || (intended_device_family == "STRATIXIV(GT)") || (intended_device_family == "stratixiv(gt)") || (intended_device_family == "StratixIV(GX)") || (intended_device_family == "STRATIXIV(GX)") || (intended_device_family == "stratixiv(gx)") || (intended_device_family == "StratixIV(E)") || (intended_device_family == "STRATIXIV(E)") || (intended_device_family == "stratixiv(e)") || (intended_device_family == "StratixIIIGX") || (intended_device_family == "STRATIXIIIGX") || (intended_device_family == "stratixiiigx") || (intended_device_family == "Stratix IV (GT/GX/E)") || (intended_device_family == "STRATIX IV (GT/GX/E)") || (intended_device_family == "stratix iv (gt/gx/e)") || (intended_device_family == "Stratix IV (GT/E/GX)") || (intended_device_family == "STRATIX IV (GT/E/GX)") || (intended_device_family == "stratix iv (gt/e/gx)") || (intended_device_family == "Stratix IV (E/GT/GX)") || (intended_device_family == "STRATIX IV (E/GT/GX)") || (intended_device_family == "stratix iv (e/gt/gx)") || (intended_device_family == "Stratix IV (E/GX/GT)") || (intended_device_family == "STRATIX IV (E/GX/GT)") || (intended_device_family == "stratix iv (e/gx/gt)") || (intended_device_family == "StratixIV(GT/GX/E)") || (intended_device_family == "STRATIXIV(GT/GX/E)") || (intended_device_family == "stratixiv(gt/gx/e)") || (intended_device_family == "StratixIV(GT/E/GX)") || (intended_device_family == "STRATIXIV(GT/E/GX)") || (intended_device_family == "stratixiv(gt/e/gx)") || (intended_device_family == "StratixIV(E/GX/GT)") || (intended_device_family == "STRATIXIV(E/GX/GT)") || (intended_device_family == "stratixiv(e/gx/gt)") || (intended_device_family == "StratixIV(E/GT/GX)") || (intended_device_family == "STRATIXIV(E/GT/GX)") || (intended_device_family == "stratixiv(e/gt/gx)") || (intended_device_family == "Stratix IV (GX/E)") || (intended_device_family == "STRATIX IV (GX/E)") || (intended_device_family == "stratix iv (gx/e)") || (intended_device_family == "StratixIV(GX/E)") || (intended_device_family == "STRATIXIV(GX/E)") || (intended_device_family == "stratixiv(gx/e)") || (family_arriaiigx == 1) || (family_hardcopyiv == 1) || (family_hardcopyiii == 1) || (family_stratixv == 1) || (family_arriaiigz == 1) || (family_base_arriav == 1)) ? 1 : 0 ;
    
-   parameter family_cycloneiii = ((intended_device_family == "Cyclone III") || (intended_device_family == "CYCLONE III") || (intended_device_family == "cyclone iii") || (intended_device_family == "CycloneIII") || (intended_device_family == "CYCLONEIII") || (intended_device_family == "cycloneiii") || (intended_device_family == "Barracuda") || (intended_device_family == "BARRACUDA") || (intended_device_family == "barracuda") || (intended_device_family == "Cuda") || (intended_device_family == "CUDA") || (intended_device_family == "cuda") || (intended_device_family == "CIII") || (intended_device_family == "ciii") || (intended_device_family == "Cyclone III LS") || (intended_device_family == "CYCLONE III LS") || (intended_device_family == "cyclone iii ls") || (intended_device_family == "CycloneIIILS") || (intended_device_family == "CYCLONEIIILS") || (intended_device_family == "cycloneiiils") || (intended_device_family == "Cyclone III LPS") || (intended_device_family == "CYCLONE III LPS") || (intended_device_family == "cyclone iii lps") || (intended_device_family == "Cyclone LPS") || (intended_device_family == "CYCLONE LPS") || (intended_device_family == "cyclone lps") || (intended_device_family == "CycloneLPS") || (intended_device_family == "CYCLONELPS") || (intended_device_family == "cyclonelps") || (intended_device_family == "Tarpon") || (intended_device_family == "TARPON") || (intended_device_family == "tarpon") || (intended_device_family == "Cyclone IIIE") || (intended_device_family == "CYCLONE IIIE") || (intended_device_family == "cyclone iiie") || (intended_device_family == "Cyclone IV GX") || (intended_device_family == "CYCLONE IV GX") || (intended_device_family == "cyclone iv gx") || (intended_device_family == "Cyclone IVGX") || (intended_device_family == "CYCLONE IVGX") || (intended_device_family == "cyclone ivgx") || (intended_device_family == "CycloneIV GX") || (intended_device_family == "CYCLONEIV GX") || (intended_device_family == "cycloneiv gx") || (intended_device_family == "CycloneIVGX") || (intended_device_family == "CYCLONEIVGX") || (intended_device_family == "cycloneivgx") || (intended_device_family == "Cyclone IV") || (intended_device_family == "CYCLONE IV") || (intended_device_family == "cyclone iv") || (intended_device_family == "CycloneIV") || (intended_device_family == "CYCLONEIV") || (intended_device_family == "cycloneiv") || (intended_device_family == "Cyclone IV (GX)") || (intended_device_family == "CYCLONE IV (GX)") || (intended_device_family == "cyclone iv (gx)") || (intended_device_family == "CycloneIV(GX)") || (intended_device_family == "CYCLONEIV(GX)") || (intended_device_family == "cycloneiv(gx)") || (intended_device_family == "Cyclone III GX") || (intended_device_family == "CYCLONE III GX") || (intended_device_family == "cyclone iii gx") || (intended_device_family == "CycloneIII GX") || (intended_device_family == "CYCLONEIII GX") || (intended_device_family == "cycloneiii gx") || (intended_device_family == "Cyclone IIIGX") || (intended_device_family == "CYCLONE IIIGX") || (intended_device_family == "cyclone iiigx") || (intended_device_family == "CycloneIIIGX") || (intended_device_family == "CYCLONEIIIGX") || (intended_device_family == "cycloneiiigx") || (intended_device_family == "Cyclone III GL") || (intended_device_family == "CYCLONE III GL") || (intended_device_family == "cyclone iii gl") || (intended_device_family == "CycloneIII GL") || (intended_device_family == "CYCLONEIII GL") || (intended_device_family == "cycloneiii gl") || (intended_device_family == "Cyclone IIIGL") || (intended_device_family == "CYCLONE IIIGL") || (intended_device_family == "cyclone iiigl") || (intended_device_family == "CycloneIIIGL") || (intended_device_family == "CYCLONEIIIGL") || (intended_device_family == "cycloneiiigl") || (intended_device_family == "Stingray") || (intended_device_family == "STINGRAY") || (intended_device_family == "stingray") || (intended_device_family == "Cyclone IV E") || (intended_device_family == "CYCLONE IV E") || (intended_device_family == "cyclone iv e") || (intended_device_family == "CycloneIV E") || (intended_device_family == "CYCLONEIV E") || (intended_device_family == "cycloneiv e") || (intended_device_family == "Cyclone IVE") || (intended_device_family == "CYCLONE IVE") || (intended_device_family == "cyclone ive") || (intended_device_family == "CycloneIVE") || (intended_device_family == "CYCLONEIVE") || (intended_device_family == "cycloneive")) ? 1 : 0 ;
+   parameter family_zippleback = ((intended_device_family == "MAX 10") || (intended_device_family == "MAX10") || (intended_device_family == "max 10") || (intended_device_family == "max10") || (intended_device_family == "MAX 10 FPGA") || (intended_device_family == "max 10 fpga") || (intended_device_family == "Zippleback") || (intended_device_family == "ZIPPLEBACK")|| (intended_device_family == "zippleback")|| (intended_device_family == "MAX10FPGA")|| (intended_device_family == "max10fpga")|| (intended_device_family == "MAX 10 FPGA (DA/DF/DC/SF/SC)")|| (intended_device_family == "max 10 fpga (da/df/dc/sf/sc)")|| (intended_device_family == "MAX10FPGA(DA/DF/DC/SF/SC)")|| (intended_device_family == "max10fpga(da/df/dc/sf/sc)")|| (intended_device_family == "MAX 10 FPGA (DA)")|| (intended_device_family == "max 10 fpga (da)")|| (intended_device_family == "MAX10FPGA(DA)")|| (intended_device_family == "max10fpga(da)")|| (intended_device_family == "MAX 10 FPGA (DF)")|| (intended_device_family == "max 10 fpga (df)")|| (intended_device_family == "MAX10FPGA(DF)")|| (intended_device_family == "max10fpga(df)")|| (intended_device_family == "MAX 10 FPGA (DC)")|| (intended_device_family == "max 10 fpga (dc)")|| (intended_device_family == "MAX10FPGA(DC)")|| (intended_device_family == "max10fpga(dc)")|| (intended_device_family == "MAX 10 FPGA (SF)")|| (intended_device_family == "max 10 fpga (sf)")|| (intended_device_family == "MAX10FPGA(SF)")|| (intended_device_family == "max10fpga(sf)")|| (intended_device_family == "MAX 10 FPGA (SC)")|| (intended_device_family == "max 10 fpga (sc)")|| (intended_device_family == "MAX10FPGA(SC)")|| (intended_device_family == "max10fpga(sc)")) ? 1 : 0 ;
+   
+   parameter family_cycloneiii = ((intended_device_family == "Cyclone III") || (intended_device_family == "CYCLONE III") || (intended_device_family == "cyclone iii") || (intended_device_family == "CycloneIII") || (intended_device_family == "CYCLONEIII") || (intended_device_family == "cycloneiii") || (intended_device_family == "Barracuda") || (intended_device_family == "BARRACUDA") || (intended_device_family == "barracuda") || (intended_device_family == "Cuda") || (intended_device_family == "CUDA") || (intended_device_family == "cuda") || (intended_device_family == "CIII") || (intended_device_family == "ciii") || (intended_device_family == "Cyclone III LS") || (intended_device_family == "CYCLONE III LS") || (intended_device_family == "cyclone iii ls") || (intended_device_family == "CycloneIIILS") || (intended_device_family == "CYCLONEIIILS") || (intended_device_family == "cycloneiiils") || (intended_device_family == "Cyclone III LPS") || (intended_device_family == "CYCLONE III LPS") || (intended_device_family == "cyclone iii lps") || (intended_device_family == "Cyclone LPS") || (intended_device_family == "CYCLONE LPS") || (intended_device_family == "cyclone lps") || (intended_device_family == "CycloneLPS") || (intended_device_family == "CYCLONELPS") || (intended_device_family == "cyclonelps") || (intended_device_family == "Tarpon") || (intended_device_family == "TARPON") || (intended_device_family == "tarpon") || (intended_device_family == "Cyclone IIIE") || (intended_device_family == "CYCLONE IIIE") || (intended_device_family == "cyclone iiie") || (intended_device_family == "Cyclone IV GX") || (intended_device_family == "CYCLONE IV GX") || (intended_device_family == "cyclone iv gx") || (intended_device_family == "Cyclone IVGX") || (intended_device_family == "CYCLONE IVGX") || (intended_device_family == "cyclone ivgx") || (intended_device_family == "CycloneIV GX") || (intended_device_family == "CYCLONEIV GX") || (intended_device_family == "cycloneiv gx") || (intended_device_family == "CycloneIVGX") || (intended_device_family == "CYCLONEIVGX") || (intended_device_family == "cycloneivgx") || (intended_device_family == "Cyclone IV") || (intended_device_family == "CYCLONE IV") || (intended_device_family == "cyclone iv") || (intended_device_family == "CycloneIV") || (intended_device_family == "CYCLONEIV") || (intended_device_family == "cycloneiv") || (intended_device_family == "Cyclone IV (GX)") || (intended_device_family == "CYCLONE IV (GX)") || (intended_device_family == "cyclone iv (gx)") || (intended_device_family == "CycloneIV(GX)") || (intended_device_family == "CYCLONEIV(GX)") || (intended_device_family == "cycloneiv(gx)") || (intended_device_family == "Cyclone III GX") || (intended_device_family == "CYCLONE III GX") || (intended_device_family == "cyclone iii gx") || (intended_device_family == "CycloneIII GX") || (intended_device_family == "CYCLONEIII GX") || (intended_device_family == "cycloneiii gx") || (intended_device_family == "Cyclone IIIGX") || (intended_device_family == "CYCLONE IIIGX") || (intended_device_family == "cyclone iiigx") || (intended_device_family == "CycloneIIIGX") || (intended_device_family == "CYCLONEIIIGX") || (intended_device_family == "cycloneiiigx") || (intended_device_family == "Cyclone III GL") || (intended_device_family == "CYCLONE III GL") || (intended_device_family == "cyclone iii gl") || (intended_device_family == "CycloneIII GL") || (intended_device_family == "CYCLONEIII GL") || (intended_device_family == "cycloneiii gl") || (intended_device_family == "Cyclone IIIGL") || (intended_device_family == "CYCLONE IIIGL") || (intended_device_family == "cyclone iiigl") || (intended_device_family == "CycloneIIIGL") || (intended_device_family == "CYCLONEIIIGL") || (intended_device_family == "cycloneiiigl") || (intended_device_family == "Stingray") || (intended_device_family == "STINGRAY") || (intended_device_family == "stingray") || (intended_device_family == "Cyclone IV E") || (intended_device_family == "CYCLONE IV E") || (intended_device_family == "cyclone iv e") || (intended_device_family == "CycloneIV E") || (intended_device_family == "CYCLONEIV E") || (intended_device_family == "cycloneiv e") || (intended_device_family == "Cyclone IVE") || (intended_device_family == "CYCLONE IVE") || (intended_device_family == "cyclone ive") || (intended_device_family == "CycloneIVE") || (intended_device_family == "CYCLONEIVE") || (intended_device_family == "cycloneive") || family_zippleback) ? 1 : 0 ;
 
    parameter family_cyclone = ((intended_device_family == "Cyclone") || (intended_device_family == "CYCLONE") || (intended_device_family == "cyclone") || (intended_device_family == "ACEX2K") || (intended_device_family == "acex2k") || (intended_device_family == "ACEX 2K") || (intended_device_family == "acex 2k") || (intended_device_family == "Tornado") || (intended_device_family == "TORNADO") || (intended_device_family == "tornado")) ? 1 : 0 ;
    
@@ -44087,25 +48989,25 @@ module altsyncram   (
    
    parameter family_base_stratixii = ((intended_device_family == "Stratix II") || (intended_device_family == "STRATIX II") || (intended_device_family == "stratix ii") || (intended_device_family == "StratixII") || (intended_device_family == "STRATIXII") || (intended_device_family == "stratixii") || (intended_device_family == "Armstrong") || (intended_device_family == "ARMSTRONG") || (intended_device_family == "armstrong") || (intended_device_family == "Stratix II GX") || (intended_device_family == "STRATIX II GX") || (intended_device_family == "stratix ii gx") || (intended_device_family == "StratixIIGX") || (intended_device_family == "STRATIXIIGX") || (intended_device_family == "stratixiigx") || (intended_device_family == "Arria GX") || (intended_device_family == "ARRIA GX") || (intended_device_family == "arria gx") || (intended_device_family == "ArriaGX") || (intended_device_family == "ARRIAGX") || (intended_device_family == "arriagx") || (intended_device_family == "Stratix II GX Lite") || (intended_device_family == "STRATIX II GX LITE") || (intended_device_family == "stratix ii gx lite") || (intended_device_family == "StratixIIGXLite") || (intended_device_family == "STRATIXIIGXLITE") || (intended_device_family == "stratixiigxlite") || (family_hardcopyii == 1)) ? 1 : 0 ;
    
-   parameter family_has_lutram = ((family_stratixiii == 1) || (family_stratixv == 1) || (family_arriav == 1)) ? 1 : 0 ;
-   parameter family_has_stratixv_style_ram = ((family_arriav == 1) || (family_stratixv == 1)) ? 1 : 0 ;
+   parameter family_has_lutram = ((family_stratixiii == 1) || (family_stratixv == 1) || (family_base_arriav == 1) || (family_nightfury == 1) || (family_c10gx == 1)) ? 1 : 0 ;
+   parameter family_has_stratixv_style_ram = ((family_base_arriav == 1) || (family_stratixv == 1) || (family_nightfury == 1) || (family_c10gx == 1)) ? 1 : 0 ;
    parameter family_has_stratixiii_style_ram = ((family_stratixiii == 1) || (family_cycloneiii == 1)) ? 1 : 0;
 
    parameter family_has_m512 = (((intended_device_family == "StratixHC") || (family_base_stratix == 1) || (family_base_stratixii == 1)) && (family_hardcopyii == 0)) ? 1 : 0;
    
-   parameter family_has_megaram = (((intended_device_family == "StratixHC") || (family_base_stratix == 1) || (family_base_stratixii == 1) || (family_stratixiii == 1)) && (family_arriaiigx == 0) && (family_stratixv == 0) && (family_arriav == 0)) ? 1 : 0 ;
+   parameter family_has_megaram = (((intended_device_family == "StratixHC") || (family_base_stratix == 1) || (family_base_stratixii == 1) || (family_stratixiii == 1)) && (family_arriaiigx == 0) && (family_stratixv == 0) && (family_base_arriav == 0)) ? 1 : 0 ;
 
    parameter family_has_stratixi_style_ram = ((intended_device_family == "StratixHC") || (family_base_stratix == 1) || (family_cyclone == 1)) ? 1 : 0;
    
-   parameter is_write_on_positive_edge = (((ram_block_type == "M-RAM") || (ram_block_type == "MEGARAM")) || (ram_block_type == "M9K") || (ram_block_type == "M20K") || (ram_block_type == "M144K") || ((family_has_stratixv_style_ram == 1) && (is_lutram == 1)) || (((family_has_stratixv_style_ram == 1) || (family_has_stratixiii_style_ram == 1)) && (ram_block_type == "AUTO"))) ? 1 : 0; 
+   parameter is_write_on_positive_edge = (((ram_block_type == "M-RAM") || (ram_block_type == "MEGARAM")) || (ram_block_type == "M9K") || (ram_block_type == "M20K") || (ram_block_type == "M10K") || (ram_block_type == "M144K") || ((family_has_stratixv_style_ram == 1) && (is_lutram == 1)) || (((family_has_stratixv_style_ram == 1) || (family_has_stratixiii_style_ram == 1)) && (ram_block_type == "AUTO"))) ? 1 : 0; 
 
    parameter lutram_single_port_fast_read = ((is_lutram == 1) && ((read_during_write_mode_port_a == "DONT_CARE") || (outdata_reg_a == "UNREGISTERED")) && (operation_mode == "SINGLE_PORT")) ? 1 : 0;
             
-   parameter lutram_dual_port_fast_read = ((is_lutram == 1) && ((read_during_write_mode_mixed_ports == "NEW_DATA") || (read_during_write_mode_mixed_ports == "DONT_CARE") || ((read_during_write_mode_mixed_ports == "OLD_DATA") && (outdata_reg_b == "UNREGISTERED")))) ? 1 : 0;
+   parameter lutram_dual_port_fast_read = ((is_lutram == 1) && ((read_during_write_mode_mixed_ports == "NEW_DATA") || (read_during_write_mode_mixed_ports == "DONT_CARE") || (read_during_write_mode_mixed_ports == "CONSTRAINED_DONT_CARE") || ((read_during_write_mode_mixed_ports == "OLD_DATA") && (outdata_reg_b == "UNREGISTERED")))) ? 1 : 0;
             
-   parameter s3_address_aclr_a =  ((family_stratixv || family_stratixiii) && (is_lutram != 1) && (outdata_reg_a != "CLOCK0") && (outdata_reg_a != "CLOCK1")) ? 1 : 0;
+   parameter s3_address_aclr_a =  ((family_has_stratixv_style_ram || family_stratixiii) && (is_lutram != 1) && (outdata_reg_a != "CLOCK0") && (outdata_reg_a != "CLOCK1")) ? 1 : 0;
 
-   parameter s3_address_aclr_b =  ((family_stratixv || family_stratixiii) && (is_lutram != 1) && (outdata_reg_b != "CLOCK0") && (outdata_reg_b != "CLOCK1")) ? 1 : 0;
+   parameter s3_address_aclr_b =  ((family_has_stratixv_style_ram || family_stratixiii) && (is_lutram != 1) && (outdata_reg_b != "CLOCK0") && (outdata_reg_b != "CLOCK1")) ? 1 : 0;
 
    parameter i_address_aclr_family_a = ((((family_has_stratixv_style_ram == 1) || (family_has_stratixiii_style_ram == 1)) && (operation_mode != "ROM")) || (family_base_stratixii == 1 || family_base_cycloneii == 1)) ? 1 : 0;
     
@@ -44190,10 +49092,10 @@ module altsyncram   (
     reg [width_b-1:0] i_byteena_mask_reg_b;
     reg [widthad_a-1:0] i_address_reg_a;
     reg [widthad_b-1:0] i_address_reg_b;
-	
-	reg [width_b-1:0] i_q_ecc_reg_b;
+    
+    reg [width_b-1:0] i_q_ecc_reg_b;
     reg [width_b-1:0] i_q_ecc_tmp_b;
-	
+    
     reg [widthad_a-1:0] i_original_address_a;
     
     reg [width_a-1:0] i_byteena_mask_reg_a_tmp;
@@ -44250,7 +49152,7 @@ module altsyncram   (
     reg i_force_reread_b_signal;
 
 // INTERNAL PARAMETER
-    reg [9*8:0] cread_during_write_mode_mixed_ports;
+    reg [21*8:0] cread_during_write_mode_mixed_ports;
     reg [7*8:0] i_ram_block_type;
     integer i_byte_size;
     
@@ -44278,6 +49180,8 @@ module altsyncram   (
     wire i_byteena_aclr_b;
     wire i_outdata_clken_a;
     wire i_outdata_clken_b;
+    wire i_outlatch_clken_a;
+    wire i_outlatch_clken_b;    
     wire i_clocken0;
     wire i_clocken1_b;
     wire i_clocken0_b;
@@ -44345,6 +49249,7 @@ module altsyncram   (
     integer port_b_bit_count_high;
 
     time i_data_write_time_a;
+    time i_data_write_time_b;
 
     // ------------------------
     // COMPONENT INSTANTIATIONS
@@ -44356,14 +49261,14 @@ module altsyncram   (
 
     initial
     begin
-
+        
 
         i_numwords_a = (numwords_a != 0) ? numwords_a : (1 << widthad_a);
         i_numwords_b = (numwords_b != 0) ? numwords_b : (1 << widthad_b);
         
         if (family_has_stratixv_style_ram == 1)
         begin
-            if ((((is_lutram == 1) || (ram_block_type == "M10K")) && (family_arriav == 1)) ||
+            if ((((is_lutram == 1) || (ram_block_type == "M10K")) && (family_base_arriav == 1)) ||
                 (((is_lutram == 1) || (ram_block_type == "M20K")) && (family_stratixv == 1)))
                 i_ram_block_type = ram_block_type;
             else
@@ -44389,7 +49294,7 @@ module altsyncram   (
             else
                 i_ram_block_type = ram_block_type;
         end
-	
+    
         if ((family_cyclone == 1) || (family_cycloneii == 1))
             cread_during_write_mode_mixed_ports = "OLD_DATA";
         else if (read_during_write_mode_mixed_ports == "UNUSED")
@@ -44412,14 +49317,14 @@ module altsyncram   (
             $finish;
         end
 
-        if ((family_arriav == 1) &&
+        if ((family_base_arriav == 1) &&
             (ram_block_type != "M10K") && (is_lutram != 1) && (ram_block_type != "AUTO"))
         begin
             $display("Warning: RAM_BLOCK_TYPE HAS AN INVALID VALUE. IT CAN ONLY BE M10K, LUTRAM OR AUTO for %s device family. This parameter will take AUTO as its value", intended_device_family);
             $display("Time: %0t  Instance: %m", $time);
         end
         
-        if ((family_arriav != 1) && (family_stratixv == 1) &&
+        if ((family_base_arriav != 1) && (family_stratixv == 1) &&
             (ram_block_type != "M20K") && (is_lutram != 1) && (ram_block_type != "AUTO"))
         begin
             $display("Warning: RAM_BLOCK_TYPE HAS AN INVALID VALUE. IT CAN ONLY BE M20K, LUTRAM OR AUTO for %s device family. This parameter will take AUTO as its value", intended_device_family);
@@ -44442,10 +49347,11 @@ module altsyncram   (
 
 
         if ((cread_during_write_mode_mixed_ports != "DONT_CARE") &&
+            (cread_during_write_mode_mixed_ports != "CONSTRAINED_DONT_CARE") &&
             (cread_during_write_mode_mixed_ports != "OLD_DATA") && 
             (cread_during_write_mode_mixed_ports != "NEW_DATA"))
         begin
-            $display("Error: Invalid value for read_during_write_mode_mixed_ports parameter. It has to be OLD_DATA or DONT_CARE or NEW_DATA");
+            $display("Error: Invalid value for read_during_write_mode_mixed_ports parameter. It has to be OLD_DATA or DONT_CARE or CONSTRAINED_DONT_CARE or NEW_DATA");
             $display("Time: %0t  Instance: %m", $time);
             $finish;
         end
@@ -44456,6 +49362,12 @@ module altsyncram   (
             $display("Time: %0t  Instance: %m", $time);
         end
         
+        if ((is_lutram != 1) && (cread_during_write_mode_mixed_ports == "CONSTRAINED_DONT_CARE"))
+        begin
+            $display("Warning: read_during_write_mode_mixed_ports cannot be set to CONSTRAINED_DONT_CARE for non-LUTRAM ram block type. This will cause incorrect simulation result.");
+            $display("Time: %0t  Instance: %m", $time);
+        end
+
         if ((is_lutram != 1) && (cread_during_write_mode_mixed_ports == "NEW_DATA"))
         begin
             $display("Warning: read_during_write_mode_mixed_ports cannot be set to NEW_DATA for non-LUTRAM ram block type. This will cause incorrect simulation result.");
@@ -44591,7 +49503,8 @@ module altsyncram   (
         end
 
         if ((family_has_stratixi_style_ram == 1) &&
-            (clock_enable_input_b == "BYPASS"))
+            (clock_enable_input_b == "BYPASS") &&
+            ((operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "DUAL_PORT")))
         begin
             $display("Error: BYPASS value for CLOCK_ENABLE_INPUT_B is not supported in %s device family", intended_device_family);
             $display("Time: %0t  Instance: %m", $time);
@@ -44599,7 +49512,8 @@ module altsyncram   (
         end
 
         if ((family_has_stratixi_style_ram == 1) &&
-            (clock_enable_output_b == "BYPASS"))
+            (clock_enable_output_b == "BYPASS") &&
+            ((operation_mode == "BIDIR_DUAL_PORT") || (operation_mode == "DUAL_PORT")))
         begin
             $display("Error: BYPASS value for CLOCK_ENABLE_OUTPUT_B is not supported in %s device family", intended_device_family);
             $display("Time: %0t  Instance: %m", $time);
@@ -44691,7 +49605,7 @@ module altsyncram   (
         end
         
         if ((is_lutram != 1) && (i_ram_block_type != "AUTO") && 
-            (read_during_write_mode_mixed_ports == "NEW_DATA"))
+            ((read_during_write_mode_mixed_ports == "NEW_DATA") || (read_during_write_mode_mixed_ports == "CONSTRAINED_DONT_CARE")))
         begin
             $display("Error: %s value for read_during_write_mode_mixed_ports is not supported in %s RAM block type", read_during_write_mode_mixed_ports, i_ram_block_type);
             $display("Time: %0t  Instance: %m", $time);
@@ -44804,9 +49718,31 @@ module altsyncram   (
             $finish;
         end
 
-        if ((i_ram_block_type != "M20K") && (i_ram_block_type != "M144K") && ((enable_ecc != "FALSE") && (enable_ecc != "NONE")) && (operation_mode != "DUAL_PORT"))
+       if((enable_ecc == "TRUE") && (((i_ram_block_type != "M20K") && (i_ram_block_type != "M144K")) || (operation_mode != "DUAL_PORT")))
         begin
-            $display("Warning: %s value for enable_ecc is not supported in %s ram block type for %s device family in %s operation mode", enable_ecc, i_ram_block_type, intended_device_family, operation_mode);
+            $display("Error: %s value for enable_ecc is not supported in %s ram block type for %s device family in %s operation mode", enable_ecc, i_ram_block_type, intended_device_family, operation_mode);
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+ 
+        if ((i_ram_block_type != "M20K") && (ecc_pipeline_stage_enabled == "TRUE"))
+        begin
+            $display("Error: %s value for ecc_pipeline_stage_enabled is not supported in %s ram block type.", ecc_pipeline_stage_enabled, i_ram_block_type);
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end
+
+        if ((outdata_reg_b == "UNREGISTERED") && (ecc_pipeline_stage_enabled == "TRUE"))
+        begin
+            $display("Error: %s value for ecc_pipeline_stage_enabled is not supported when output_reg_b is set to %s.", ecc_pipeline_stage_enabled, outdata_reg_b);
+            $display("Time: %0t  Instance: %m", $time);
+            $finish;
+        end     
+        
+        //Setting this to only warning because in synthesis it will ignore the ecc_pipeline_stage_enabled parameter when enable_ecc is set to false
+        if((ecc_pipeline_stage_enabled == "TRUE") && (enable_ecc != "TRUE"))
+        begin
+            $display("Warning: %s value for ecc_pipeline_stage_enabled is not supported when enable_ecc is set to %s", ecc_pipeline_stage_enabled, enable_ecc);
             $display("Time: %0t  Instance: %m", $time);
         end
         
@@ -44902,7 +49838,7 @@ module altsyncram   (
             end
             else if (((i_ram_block_type == "M-RAM") ||
                 (i_ram_block_type == "MEGARAM") ||
-                ((i_ram_block_type == "AUTO") && (cread_during_write_mode_mixed_ports == "DONT_CARE")) ||
+                ((i_ram_block_type == "AUTO") && ((cread_during_write_mode_mixed_ports == "DONT_CARE") || (cread_during_write_mode_mixed_ports == "CONSTRAINED_DONT_CARE"))) ||
                 (family_hardcopyii == 1) || 
                 (family_hardcopyiii == 1) || 
                 (family_hardcopyiv == 1) || 
@@ -44962,16 +49898,8 @@ module altsyncram   (
 
             if (init_file_b_port)
             begin
-                `ifdef NO_PLI
-                    $readmemh(init_file, mem_data_b);
-                `else
-                    `ifdef USE_RIF
-                        $readmemh(init_file, mem_data_b);
-                    `else
-                        mem.convert_to_ver_file(init_file, width_b, ram_initf);
-                        $readmemh(ram_initf, mem_data_b);
-                    `endif 
-                `endif
+                 mem.convert_to_ver_file(init_file, width_b, ram_initf);
+                 $readmemh(ram_initf, mem_data_b);
 
                 for (i = 0; i < (i_numwords_b * width_b); i = i + 1)
                 begin
@@ -44984,16 +49912,8 @@ module altsyncram   (
             end
             else
             begin
-                `ifdef NO_PLI
-                    $readmemh(init_file, mem_data);
-                `else
-                    `ifdef USE_RIF
-                        $readmemh(init_file, mem_data);
-                    `else
-                        mem.convert_to_ver_file(init_file, width_a, ram_initf);
-                        $readmemh(ram_initf, mem_data);
-                    `endif
-                `endif
+                mem.convert_to_ver_file(init_file, width_a, ram_initf);
+                $readmemh(ram_initf, mem_data);
                 
                 if (enable_mem_data_b_reading)
                 begin                
@@ -45038,19 +49958,21 @@ module altsyncram   (
         i_read_flag_b = 0;
         i_write_flag_a = 0;
         i_write_flag_b = 0;
-        i_byteena_mask_reg_a = {width_a{1'b1}};
-        i_byteena_mask_reg_b = {width_b{1'b1}};
         i_byteena_mask_reg_a_x = 0;
         i_byteena_mask_reg_b_x = 0;
-        i_byteena_mask_reg_a_out = {width_a{1'b1}};
-        i_byteena_mask_reg_b_out = {width_b{1'b1}};
         i_original_data_b = 0;
         i_original_data_a = 0;
         i_data_write_time_a = 0;
+        i_data_write_time_b = 0;
         i_core_clocken_a_reg = 0;
         i_core_clocken0_b_reg = 0;
         i_core_clocken1_b_reg = 0;
 
+        i_byteena_mask_reg_a = (family_has_stratixv_style_ram == 1)? {width_a{1'b0}} : {width_a{1'b1}};
+        i_byteena_mask_reg_b = (family_has_stratixv_style_ram == 1)? {width_a{1'b0}} : {width_a{1'b1}};
+        i_byteena_mask_reg_a_out = (family_has_stratixv_style_ram == 1)? {width_a{1'b0}} : {width_a{1'b1}};
+        i_byteena_mask_reg_b_out = (family_has_stratixv_style_ram == 1)? {width_a{1'b0}} : {width_a{1'b1}};
+        
         if ((family_has_stratixv_style_ram == 1) || (family_has_stratixiii_style_ram == 1))
         begin
             i_rden_reg_a = 0;
@@ -45066,7 +49988,7 @@ module altsyncram   (
 
         if (((i_ram_block_type == "M-RAM") ||
                 (i_ram_block_type == "MEGARAM") ||
-                ((i_ram_block_type == "AUTO") && (cread_during_write_mode_mixed_ports == "DONT_CARE"))) && 
+                ((i_ram_block_type == "AUTO") && ((cread_during_write_mode_mixed_ports == "DONT_CARE") || (cread_during_write_mode_mixed_ports == "CONSTRAINED_DONT_CARE")))) && 
                 (family_has_stratixv_style_ram != 1) && (family_has_stratixiii_style_ram != 1))
         begin
             i_q_tmp_a = {width_a{1'bx}};
@@ -45147,7 +50069,17 @@ module altsyncram   (
                                             clocken1 : (outdata_reg_b == "CLOCK0") ?
                                             clocken0 : 1'b1;
 
-
+    // port a output latch clock enable assignments:
+    assign i_outlatch_clken_a              = ((clock_enable_output_b == "NORMAL") && (outdata_reg_a == "UNREGISTERED") && (outdata_reg_b == "CLOCK0") && 
+                                            (operation_mode == "BIDIR_DUAL_PORT") && (family_has_stratixv_style_ram == 1))?
+                                            clocken0 : 1'b1;
+    // port b clock enable assignments:
+    assign i_outlatch_clken_b              = ((clock_enable_output_a == "NORMAL") && (outdata_reg_b == "UNREGISTERED") && 
+                                            (operation_mode == "BIDIR_DUAL_PORT") && (family_has_stratixv_style_ram == 1))?
+                                            (((address_reg_b == "CLOCK0") && (outdata_reg_a == "CLOCK0")) ? clocken0 : 
+                                            (((address_reg_b == "CLOCK1") && (outdata_reg_a == "CLOCK1")) ? clocken1 : 1'b1))
+                                            : 1'b1;
+                                            
     assign i_clocken0                     = (clock_enable_input_a == "BYPASS") ?
                                             1'b1 : (clock_enable_input_a == "NORMAL") ?
                                             clocken0 : clocken2;
@@ -45257,13 +50189,13 @@ module altsyncram   (
     always @(posedge clock0)
     begin
     
-        if (i_force_reread_a)
+        if (i_force_reread_a && i_outlatch_clken_a)
         begin
             i_force_reread_a_signal <= ~ i_force_reread_a_signal;
             i_force_reread_a <= 0;
         end
         
-        if (i_force_reread_b && ((is_bidir_and_wrcontrol_addb_clk0 == 1) || (dual_port_addreg_b_clk0 == 1)))
+        if (i_force_reread_b && ((is_bidir_and_wrcontrol_addb_clk0 == 1) || (dual_port_addreg_b_clk0 == 1)) && i_outlatch_clken_b)
         begin
             i_force_reread_b_signal <= ~ i_force_reread_b_signal;
             i_force_reread_b <= 0;
@@ -45309,7 +50241,7 @@ module altsyncram   (
                     i_nmram_write_a <= 1'b1;
             end
 
-            if (((family_stratixv == 1) || (family_stratixiii == 1)) && (is_lutram != 1))
+            if (((family_has_stratixv_style_ram == 1) || (family_stratixiii == 1)) && (is_lutram != 1))
             begin
                 good_to_go_a <= 1;
                 
@@ -45384,7 +50316,7 @@ module altsyncram   (
                
             end
 
-            if (((family_stratixv == 0) && (family_stratixiii == 0)) || 
+            if (((family_has_stratixv_style_ram == 0) && (family_stratixiii == 0)) || 
                 (is_lutram == 1))
             begin
                 good_to_go_a <= 1;
@@ -45424,7 +50356,7 @@ module altsyncram   (
 
             if (i_core_clocken0_b)
             begin
-                if ((family_stratixv == 1) || (family_stratixiii == 1))
+                if ((family_has_stratixv_style_ram == 1) || (family_stratixiii == 1))
                 begin
                     good_to_go_b <= 1;
                     
@@ -45469,7 +50401,7 @@ module altsyncram   (
                     i_data_reg_b <= data_b;
         
 
-                if ((family_stratixv == 0) && (family_stratixiii == 0))
+                if ((family_has_stratixv_style_ram == 0) && (family_stratixiii == 0))
                 begin
                     good_to_go_b <= 1;
                 
@@ -45544,7 +50476,7 @@ module altsyncram   (
 
             if (i_core_clocken0_b)
             begin
-                if (((family_stratixv == 1) || (family_stratixiii == 1)) && !is_lutram)
+                if (((family_has_stratixv_style_ram == 1) || (family_stratixiii == 1)) && !is_lutram)
                 begin
                     good_to_go_b <= 1;
                     
@@ -45561,7 +50493,7 @@ module altsyncram   (
                 ((clock_enable_input_b == "NORMAL") && clocken0) ||
                 ((clock_enable_input_b == "ALTERNATE") && clocken2))
             begin
-                if (((family_stratixv == 0) && (family_stratixiii == 0)) || is_lutram)
+                if (((family_has_stratixv_style_ram == 0) && (family_stratixiii == 0)) || is_lutram)
                 begin
                     good_to_go_b <= 1;
                 
@@ -45648,7 +50580,7 @@ module altsyncram   (
             begin
                 i_read_flag_b <= ~i_read_flag_b;
     
-                if ((family_stratixv == 1) || (family_stratixiii == 1))
+                if ((family_has_stratixv_style_ram == 1) || (family_stratixiii == 1))
                 begin
                     good_to_go_b <= 1;
                     
@@ -45692,7 +50624,7 @@ module altsyncram   (
                         i_data_reg_b <= data_b;
                 end
 
-                if ((family_stratixv == 0) && (family_stratixiii == 0))
+                if ((family_has_stratixv_style_ram == 0) && (family_stratixiii == 0))
                 begin
                     good_to_go_b <= 1;
     
@@ -45771,7 +50703,7 @@ module altsyncram   (
                     i_force_reread_b_signal <= ~ i_force_reread_b_signal;
                     i_force_reread_b1 <= 0;
                 end
-                if (((family_stratixv == 1) || (family_stratixiii == 1)) && !is_lutram)
+                if (((family_has_stratixv_style_ram == 1) || (family_stratixiii == 1)) && !is_lutram)
                 begin
                     good_to_go_b <= 1;
                     
@@ -45792,7 +50724,7 @@ module altsyncram   (
                 ((clock_enable_input_b == "NORMAL") && clocken1) ||
                 ((clock_enable_input_b == "ALTERNATE") && clocken3))
             begin
-                if (((family_stratixv == 0) && (family_stratixiii == 0)) || is_lutram)
+                if (((family_has_stratixv_style_ram == 0) && (family_stratixiii == 0)) || is_lutram)
                 begin
                     good_to_go_b <= 1;
                 
@@ -45861,14 +50793,14 @@ module altsyncram   (
     
     always @(posedge i_outdata_aclr_a)
     begin
-        if (((family_stratixv == 1) || (family_cycloneiii == 1)) && 
+        if (((family_has_stratixv_style_ram == 1) || (family_cycloneiii == 1)) && 
             ((outdata_reg_a != "CLOCK0") && (outdata_reg_a != "CLOCK1")))
             i_read_flag_a <= ~i_read_flag_a;
     end
 
     always @(posedge i_outdata_aclr_b)
     begin
-        if (((family_stratixv == 1) || (family_cycloneiii == 1)) && 
+        if (((family_has_stratixv_style_ram == 1) || (family_cycloneiii == 1)) && 
             ((outdata_reg_b != "CLOCK0") && (outdata_reg_b != "CLOCK1")))
             i_read_flag_b <= ~i_read_flag_b;
     end
@@ -46082,7 +51014,7 @@ module altsyncram   (
                         port_b_bit_count_low = i_address_reg_b * width_b;
                         port_a_bit_count_low = i_address_reg_a * width_a;
                         port_a_bit_count_high = port_a_bit_count_low + width_a;
-                        
+                        i_data_write_time_b = $time;                        
                         for (i2 = 0; i2 < width_b; i2 = i2 + 1)
                         begin
                             port_b_bit_count_high = port_b_bit_count_low + i2;
@@ -46130,7 +51062,7 @@ module altsyncram   (
             begin
 
                 if (((i_ram_block_type == "M-RAM") || (i_ram_block_type == "MEGARAM") ||
-                        ((i_ram_block_type == "AUTO") && (cread_during_write_mode_mixed_ports == "DONT_CARE"))) && 
+                        ((i_ram_block_type == "AUTO") && ((cread_during_write_mode_mixed_ports == "DONT_CARE") || (cread_during_write_mode_mixed_ports == "CONSTRAINED_DONT_CARE")))) && 
                     (operation_mode != "ROM") &&
                     ((family_has_stratixv_style_ram == 0) && (family_has_stratixiii_style_ram == 0)))
                     i_q_tmp2_a = {width_a{1'bx}};
@@ -46189,7 +51121,7 @@ module altsyncram   (
                             ((((is_bidir_and_wrcontrol_addb_clk0 & i_clocken0_b) || 
                             (is_bidir_and_wrcontrol_addb_clk1 & i_clocken1_b)) && ((family_has_stratixv_style_ram == 1) || (family_has_stratixiii_style_ram == 1))) ||
                             (((is_bidir_and_wrcontrol_addb_clk0 & i_core_clocken0_b) || 
-                            (is_bidir_and_wrcontrol_addb_clk1 & i_core_clocken1_b)) && ((family_has_stratixv_style_ram == 1) || (family_has_stratixiii_style_ram == 1)))))
+                            (is_bidir_and_wrcontrol_addb_clk1 & i_core_clocken1_b)) && ((family_has_stratixv_style_ram == 1) || (family_has_stratixiii_style_ram == 1)))) & (i_data_write_time_b == $time))
                             begin
                                 add_reg_a_mult_wa = i_address_reg_a * width_a;
                                 add_reg_b_mult_wb = i_address_reg_b * width_b;
@@ -46248,9 +51180,9 @@ module altsyncram   (
                 if ((is_lutram == 1) && i_address_aclr_a && (i_address_aclr_family_a == 0) && (operation_mode == "ROM"))
                     i_q_tmp2_a = mem_data[0];
                 
-                if (((family_stratixv == 1) || (family_cycloneiii == 1)) && 
+                if (((family_has_stratixv_style_ram == 1) || (family_cycloneiii == 1)) && 
                     (is_lutram != 1) &&
-                    (i_outdata_aclr_a) &&
+                    (i_outdata_aclr_a || i_force_reread_a) &&
                     (outdata_reg_a != "CLOCK0") && (outdata_reg_a != "CLOCK1"))
                     i_q_tmp2_a = {width_a{1'b0}};
             end // end good_to_go_a
@@ -46277,7 +51209,7 @@ module altsyncram   (
         else 
             begin
                 if (i_outdata_aclr_a_prev && ~ i_outdata_aclr_a && 
-                    (family_has_stratixv_style_ram != 1) && (family_has_stratixiii_style_ram == 1) &&
+                    (family_has_stratixiii_style_ram == 1) &&
                     (is_lutram != 1))
                 begin
                     i_outdata_aclr_a_prev = i_outdata_aclr_a;
@@ -46289,7 +51221,7 @@ module altsyncram   (
                         i_q_tmp_a <= {width_a{1'bx}};
                     i_force_reread_a1 <= 1;
                 end
-                else if ((i_force_reread_a1 == 0) && !(i_address_aclr_a_prev && ~i_address_aclr_a && (i_address_aclr_family_a == 0) && s3_address_aclr_a))
+                else if ((i_force_reread_a == 0) && (i_force_reread_a1 == 0) && !(i_address_aclr_a_prev && ~i_address_aclr_a && (i_address_aclr_family_a == 0) && s3_address_aclr_a))
                 begin
                     i_q_tmp_a <= i_q_tmp2_a;
                 end
@@ -46329,7 +51261,7 @@ module altsyncram   (
                 else if (i_outdata_clken_a)
                 begin           
                     if ((i_address_aclr_a_flag == 1) &&
-                        (family_stratixv || family_stratixiii) && (is_lutram != 1))
+                        (family_has_stratixv_style_ram || family_stratixiii) && (is_lutram != 1))
                         i_q_reg_a <= 'bx;
                     else
                         i_q_reg_a <= i_q_tmp_a;
@@ -46412,7 +51344,7 @@ module altsyncram   (
                                     else
                                         temp_wb = mem_data[i_address_reg_b];
                                 end
-                                else if (cread_during_write_mode_mixed_ports == "DONT_CARE")
+                                else if ((cread_during_write_mode_mixed_ports == "DONT_CARE") || (cread_during_write_mode_mixed_ports == "CONSTRAINED_DONT_CARE"))
                                     temp_wb = mem_data[i_address_reg_b] ^ i_byteena_mask_reg_a_out_b;
                                 else
                                     temp_wb = mem_data[i_address_reg_b];
@@ -46446,7 +51378,10 @@ module altsyncram   (
                                                 else
                                                     temp_wb = mem_data[i_address_reg_b];
                                             else
-                                                temp_wb = mem_data[i_address_reg_b] ^ i_byteena_mask_reg_a_out_b;
+                                                if(i_data_write_time_a == $time)
+                                                    temp_wb = mem_data[i_address_reg_b] ^ i_byteena_mask_reg_a_out_b;
+                                                else
+                                                    temp_wb = mem_data[i_address_reg_b];
                                     end
                                 end
                             end
@@ -46493,7 +51428,7 @@ module altsyncram   (
                                     end
                                     else if (cread_during_write_mode_mixed_ports == "OLD_DATA")
                                         temp_wa2b = i_original_data_a;
-                                    else if (cread_during_write_mode_mixed_ports == "DONT_CARE")
+                                    else if ((cread_during_write_mode_mixed_ports == "DONT_CARE") || (cread_during_write_mode_mixed_ports == "CONSTRAINED_DONT_CARE"))
                                     begin
                                         temp_wa2b = mem_data[j2_plus_i5_div_a];
                                         temp_wa2b = temp_wa2b ^ i_byteena_mask_reg_a_out_b;
@@ -46527,16 +51462,22 @@ module altsyncram   (
                                         // if A write to the same Ram address B is reading from
                                         if (j2_plus_i5_div_a == i_address_reg_a)
                                         begin
-                                            if (lutram_single_port_fast_read == 1)
+                                            if (lutram_single_port_fast_read == 1 && (i_data_write_time_a == $time))
                                                 temp_wa2b = (i_data_reg_a & i_byteena_mask_reg_a) | (i_q_tmp2_a & ~i_byteena_mask_reg_a) ^ i_byteena_mask_reg_a_x;
                                             else
                                             begin
-                                                if (cread_during_write_mode_mixed_ports == "OLD_DATA")
-                                                    temp_wa2b = i_original_data_a;
+                                                if(i_data_write_time_a == $time) begin
+                                                    if (cread_during_write_mode_mixed_ports == "OLD_DATA")
+                                                        temp_wa2b = i_original_data_a;
+                                                    else
+                                                    begin
+                                                        temp_wa2b = mem_data[j2_plus_i5_div_a];
+                                                        temp_wa2b = temp_wa2b ^ i_byteena_mask_reg_a_out_b;
+                                                    end
+                                                end
                                                 else
                                                 begin
-                                                    temp_wa2b = mem_data[j2_plus_i5_div_a];
-													temp_wa2b = temp_wa2b ^ i_byteena_mask_reg_a_out_b;
+                                                    temp_wa2b = i_original_data_a;
                                                 end
                                             end
                                                 
@@ -46575,8 +51516,8 @@ module altsyncram   (
                     end
                 end
                 
-                if ((i_outdata_aclr_b) && 
-                    ((family_stratixv == 1) || (family_cycloneiii == 1)) &&
+                if ((i_outdata_aclr_b || i_force_reread_b) && 
+                    ((family_has_stratixv_style_ram == 1) || (family_cycloneiii == 1)) &&
                     (is_lutram != 1) &&
                     (outdata_reg_b != "CLOCK0") && (outdata_reg_b != "CLOCK1"))
                     i_q_tmp2_b = {width_b{1'b0}};
@@ -46606,19 +51547,20 @@ module altsyncram   (
             if (operation_mode == "BIDIR_DUAL_PORT")
             begin
             
-                if (i_outdata_aclr_b_prev && ~ i_outdata_aclr_b && (family_has_stratixv_style_ram != 1) && (family_has_stratixiii_style_ram == 1) && (is_lutram != 1))
+                if (i_outdata_aclr_b_prev && ~ i_outdata_aclr_b && (family_has_stratixiii_style_ram == 1) && (is_lutram != 1))
                 begin
                     i_outdata_aclr_b_prev <= i_outdata_aclr_b;
                     i_force_reread_b <= 1;
                 end
                 else
                 begin
-                    i_q_tmp_b <= i_q_tmp2_b;
+                    if( i_force_reread_b == 0)
+                        i_q_tmp_b <= i_q_tmp2_b;
                 end
             end
             else if (operation_mode == "DUAL_PORT")
             begin
-                if (i_outdata_aclr_b_prev && ~ i_outdata_aclr_b && (family_has_stratixv_style_ram != 1) && (family_has_stratixiii_style_ram == 1) && (is_lutram != 1))
+                if (i_outdata_aclr_b_prev && ~ i_outdata_aclr_b && (family_has_stratixiii_style_ram == 1) && (is_lutram != 1))
                 begin
                     i_outdata_aclr_b_prev <= i_outdata_aclr_b;
                     i_force_reread_b <= 1;
@@ -46627,10 +51569,15 @@ module altsyncram   (
                 begin
                     if (i_rden_reg_b)
                         i_q_tmp_b <= {width_b{1'bx}};
-                        i_force_reread_b1 <= 1;
+                    i_force_reread_b1 <= 1;
                 end
                 else if ((i_force_reread_b1 == 0) && !(i_address_aclr_b_prev && ~i_address_aclr_b && (i_address_aclr_family_b == 0) && s3_address_aclr_b))
                 begin
+        
+        
+                if ((is_lutram == 1) && (is_write_on_positive_edge) && (cread_during_write_mode_mixed_ports == "OLD_DATA") && (width_a == width_b) && (i_address_reg_a == i_address_reg_b) && i_wren_reg_a && i_rden_reg_b)
+                    i_q_tmp_b <= i_original_data_a;
+        else
                     i_q_tmp_b <= i_q_tmp2_b;
                 end
             end
@@ -46643,21 +51590,30 @@ module altsyncram   (
         i_address_aclr_b_prev <= i_address_aclr_b;
     end
 
-    // output latch for lutram (only used when read_during_write_mode_mixed_ports == "OLD_DATA")
     generate if (outdata_reg_b == "CLOCK1")
         begin: clk1_on_outb_fall_gen
             always @(negedge clock1)
             begin
                 if (i_core_clocken_a)
-                    i_q_output_latch <= i_q_tmp2_b;
-            end
+        begin
+                    if ((width_a == width_b) && (i_address_reg_a == i_address_reg_b) && i_wren_reg_a && i_rden_reg_b)
+                        i_q_output_latch <= i_original_data_a;
+                else
+                        i_q_output_latch <= i_q_tmp2_b;
+                end
+        end
         end
         else if (outdata_reg_b == "CLOCK0")
         begin: clk0_on_outb_fall_gen
             always @(negedge clock0)
             begin
                 if (i_core_clocken_a)
-                    i_q_output_latch <= i_q_tmp2_b;
+        begin
+                    if ((width_a == width_b) && (i_address_reg_a == i_address_reg_b) && i_wren_reg_a && i_rden_reg_b)
+                        i_q_output_latch <= i_original_data_a;
+                else
+                        i_q_output_latch <= i_q_tmp2_b;
+                end
             end
         end
     endgenerate
@@ -46671,7 +51627,7 @@ module altsyncram   (
                     i_q_reg_b <= 0;
                 else if (i_outdata_clken_b)
                 begin
-                    if ((i_address_aclr_b_flag == 1) && (family_stratixv || family_stratixiii) &&
+                    if ((i_address_aclr_b_flag == 1) && (family_has_stratixv_style_ram || family_stratixiii) &&
                         (is_lutram != 1))
                         i_q_reg_b <= 'bx;
                     else
@@ -46691,7 +51647,7 @@ module altsyncram   (
                         i_q_reg_b <= i_q_output_latch;
                     else
                     begin           
-                        if ((i_address_aclr_b_flag == 1) && (family_stratixv || family_stratixiii) &&
+                        if ((i_address_aclr_b_flag == 1) && (family_has_stratixv_style_ram || family_stratixiii) &&
                             (is_lutram != 1))
                             i_q_reg_b <= 'bx;
                         else
@@ -46702,32 +51658,32 @@ module altsyncram   (
         end
     endgenerate
 
-	generate if (outdata_reg_b == "CLOCK0" && ecc_pipeline_stage_enabled == "TRUE")
-	begin: clk0_on_ecc_pipeline_reg_rise_gen
-		 always @(posedge clock0 or posedge i_outdata_aclr_b)
-		begin
-			if (i_outdata_aclr_b)
-				i_q_ecc_reg_b <= 0;
-			else if (i_outdata_clken_b)
-			begin
-				i_q_ecc_reg_b <= i_q_reg_b;
-			end
-		end
-	end
-			else if (outdata_reg_b == "CLOCK1" && ecc_pipeline_stage_enabled == "TRUE")
-	begin: clk0_on_ecc_pipeline_reg_rise_gen
-		always @(posedge clock1 or posedge i_outdata_aclr_b)
-		begin
-			if (i_outdata_aclr_b)
-				i_q_ecc_reg_b <= 0;
-			else if (i_outdata_clken_b)
-			begin
-				i_q_ecc_reg_b <= i_q_reg_b;
-			end
-		end
-	end
-	endgenerate
-	
+    generate if (outdata_reg_b == "CLOCK0" && ecc_pipeline_stage_enabled == "TRUE")
+    begin: clk0_on_ecc_pipeline_reg_rise_gen
+         always @(posedge clock0 or posedge i_outdata_aclr_b)
+        begin
+            if (i_outdata_aclr_b)
+                i_q_ecc_reg_b <= 0;
+            else if (i_outdata_clken_b)
+            begin
+                i_q_ecc_reg_b <= i_q_reg_b;
+            end
+        end
+    end
+            else if (outdata_reg_b == "CLOCK1" && ecc_pipeline_stage_enabled == "TRUE")
+    begin: clk0_on_ecc_pipeline_reg_rise_gen
+        always @(posedge clock1 or posedge i_outdata_aclr_b)
+        begin
+            if (i_outdata_aclr_b)
+                i_q_ecc_reg_b <= 0;
+            else if (i_outdata_clken_b)
+            begin
+                i_q_ecc_reg_b <= i_q_reg_b;
+            end
+        end
+    end
+    endgenerate
+    
     // Latch for address aclr till outclock enabled
     always @(posedge i_address_aclr_b or posedge i_outdata_aclr_b)
         if (i_outdata_aclr_b)
@@ -46743,14 +51699,14 @@ module altsyncram   (
                     (operation_mode == "ROM")) ?
                         {width_b{1'b0}} : (((outdata_reg_b == "CLOCK0") ||
                             (outdata_reg_b == "CLOCK1")) ?
-							((ecc_pipeline_stage_enabled == "TRUE")?(i_q_ecc_reg_b) : (i_q_reg_b)):
-							((ecc_pipeline_stage_enabled == "TRUE")?(i_q_ecc_tmp_b) : (i_q_tmp_b))); //i_q_ecc_tmp_b has 'x' output
+                            ((ecc_pipeline_stage_enabled == "TRUE")?(i_q_ecc_reg_b) : (i_q_reg_b)):
+                            ((ecc_pipeline_stage_enabled == "TRUE")?(i_q_ecc_tmp_b) : (i_q_tmp_b))); //i_q_ecc_tmp_b has 'x' output
 
 
     // ECC status
     assign eccstatus = {width_eccstatus{1'b0}};
 
-endmodule // ALTSYNCRAM
+endmodule // altsyncram_body
 
 // END OF MODULE
 
@@ -47119,16 +52075,10 @@ module alt3pram (wren, data, wraddress, inclock, inclocken,
                     mem_data[i] = 0;
         else
         begin
-`ifdef NO_PLI
-            $readmemh(lpm_file, mem_data);
-`else
-    `ifdef USE_RIF
-            $readmemh(lpm_file, mem_data);
-    `else
-            mem.convert_to_ver_file(lpm_file, width, ram_initf);
-            $readmemh(ram_initf, mem_data);
-    `endif 
-`endif
+        
+    mem.convert_to_ver_file(lpm_file, width, ram_initf);
+        $readmemh(ram_initf, mem_data);
+
         end
 
         // Initialize registers
@@ -47668,6 +52618,7 @@ module scfifo ( data,
                 aclr, 
                 sclr,
                 q, 
+                eccstatus,
                 usedw, 
                 full, 
                 empty, 
@@ -47690,12 +52641,14 @@ module scfifo ( data,
     parameter almost_full_value       = 0;
     parameter almost_empty_value      = 0;
     parameter maximum_depth           = 0;    
+    parameter enable_ecc              = "FALSE";  
 
 // LOCAL_PARAMETERS_BEGIN
 
     parameter showahead_area          = ((lpm_showahead == "ON")  && (add_ram_output_register == "OFF"));
     parameter showahead_speed         = ((lpm_showahead == "ON")  && (add_ram_output_register == "ON"));
     parameter legacy_speed            = ((lpm_showahead == "OFF") && (add_ram_output_register == "ON"));
+    parameter ram_block_type = "AUTO";
 
 // LOCAL_PARAMETERS_END
 
@@ -47714,6 +52667,7 @@ module scfifo ( data,
     output empty;
     output almost_full;
     output almost_empty;
+    output [1:0] eccstatus;
 
 // INTERNAL REGISTERS DECLARATION
     reg [lpm_width-1:0] mem_data [(1<<lpm_widthu):0];
@@ -47844,8 +52798,9 @@ module scfifo ( data,
     begin        
         if (aclr)
         begin
-            if (add_ram_output_register == "ON")
-                tmp_q <= {lpm_width{1'b0}};
+            if (add_ram_output_register == "ON")begin
+                //do nothing, ram output is not reset on scfifo
+            end
             else if ((lpm_showahead == "ON") && (use_eab == "ON"))
             begin
                 tmp_q <= {lpm_width{1'bX}};
@@ -47864,11 +52819,14 @@ module scfifo ( data,
             count_id <= 0;
             full_flag <= 1'b0;
             empty_flag <= 1'b1;
+            write_flag <= 1'b0;
             empty_latency1 <= 1'b1; 
             empty_latency2 <= 1'b1;
             set_q_to_x <= 1'b0;
             set_q_to_x_by_empty <= 1'b0;
             wrt_count <= 0;
+            //reset stratix_family for x-prop
+            stratix_family <= (dev.FEATURE_FAMILY_STRATIX(intended_device_family));    
             
             if (almost_full_value > 0)
                 almost_full_flag <= 1'b0;
@@ -47881,10 +52839,9 @@ module scfifo ( data,
             begin
                 write_latency1 <= 1'bx;
                 write_latency2 <= 1'bx;
-                data_shown <= {lpm_width{1'b0}};
-                if (add_ram_output_register == "ON")
-                    tmp_q <= {lpm_width{1'b0}};
-                else
+                data_shown <= {(1<<lpm_widthu){1'b0}};
+                data_ready <= {(1<<lpm_widthu){1'b0}};
+                if (add_ram_output_register == "OFF")
                     tmp_q <= {lpm_width{1'bX}};
             end            
         end
@@ -47892,20 +52849,21 @@ module scfifo ( data,
         begin
             if (sclr)
             begin
-                if (add_ram_output_register == "ON")
-                    tmp_q <= {lpm_width{1'b0}};
-                else
+                if (add_ram_output_register == "OFF")
                     tmp_q <= {lpm_width{1'bX}};
 
                 read_id <= 0;
                 count_id <= 0;
                 full_flag <= 1'b0;
                 empty_flag <= 1'b1;
+                write_flag <= 1'b0;
                 empty_latency1 <= 1'b1; 
                 empty_latency2 <= 1'b1;
                 set_q_to_x <= 1'b0;
                 set_q_to_x_by_empty <= 1'b0;
                 wrt_count <= 0;
+                //reset stratix_family for x-prop
+                stratix_family <= (dev.FEATURE_FAMILY_STRATIX(intended_device_family));  
 
                 if (almost_full_value > 0)
                     almost_full_flag <= 1'b0;
@@ -47930,10 +52888,9 @@ module scfifo ( data,
                 begin
                     write_latency1 <= 1'bx;
                     write_latency2 <= 1'bx;
-                    data_shown <= {lpm_width{1'b0}};                    
-                    if (add_ram_output_register == "ON")
-                        tmp_q <= {lpm_width{1'b0}};
-                    else
+                    data_shown <= {(1<<lpm_widthu){1'b0}};
+                    data_ready <= {(1<<lpm_widthu){1'b0}};                    
+                    if (add_ram_output_register == "OFF")
                         tmp_q <= {lpm_width{1'bX}};
                 end            
             end
@@ -48246,7 +53203,7 @@ module scfifo ( data,
                                 begin
                                     write_latency1 <= write_id;                    
                                     data_shown[write_id] <= 1'b1;
-                                    data_ready[write_id] <= 1'bx;
+                                    data_ready[write_id] <= 1'b0;
                                 end
                                 else
                                 begin 
@@ -48269,7 +53226,7 @@ module scfifo ( data,
                                 begin
                                     write_latency1 <= write_id;                    
                                     data_shown[write_id] <= 1'b1;
-                                    data_ready[write_id] <= 1'bx;
+                                    data_ready[write_id] <= 1'b0;
                                 end
                             end
                         end
@@ -48305,6 +53262,9 @@ module scfifo ( data,
                             almost_empty_flag <= 1'b0;
                         else if ((almost_empty_value > 1) && (count_id == almost_empty_value - 1)
                                 && wrreq && !rdreq)
+                            almost_empty_flag <= 1'b0;
+                        else if ((almost_empty_value > 1) && (count_id == almost_empty_value - 1)
+                                && wrreq && !valid_rreq)
                             almost_empty_flag <= 1'b0;
                     end
                     else
@@ -48416,7 +53376,7 @@ module scfifo ( data,
         begin
             if (!empty)
             begin
-                if ((lpm_showahead == "ON") && ($time > 0))
+                if (lpm_showahead == "ON")
                     tmp_q <= mem_data[read_id];
             end
         end
@@ -48444,6 +53404,7 @@ module scfifo ( data,
     assign usedw = (set_q_to_x || set_q_to_x_by_empty)? {lpm_widthu{1'bX}} : count_id;
     assign almost_full = (set_q_to_x || set_q_to_x_by_empty)? 1'bX : almost_full_flag;
     assign almost_empty = (set_q_to_x || set_q_to_x_by_empty)? 1'bX : almost_empty_flag;
+    assign eccstatus = {2'b0};
 
 endmodule // scfifo
 // END OF MODULE
@@ -48466,8 +53427,16 @@ endmodule // scfifo
 //--------------------------------------------------------------------------
 `timescale 1 ps / 1 ps
 
+
 // MODULE DECLARATION
-module altshift_taps (shiftin, clock, clken, aclr, shiftout, taps);
+module altshift_taps (shiftin, clock, clken, aclr, sclr, shiftout, taps);
+
+`ifdef ENA_INPUT_X_PROP
+    parameter enable_input_x_prop = 1;
+`else
+    parameter enable_input_x_prop = 0;
+`endif
+
 
 // PARAMETER DECLARATION
     parameter number_of_taps = 4;   // Specifies the number of regularly spaced
@@ -48495,6 +53464,7 @@ module altshift_taps (shiftin, clock, clken, aclr, shiftout, taps);
     input clock;                    // Positive-edge triggered clock
     input clken;                    // Clock enable for the clock port
     input aclr;                     // Asynchronous clear port
+    input sclr;                     // Synchronous clear port
 
 // OUTPUT PORT DECLARATION
     output [width-1:0] shiftout;    // Output from the end of the shift
@@ -48511,14 +53481,16 @@ module altshift_taps (shiftin, clock, clken, aclr, shiftout, taps);
 
 // LOCAL INTEGER DECLARATION
     integer head;     // pointer to memory
+    integer tmp_head;     // pointer to memory
     integer i;        // for loop index
     integer j;        // for loop index
     integer k;        // for loop index
     integer place;
-
+    integer delay_tmp;    
 // TRI STATE DECLARATION
     tri1 clken;
     tri0 aclr;
+    tri0 sclr;
 
 // INITIAL CONSTRUCT BLOCK
     initial
@@ -48539,11 +53511,13 @@ module altshift_taps (shiftin, clock, clken, aclr, shiftout, taps);
             end
         end
     end
-
+wire enable_unknown_clock = enable_input_x_prop && (clock === 1'bx) ? 'bx : 1'b0;
+wire enable_unknown_clear = enable_input_x_prop && (aclr === 1'bx) ?  'bx: 1'b0;
+// Read stage 2 : Send data to output
 // ALWAYS CONSTRUCT BLOCK
-    always @(posedge clock or posedge aclr)
+    always @(posedge clock or posedge aclr or posedge enable_unknown_clock or  posedge enable_unknown_clear)
     begin
-        if (aclr == 1'b1)
+        if ((aclr == 1'b1 && !(aclr === 1'bx) && enable_input_x_prop) ||aclr == 1'b1)
         begin
             for (k=0; k < TOTAL_TAP_DISTANCE; k=k+1)
                 contents[k] = 0;
@@ -48552,12 +53526,88 @@ module altshift_taps (shiftin, clock, clken, aclr, shiftout, taps);
             shiftout_tmp = 0;
             taps_tmp = 0;        
         end
+        else if (((aclr === 1'bx) || (sclr === 1'bx)) && enable_input_x_prop)
+        begin
+            for (k=0; k < TOTAL_TAP_DISTANCE; k=k+1)
+                contents[k] = 'bx;
+
+            head = 'b0;
+            shiftout_tmp = 'bx;
+            taps_tmp = 'bx;        
+        end
+        
+        else if (((clock === 1'bx) ||(clken === 1'bx)) && enable_input_x_prop)
+        begin
+            contents[head] = 'bx;
+            // head = (head+1 ) % TOTAL_TAP_DISTANCE;   
+            shiftout_tmp = contents[head];
+            
+            taps_tmp = 0;
+                delay_tmp = 2;
+            for (k=0; k < number_of_taps; k=k+1)
+            begin
+                    //for (loop_test=0; loop_test<=2; loop_test++)
+                //  begin
+                    //contents[head+number_of_taps-k-1] = 'bx;
+                place =( (((number_of_taps - k-1 ) * tap_distance)+head ) %
+                        TOTAL_TAP_DISTANCE);
+                    contents[place] = 'bx;
+                    //end
+                
+            end
+                taps_tmp ='bx ;
+                shiftout_tmp = 'bx;
+        end
         else
         begin
             if (clken == 1'b1)
             begin
+            if ((sclr == 1'b1 && !(sclr === 1'bx) && enable_input_x_prop) ||sclr == 1'b1 )
+            begin
+                    for (k=0; k < TOTAL_TAP_DISTANCE; k=k+1)
+                    contents[k] = 0;
+
+                head = 0;
+                    shiftout_tmp = 0;
+                    taps_tmp = 0;        
+            end
+            else if ((sclr === 1'bx) && enable_input_x_prop )
+            begin
+                for (k=0; k < TOTAL_TAP_DISTANCE; k=k+1)
+                    contents[k] = 'bx;
+
+                head = 0;
+                    shiftout_tmp = 'bx;
+                    taps_tmp = 'bx;    
+            end
+            else
+            begin
+                if (delay_tmp<=2 && delay_tmp>0) 
+                begin
+                    contents[head] = shiftin;
+                    contents[head+delay_tmp] = 'bx;
+                    //if (delay_tmp <2)
+                        head = (head+1) % TOTAL_TAP_DISTANCE;
+                    
+                    taps_tmp = 0;
+            
+
+                    for (k=0; k < number_of_taps; k=k+1)
+                    begin
+                        place =( (((number_of_taps - k-1 ) * tap_distance)+ head ) %
+                            TOTAL_TAP_DISTANCE);
+                        contents[place] = 'bx;      
+                  
+                    end
+                    taps_tmp = 'bx ;
+                    shiftout_tmp = 'bx;
+                    delay_tmp = delay_tmp-1;
+                end
+                else
+                begin
                 contents[head] = shiftin;
                 head = (head + 1) % TOTAL_TAP_DISTANCE;
+                
                 shiftout_tmp = contents[head];
             
                 taps_tmp = 0;
@@ -48568,6 +53618,8 @@ module altshift_taps (shiftin, clock, clken, aclr, shiftout, taps);
                             TOTAL_TAP_DISTANCE;
                     taps_tmp = taps_tmp | (contents[place] << (k * width));
                 end
+            end
+            end
             end
         end
     end
@@ -48699,6 +53751,13 @@ module altsquare (
     result
 );
 
+// Define flag to enable X-Propagation
+`ifdef ENA_INPUT_X_PROP
+    parameter enable_input_x_prop_altsq = 1;
+`else
+    parameter enable_input_x_prop_altsq = 0;
+`endif
+
 // GLOBAL PARAMETER DECLARATION
     parameter data_width = 1;
     parameter result_width = 1;
@@ -48721,6 +53780,10 @@ module altsquare (
     reg [result_width - 1 : 0]stage_values[pipeline+1 : 0];
     reg [data_width - 1 : 0] pos_data_value;
     reg [(2*data_width) - 1 : 0] temp_value;
+    
+    // For 'X' result
+    reg [result_width - 1 : 0]reg_out_x[pipeline+1 : 0];
+    
     // LOCAL INTEGER DECLARATION
     integer i;
 
@@ -48756,43 +53819,77 @@ module altsquare (
     end // INITIALIZE
 
     // ALWAYS CONSTRUCT BLOCK
+    
+    // Added for x_prop
+    // Check for Input CLK 'X' value
+    wire x_prop_clr;
+    assign x_prop_clr = (( i_aclr === 1'bx ) && enable_input_x_prop_altsq )? 1'b1 : 1'b0;
+    
     always @(data or i_aclr)
     begin
-        if (i_aclr) // clear the pipeline
-            for (i = 0; i <= pipeline; i = i + 1)
-                stage_values[i] = 'b0;
+        // Condition to check for 'X'
+        if (x_prop_clr === 1'b0)
+        begin
+            if (i_aclr) // clear the pipeline
+                for (i = 0; i <= pipeline; i = i + 1)
+                    stage_values[i] = 'b0;
+            else
+            begin
+                if ((representation == "SIGNED") && (data[data_width - 1] == 1))
+                    pos_data_value = (~data) + 1;
+                else
+                    pos_data_value = data;
+
+                if ( (result_width < (2 * data_width)) && (result_alignment == "MSB") )
+                begin
+                    temp_value = pos_data_value * pos_data_value;
+                    stage_values[pipeline] = temp_value[(2*data_width)-1 : (2*data_width)-result_width];
+                end
+                else
+                    stage_values[pipeline] = pos_data_value * pos_data_value;
+            end
+        end
         else
         begin
-            if ((representation == "SIGNED") && (data[data_width - 1] == 1))
-                pos_data_value = (~data) + 1;
-            else
-                pos_data_value = data;
-
-            if ( (result_width < (2 * data_width)) && (result_alignment == "MSB") )
-            begin
-                temp_value = pos_data_value * pos_data_value;
-                stage_values[pipeline] = temp_value[(2*data_width)-1 : (2*data_width)-result_width];
-            end
-            else
-                stage_values[pipeline] = pos_data_value * pos_data_value;
+            // output 'X'
+            for (i = 0; i <= pipeline; i = i + 1)
+                stage_values[i] <= reg_out_x[i + 1];
         end
     end
 
+    // Added for x_prop
+    // Check for Input CLK 'X' value
+    wire x_prop_clk;
+    assign x_prop_clk = (( i_clock === 1'bx || i_clken === 1'bx) && enable_input_x_prop_altsq) ? 1'b1 : 1'b0;
+    
     // Pipeline model
     always @(posedge i_clock)
     begin
-        if (!i_aclr && i_clken == 1)
+        // Condition to check for XPROP
+        if (x_prop_clk === 1'b0)
         begin
+            if (!i_aclr && i_clken == 1)
+            begin
+                for(i = 0; i < pipeline+1; i = i + 1)
+                    if(i < pipeline)
+                        stage_values[i] <= stage_values[i + 1];
+            end
+        end
+        else
+        begin
+            // output 'X'
             for(i = 0; i < pipeline+1; i = i + 1)
                 if(i < pipeline)
-                    stage_values[i] <= stage_values[i + 1];
-        end
+                    stage_values[i] <= reg_out_x[i + 1];
+            
+        end       
     end
 
     // CONTINOUS ASSIGNMENT
     assign result = stage_values[0];
 endmodule // altsquare
 // END OF MODULE
+
 
 
 // START_FILE_HEADER ----------------------------------------------------------
@@ -48853,9 +53950,9 @@ module altera_std_synchronizer (
     //        to enable automatic metastability MTBF analysis.
     //     2. Cut all timing paths terminating on data input pin of the first flop din_s1.
 
-    (* altera_attribute = {"-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS; -name DONT_MERGE_REGISTER ON; -name PRESERVE_REGISTER ON; -name SDC_STATEMENT \"set_false_path -to [get_keepers {*altera_std_synchronizer:*|din_s1}]\" "} *) reg din_s1;
+    (* altera_attribute = {"-name ADV_NETLIST_OPT_ALLOWED NEVER_ALLOW; -name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS; -name DONT_MERGE_REGISTER ON; -name PRESERVE_REGISTER ON; -name SDC_STATEMENT \"set_false_path -to [get_keepers {*altera_std_synchronizer:*|din_s1}]\" "} *) reg din_s1;
 
-    (* altera_attribute = {"-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS; -name DONT_MERGE_REGISTER ON; -name PRESERVE_REGISTER ON"} *) reg [depth-2:0] dreg;    
+    (* altera_attribute = {"-name ADV_NETLIST_OPT_ALLOWED NEVER_ALLOW; -name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS; -name DONT_MERGE_REGISTER ON; -name PRESERVE_REGISTER ON"} *) reg [depth-2:0] dreg;    
 
     //synthesis translate_off
     initial begin
@@ -49067,7 +54164,7 @@ module  alt_cal
         (* ALTERA_ATTRIBUTE = {"PRESERVE_REGISTER=ON;POWER_UP_LEVEL=LOW"} *)
         reg     [3:0]   sim_counter_reg;
         (* ALTERA_ATTRIBUTE = {"PRESERVE_REGISTER=ON;POWER_UP_LEVEL=HIGH"} *)
-	reg     [0:0]   first_run;
+    reg     [0:0]   first_run;
         wire    [3:0]   wire_next_scount_num_dataa;
         wire    [3:0]   wire_next_scount_num_datab;
         wire    [3:0]   wire_next_scount_num_result;
@@ -49080,7 +54177,7 @@ module  alt_cal
         // synopsys translate_off
         initial begin
                 p0addr_sim[0:0] = 0;
-		first_run = 1'b1;
+        first_run = 1'b1;
         end
         // synopsys translate_on
         always @ ( posedge clock)
@@ -49091,12 +54188,12 @@ module  alt_cal
         // synopsys translate_on
         always @ ( posedge clock) begin
                 sim_counter_reg <= ({4{((~start && ~transceiver_init) & sim_activator)}} & (({4{(p0addr_sim | ((~ sim_counter_and) & sim_counter_or))}} & sim_counter_next) | ({4{sim_counter_and}} & sim_counter_reg)) & {4{~(first_run & reset)}}) | ({4{reset & ~first_run}});
-		if (first_run == 1'b1) begin
-			first_run <= ~sim_counter_and;
-		end else begin
-			first_run <= 1'b0;
-		end
-	end
+        if (first_run == 1'b1) begin
+            first_run <= ~sim_counter_and;
+        end else begin
+            first_run <= 1'b0;
+        end
+    end
 
         assign
                 wire_next_scount_num_result = wire_next_scount_num_dataa + wire_next_scount_num_datab;
@@ -49147,26 +54244,26 @@ module  alt_cal_mm
         parameter lpm_type = "alt_cal_mm";
         parameter lpm_hint = "UNUSED";
 
-	// Internal parameters
-	parameter idle			= 5'd0;
-	parameter ch_wait		= 5'd1;
-	parameter testbus_set		= 5'd2;
-	parameter offsets_pden_rd	= 5'd3;
-	parameter offsets_pden_wr	= 5'd4;
-	parameter cal_pd_wr		= 5'd5;
-	parameter cal_rx_rd		= 5'd6;
-	parameter cal_rx_wr		= 5'd7;
-	parameter dprio_wait		= 5'd8;
-	parameter sample_tb		= 5'd9;
-	parameter test_input		= 5'd10;
-	parameter ch_adv		= 5'd12;
-	parameter dprio_read		= 5'd14;
-	parameter dprio_write		= 5'd15;
-	parameter kick_start_rd 	= 5'd13;
-	parameter kick_start_wr 	= 5'd16;
-	parameter kick_pause 		= 5'd17;
-	parameter kick_delay_oc		= 5'd18;
-	parameter sample_length		= 8'd0;
+    // Internal parameters
+    parameter idle          = 5'd0;
+    parameter ch_wait       = 5'd1;
+    parameter testbus_set       = 5'd2;
+    parameter offsets_pden_rd   = 5'd3;
+    parameter offsets_pden_wr   = 5'd4;
+    parameter cal_pd_wr     = 5'd5;
+    parameter cal_rx_rd     = 5'd6;
+    parameter cal_rx_wr     = 5'd7;
+    parameter dprio_wait        = 5'd8;
+    parameter sample_tb     = 5'd9;
+    parameter test_input        = 5'd10;
+    parameter ch_adv        = 5'd12;
+    parameter dprio_read        = 5'd14;
+    parameter dprio_write       = 5'd15;
+    parameter kick_start_rd     = 5'd13;
+    parameter kick_start_wr     = 5'd16;
+    parameter kick_pause        = 5'd17;
+    parameter kick_delay_oc     = 5'd18;
+    parameter sample_length     = 8'd0;
 
 
 
@@ -49205,8 +54302,8 @@ module  alt_cal_mm
         // synopsys translate_off
         initial begin
                 p0addr_sim[0:0] = 0;
-		first_run = 1'b1;
-	end
+        first_run = 1'b1;
+    end
         // synopsys translate_on
         always @ ( posedge clock)
                 p0addr_sim[0:0] <= 1'b1;
@@ -49292,7 +54389,7 @@ module  alt_cal_c3gxb
         (* ALTERA_ATTRIBUTE = {"PRESERVE_REGISTER=ON;POWER_UP_LEVEL=LOW"} *)
         reg     [3:0]   sim_counter_reg;
         (* ALTERA_ATTRIBUTE = {"PRESERVE_REGISTER=ON;POWER_UP_LEVEL=HIGH"} *)
-	reg     [0:0]   first_run;
+    reg     [0:0]   first_run;
         wire    [3:0]   wire_next_scount_num_dataa;
         wire    [3:0]   wire_next_scount_num_datab;
         wire    [3:0]   wire_next_scount_num_result;
@@ -49305,8 +54402,8 @@ module  alt_cal_c3gxb
         // synopsys translate_off
         initial begin
                 p0addr_sim[0:0] = 0;
-		first_run = 1;
-	end
+        first_run = 1;
+    end
         // synopsys translate_on
         always @ ( posedge clock)
                 p0addr_sim[0:0] <= 1'b1;
@@ -49370,6 +54467,7 @@ module  alt_cal_sv
         parameter lpm_hint = "UNUSED";
         parameter sample_length = 8'd100;
         parameter pma_base_address = 12'h0;
+        localparam COUNTER_WIDTH = 9;
 
         output   busy;
         input   clock;
@@ -49388,23 +54486,23 @@ module  alt_cal_sv
         (* ALTERA_ATTRIBUTE = {"PRESERVE_REGISTER=ON;POWER_UP_LEVEL=LOW"} *)
         reg     [0:0]   p0addr_sim;
         (* ALTERA_ATTRIBUTE = {"PRESERVE_REGISTER=ON;POWER_UP_LEVEL=LOW"} *)
-        reg     [3:0]   sim_counter_reg;
+        reg     [COUNTER_WIDTH-1:0]   sim_counter_reg;
         (* ALTERA_ATTRIBUTE = {"PRESERVE_REGISTER=ON;POWER_UP_LEVEL=HIGH"} *)
-	reg     [0:0]   first_run;
-        wire    [3:0]   wire_next_scount_num_dataa;
-        wire    [3:0]   wire_next_scount_num_datab;
-        wire    [3:0]   wire_next_scount_num_result;
+    reg     [0:0]   first_run;
+        wire    [COUNTER_WIDTH-1:0]   wire_next_scount_num_dataa;
+        wire    [COUNTER_WIDTH-1:0]   wire_next_scount_num_datab;
+        wire    [COUNTER_WIDTH-1:0]   wire_next_scount_num_result;
         wire  [0:0]  busy_sim;
         wire  [0:0]  sim_activator;
         wire  [0:0]  sim_counter_and;
-        wire  [3:0]  sim_counter_next;
+        wire  [COUNTER_WIDTH-1:0]  sim_counter_next;
         wire  [0:0]  sim_counter_or;
 
         // synopsys translate_off
         initial begin
                 p0addr_sim[0:0] = 0;
-		first_run = 1;
-	end
+        first_run = 1;
+    end
         // synopsys translate_on
         always @ ( posedge clock)
                 p0addr_sim[0:0] <= 1'b1;
@@ -49413,7 +54511,7 @@ module  alt_cal_sv
                 sim_counter_reg = 0;
         // synopsys translate_on
         always @ ( posedge clock) begin
-                sim_counter_reg <= ({4{(~start & sim_activator)}} & (({4{(p0addr_sim | ((~ sim_counter_and) & sim_counter_or))}} & sim_counter_next) | ({4{sim_counter_and}} & sim_counter_reg)) & {4{~(first_run & reset)}}) | ({4{reset & ~first_run}});
+                sim_counter_reg <= ({COUNTER_WIDTH{(~start & sim_activator)}} & (({COUNTER_WIDTH{(p0addr_sim | ((~ sim_counter_and) & sim_counter_or))}} & sim_counter_next) | ({COUNTER_WIDTH{sim_counter_and}} & sim_counter_reg)) & {COUNTER_WIDTH{~(first_run & reset)}}) | ({COUNTER_WIDTH{reset & ~first_run}});
                 if (first_run == 1'b1) begin
                         first_run <= ~sim_counter_and;
                 end else begin
@@ -49425,7 +54523,7 @@ module  alt_cal_sv
                 wire_next_scount_num_result = wire_next_scount_num_dataa + wire_next_scount_num_datab;
         assign
                 wire_next_scount_num_dataa = sim_counter_reg,
-                wire_next_scount_num_datab = 4'b0001;
+                wire_next_scount_num_datab = 9'b0001;
         assign
                 busy = busy_sim,
                 busy_sim = (~reset & p0addr_sim & (~ sim_counter_and)),
@@ -49435,9 +54533,106 @@ module  alt_cal_sv
                 dprio_wren = 1'b0,
                 quad_addr = {9{1'b0}},
                 sim_activator = p0addr_sim,
-                sim_counter_and = (((sim_counter_reg[0] & sim_counter_reg[1]) & sim_counter_reg[2]) & sim_counter_reg[3]),
+                sim_counter_and = &sim_counter_reg,
                 sim_counter_next = wire_next_scount_num_result,
-                sim_counter_or = (((sim_counter_reg[0] | sim_counter_reg[1]) | sim_counter_reg[2]) | sim_counter_reg[3]);
+                sim_counter_or = |sim_counter_reg;
+endmodule
+//VALID FILE
+
+
+
+module  alt_cal_av
+        ( 
+        busy,
+        clock,
+        dprio_addr,
+        dprio_busy,
+        dprio_datain,
+        dprio_dataout,
+        dprio_rden,
+        dprio_wren,
+        quad_addr,
+        remap_addr,
+        reset,
+        start,
+        testbuses) /* synthesis synthesis_clearbox=1 */;
+
+        parameter number_of_channels = 1;
+        parameter channel_address_width = 1;
+        parameter sim_model_mode = "TRUE";
+        parameter lpm_type = "alt_cal_av";
+        parameter lpm_hint = "UNUSED";
+        parameter sample_length = 8'd100;
+        parameter pma_base_address = 12'h0;
+        localparam COUNTER_WIDTH = 9;
+
+        output   busy;
+        input   clock;
+        output   [15:0]  dprio_addr;
+        input   dprio_busy;
+        input   [15:0]  dprio_datain;
+        output   [15:0]  dprio_dataout;
+        output   dprio_rden;
+        output   dprio_wren;
+        output   [8:0]  quad_addr;
+        input   [11:0]  remap_addr;
+        input   reset;
+        input   start;
+        input   [7:0]  testbuses; // always 8 bits - muxing done in the 'B'
+
+        (* ALTERA_ATTRIBUTE = {"PRESERVE_REGISTER=ON;POWER_UP_LEVEL=LOW"} *)
+        reg     [0:0]   p0addr_sim;
+        (* ALTERA_ATTRIBUTE = {"PRESERVE_REGISTER=ON;POWER_UP_LEVEL=LOW"} *)
+        reg     [COUNTER_WIDTH-1:0]   sim_counter_reg;
+        (* ALTERA_ATTRIBUTE = {"PRESERVE_REGISTER=ON;POWER_UP_LEVEL=HIGH"} *)
+    reg     [0:0]   first_run;
+        wire    [COUNTER_WIDTH-1:0]   wire_next_scount_num_dataa;
+        wire    [COUNTER_WIDTH-1:0]   wire_next_scount_num_datab;
+        wire    [COUNTER_WIDTH-1:0]   wire_next_scount_num_result;
+        wire  [0:0]  busy_sim;
+        wire  [0:0]  sim_activator;
+        wire  [0:0]  sim_counter_and;
+        wire  [COUNTER_WIDTH-1:0]  sim_counter_next;
+        wire  [0:0]  sim_counter_or;
+
+        // synopsys translate_off
+        initial begin
+                p0addr_sim[0:0] = 0;
+        first_run = 1;
+    end
+        // synopsys translate_on
+        always @ ( posedge clock)
+                p0addr_sim[0:0] <= 1'b1;
+        // synopsys translate_off
+        initial
+                sim_counter_reg = 0;
+        // synopsys translate_on
+        always @ ( posedge clock) begin
+                sim_counter_reg <= ({COUNTER_WIDTH{(~start & sim_activator)}} & (({COUNTER_WIDTH{(p0addr_sim | ((~ sim_counter_and) & sim_counter_or))}} & sim_counter_next) | ({COUNTER_WIDTH{sim_counter_and}} & sim_counter_reg)) & {COUNTER_WIDTH{~(first_run & reset)}}) | ({COUNTER_WIDTH{reset & ~first_run}});
+                if (first_run == 1'b1) begin
+                        first_run <= ~sim_counter_and;
+                end else begin
+                        first_run <= 1'b0;
+                end
+        end
+
+        assign
+                wire_next_scount_num_result = wire_next_scount_num_dataa + wire_next_scount_num_datab;
+        assign
+                wire_next_scount_num_dataa = sim_counter_reg,
+                wire_next_scount_num_datab = 9'b0001;
+        assign
+                busy = busy_sim,
+                busy_sim = (~reset & p0addr_sim & (~ sim_counter_and)),
+                dprio_addr = {16{1'b0}},
+                dprio_dataout = {16{1'b0}},
+                dprio_rden = 1'b0,
+                dprio_wren = 1'b0,
+                quad_addr = {9{1'b0}},
+                sim_activator = p0addr_sim,
+                sim_counter_and = &sim_counter_reg,
+                sim_counter_next = wire_next_scount_num_result,
+                sim_counter_or = |sim_counter_reg;
 endmodule
 //VALID FILE
 
@@ -51587,69 +56782,93 @@ endmodule
 
 module    sld_signaltap    (
     jtag_state_sdr,
-    ir_out,
-    jtag_state_cdr,
     ir_in,
-    tdi,
     acq_trigger_out,
+    gnd,
+    jtag_state_cir,
+    jtag_state_e2ir,
+    jtag_state_pir,
+    jtag_state_udr,
+    vcc,
+    jtag_state_e1dr,
+    jtag_state_rti,
+    jtag_state_e1ir,
+    jtag_state_pdr,
+    acq_clk,
+    clr,
+    trigger_in,
+    ir_out,
+    jtag_state_sirs,
+    jtag_state_cdr,
+    jtag_state_sir,
+    jtag_state_e2dr,
+    tms,
+    jtag_state_tlr,
+    jtag_state_sdrs,
+    tdi,
     jtag_state_uir,
     acq_trigger_in,
     trigger_out,
     storage_enable,
     acq_data_out,
-    acq_data_in,
     acq_storage_qualifier_in,
-    jtag_state_udr,
+    acq_data_in,
+    vir_tdi,
     tdo,
     crc,
-    jtag_state_e1dr,
+    clrn,
     raw_tck,
+    irq,
     usr1,
-    acq_clk,
-    shift,
-    ena,
-    clr,
-    trigger_in,
-    update,
-    rti);
+    ena);
 
+    parameter    SLD_USE_JTAG_SIGNAL_ADAPTER    =    1;
     parameter    SLD_CURRENT_RESOURCE_WIDTH    =    0;
     parameter    SLD_INVERSION_MASK    =    "0";
     parameter    SLD_POWER_UP_TRIGGER    =    0;
     parameter    SLD_ADVANCED_TRIGGER_6    =    "NONE";
     parameter    SLD_ADVANCED_TRIGGER_9    =    "NONE";
+    parameter    SLD_RAM_PIPELINE    =    0;
     parameter    SLD_ADVANCED_TRIGGER_7    =    "NONE";
+    parameter    SLD_HPS_EVENT_ENABLED    =    0;
     parameter    SLD_STORAGE_QUALIFIER_ADVANCED_CONDITION_ENTITY    =    "basic";
     parameter    SLD_STORAGE_QUALIFIER_GAP_RECORD    =    0;
+    parameter    SLD_SECTION_ID    =    "hdl_signaltap_0";
     parameter    SLD_INCREMENTAL_ROUTING    =    0;
     parameter    SLD_STORAGE_QUALIFIER_PIPELINE    =    0;
     parameter    SLD_TRIGGER_IN_ENABLED    =    0;
     parameter    SLD_STATE_BITS    =    11;
+    parameter    SLD_HPS_EVENT_ID    =    0;
+    parameter    SLD_CREATE_MONITOR_INTERFACE    =    0;
     parameter    SLD_STATE_FLOW_USE_GENERATED    =    0;
     parameter    SLD_INVERSION_MASK_LENGTH    =    1;
     parameter    SLD_DATA_BITS    =    1;
+    parameter    SLD_COUNTER_PIPELINE    =    0;
     parameter    SLD_BUFFER_FULL_STOP    =    1;
     parameter    SLD_STORAGE_QUALIFIER_INVERSION_MASK_LENGTH    =    0;
     parameter    SLD_ATTRIBUTE_MEM_MODE    =    "OFF";
     parameter    SLD_STORAGE_QUALIFIER_MODE    =    "OFF";
     parameter    SLD_STATE_FLOW_MGR_ENTITY    =    "state_flow_mgr_entity.vhd";
-    parameter    SLD_NODE_CRC_LOWORD    =    50132;
+    parameter    SLD_HPS_TRIGGER_IN_ENABLED    =    0;
     parameter    SLD_ADVANCED_TRIGGER_5    =    "NONE";
+    parameter    SLD_NODE_CRC_LOWORD    =    50132;
     parameter    SLD_TRIGGER_BITS    =    1;
     parameter    SLD_STORAGE_QUALIFIER_BITS    =    1;
+    parameter    SLD_TRIGGER_PIPELINE    =    0;
+    parameter    SLD_HPS_TRIGGER_OUT_ENABLED    =    0;
     parameter    SLD_ADVANCED_TRIGGER_10    =    "NONE";
     parameter    SLD_MEM_ADDRESS_BITS    =    7;
     parameter    SLD_ADVANCED_TRIGGER_ENTITY    =    "basic";
     parameter    SLD_ADVANCED_TRIGGER_4    =    "NONE";
-    parameter    SLD_TRIGGER_LEVEL    =    10;
     parameter    SLD_ADVANCED_TRIGGER_8    =    "NONE";
+    parameter    SLD_TRIGGER_LEVEL    =    10;
     parameter    SLD_RAM_BLOCK_TYPE    =    "AUTO";
     parameter    SLD_ADVANCED_TRIGGER_2    =    "NONE";
     parameter    SLD_ADVANCED_TRIGGER_1    =    "NONE";
     parameter    SLD_DATA_BIT_CNTR_BITS    =    4;
+    parameter    SLD_SAMPLE_DEPTH    =    16;
     parameter    lpm_type    =    "sld_signaltap";
     parameter    SLD_NODE_CRC_BITS    =    32;
-    parameter    SLD_SAMPLE_DEPTH    =    16;
     parameter    SLD_ENABLE_ADVANCED_TRIGGER    =    0;
     parameter    SLD_SEGMENT_SIZE    =    0;
     parameter    SLD_NODE_INFO    =    0;
@@ -51658,36 +56877,48 @@ module    sld_signaltap    (
     parameter    SLD_TRIGGER_LEVEL_PIPELINE    =    1;
     parameter    SLD_ADVANCED_TRIGGER_3    =    "NONE";
 
-    parameter    ELA_STATUS_BITS    =    4;
-    parameter    N_ELA_INSTRS    =    8;
-    parameter    SLD_IR_BITS    =    N_ELA_INSTRS;
+    parameter    SLD_IR_BITS    =    10;
 
     input    jtag_state_sdr;
-    output    [SLD_IR_BITS-1:0]    ir_out;
-    input    jtag_state_cdr;
     input    [SLD_IR_BITS-1:0]    ir_in;
-    input    tdi;
     output    [SLD_TRIGGER_BITS-1:0]    acq_trigger_out;
+    output    gnd;
+    input    jtag_state_cir;
+    input    jtag_state_e2ir;
+    input    jtag_state_pir;
+    input    jtag_state_udr;
+    output    vcc;
+    input    jtag_state_e1dr;
+    input    jtag_state_rti;
+    input    jtag_state_e1ir;
+    input    jtag_state_pdr;
+    input    acq_clk;
+    input    clr;
+    input    trigger_in;
+    output    [SLD_IR_BITS-1:0]    ir_out;
+    input    jtag_state_sirs;
+    input    jtag_state_cdr;
+    input    jtag_state_sir;
+    input    jtag_state_e2dr;
+    input    tms;
+    input    jtag_state_tlr;
+    input    jtag_state_sdrs;
+    input    tdi;
     input    jtag_state_uir;
     input    [SLD_TRIGGER_BITS-1:0]    acq_trigger_in;
     output    trigger_out;
     input    storage_enable;
     output    [SLD_DATA_BITS-1:0]    acq_data_out;
-    input    [SLD_DATA_BITS-1:0]    acq_data_in;
     input    [SLD_STORAGE_QUALIFIER_BITS-1:0]    acq_storage_qualifier_in;
-    input    jtag_state_udr;
+    input    [SLD_DATA_BITS-1:0]    acq_data_in;
+    input    vir_tdi;
     output    tdo;
     input    [SLD_NODE_CRC_BITS-1:0]    crc;
-    input    jtag_state_e1dr;
+    input    clrn;
     input    raw_tck;
+    output    irq;
     input    usr1;
-    input    acq_clk;
-    input    shift;
     input    ena;
-    input    clr;
-    input    trigger_in;
-    input    update;
-    input    rti;
 
 endmodule //sld_signaltap
 
@@ -51740,6 +56971,7 @@ module    altparallel_flash_loader    (
     flash_ncs,
     fpga_pgm);
 
+    parameter    FLASH_STATIC_WAIT_WIDTH    =    15;
     parameter    EXTRA_ADDR_BYTE    =    0;
     parameter    FEATURES_CFG    =    1;
     parameter    PAGE_CLK_DIVISOR    =    1;
@@ -51754,20 +56986,25 @@ module    altparallel_flash_loader    (
     parameter    US_UNIT_COUNTER    =    1;
     parameter    FIFO_SIZE    =    16;
     parameter    CONF_DATA_WIDTH    =    1;
-    parameter    CONF_WAIT_TIMER_WIDTH    =    14;
+    parameter    CONF_WAIT_TIMER_WIDTH    =    16;
     parameter    NFLASH_MFC    =    "NUMONYX";
     parameter    OPTION_BITS_START_ADDRESS    =    0;
     parameter    SAFE_MODE_RETRY    =    1;
     parameter    DCLK_DIVISOR    =    1;
     parameter    FLASH_TYPE    =    "CFI_FLASH";
     parameter    N_FLASH    =    1;
+    parameter    BURST_MODE_LATENCY_COUNT    =    4;
+    parameter    QSPI_DATA_DELAY    =    0;
+    parameter    FLASH_BURST_EXTRA_CYCLE    =    0;
     parameter    TRISTATE_CHECKBOX    =    0;
     parameter    QFLASH_MFC    =    "ALTERA";
     parameter    FEATURES_PGM    =    1;
+    parameter    QFLASH_FAST_SPEED    =    0;
     parameter    DISABLE_CRC_CHECKBOX    =    0;
     parameter    FLASH_DATA_WIDTH    =    16;
     parameter    RSU_WATCHDOG_COUNTER    =    100000000;
     parameter    PFL_RSU_WATCHDOG_ENABLED    =    0;
+    parameter    MT28EW_PAGE_MODE    =    0;
     parameter    SAFE_MODE_HALT    =    0;
     parameter    ADDR_WIDTH    =    20;
     parameter    NAND_SIZE    =    67108864;
@@ -51776,10 +57013,12 @@ module    altparallel_flash_loader    (
     parameter    SAFE_MODE_REVERT    =    0;
     parameter    LPM_TYPE    =    "ALTPARALLEL_FLASH_LOADER";
     parameter    AUTO_RESTART    =    "OFF";
+    parameter    DCLK_CREATE_DELAY    =    0;
     parameter    CLK_DIVISOR    =    1;
     parameter    BURST_MODE_INTEL    =    0;
     parameter    BURST_MODE_NUMONYX    =    0;
     parameter    DECOMPRESSOR_MODE    =    "NONE";
+    parameter    QSPI_DATA_DELAY_COUNT    =    1;
 
     parameter    PFL_QUAD_IO_FLASH_IR_BITS    =    8;
     parameter    PFL_CFI_FLASH_IR_BITS    =    5;
@@ -51832,10 +57071,12 @@ module    altserial_flash_loader    (
     scein,
     dclkin);
 
+    parameter    lpm_hint    =    "UNUSED";
     parameter    enhanced_mode    =    0;
     parameter    intended_device_family    =    "Cyclone";
     parameter    enable_shared_access    =    "OFF";
     parameter    enable_quad_spi_support    =    0;
+    parameter    ncso_width    =    1;
     parameter    lpm_type    =    "ALTSERIAL_FLASH_LOADER";
 
 
@@ -51847,10 +57088,58 @@ module    altserial_flash_loader    (
     input    sdoin;
     output    asmi_access_request;
     output    data0out;
-    input    scein;
+    input    [ncso_width-1:0]    scein;
     input    dclkin;
 
 endmodule //altserial_flash_loader
+
+module    alt_fault_injection    (
+    system_error,
+    pr_ready,
+    system_reset,
+    pr_request,
+    emr_data,
+    error_scrubbed,
+    user_intosc,
+    pr_ext_request,
+    pr_error,
+    emr_valid,
+    crc_error,
+    error_injected,
+    pr_data,
+    pr_clk,
+    pr_done);
+
+    parameter    CRC_OSC_DIVIDER    =    8;
+    parameter    ENABLE_EMR_SHARE    =    "NO";
+    parameter    INTENDED_DEVICE_FAMILY    =    "Stratix V";
+    parameter    TEST_LOGIC_TYPE    =    "OR";
+    parameter    ENABLE_INTOSC_SHARE    =    "NO";
+    parameter    EMR_WIDTH    =    67;
+    parameter    INIT_EMR    =    "NO";
+    parameter    LPM_TYPE    =    "ALT_FAULT_INJECTION";
+    parameter    EMR_ARRAY_SIZE    =    128;
+    parameter    INSTANTIATE_PR_BLOCK    =    1;
+    parameter    DATA_REG_WIDTH    =    16;
+
+
+    input    system_error;
+    input    pr_ready;
+    output    system_reset;
+    output    pr_request;
+    input    [EMR_WIDTH-1:0]    emr_data;
+    output    error_scrubbed;
+    output    user_intosc;
+    input    pr_ext_request;
+    input    pr_error;
+    input    emr_valid;
+    input    crc_error;
+    output    error_injected;
+    output    [DATA_REG_WIDTH-1:0]    pr_data;
+    output    pr_clk;
+    input    pr_done;
+
+endmodule //alt_fault_injection
 
 module    sld_virtual_jtag_basic    (
     jtag_state_sdr,
@@ -51937,6 +57226,7 @@ module    altsource_probe    (
     jtag_state_udr,
     jtag_state_e1dr,
     source_clk,
+    clr,
     probe,
     source,
     ir_out,
@@ -51946,12 +57236,12 @@ module    altsource_probe    (
     jtag_state_uir,
     source_ena,
     tdo,
-    clrn,
     raw_tck,
     usr1,
     ena);
 
     parameter    lpm_hint    =    "UNUSED";
+    parameter    sync_source_clk    =    "NO";
     parameter    sld_instance_index    =    0;
     parameter    source_initial_value    =    "0";
     parameter    sld_ir_width    =    4;
@@ -51970,6 +57260,7 @@ module    altsource_probe    (
     input    jtag_state_udr;
     input    jtag_state_e1dr;
     input    source_clk;
+    input    clr;
     input    [probe_width-1:0]    probe;
     output    [source_width-1:0]    source;
     output    [sld_ir_width-1:0]    ir_out;
@@ -51979,7 +57270,6 @@ module    altsource_probe    (
     input    jtag_state_uir;
     input    source_ena;
     output    tdo;
-    input    clrn;
     input    raw_tck;
     input    usr1;
     input    ena;
