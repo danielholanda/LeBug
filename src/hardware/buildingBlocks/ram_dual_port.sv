@@ -3,7 +3,7 @@
 // Function    : Dual port ram for Intel FPGAs
 //-----------------------------------------------------
 
-module ram_dual_port_cycloneV
+module ram_dual_port //_cycloneV
 (
   clk,
   clken,
@@ -134,7 +134,7 @@ endmodule
 
 
 
-module  ram_dual_port  (
+module  ram_dual_port_stratix10  (
     address_a,
     address_b,
     clk,
