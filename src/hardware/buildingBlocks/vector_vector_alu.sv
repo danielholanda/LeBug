@@ -57,6 +57,7 @@
     reg [DATA_WIDTH-1:0] alu_add [N-1:0];
     reg [DATA_WIDTH-1:0] alu_mul [N-1:0];
     reg [DATA_WIDTH-1:0] alu_sub [N-1:0];
+    reg [DATA_WIDTH-1:0] alu_max [N-1:0];
     reg [7:0] byte_counter=0;
 
     parameter LATENCY = 2;
@@ -163,14 +164,21 @@
         operand = {>>{mem_out_a}};
       end
       for(i=0; i<N; i=i+1) begin
-        alu_add[i] =  vector_in_delay[i] + operand[i];
-        alu_mul[i] =  vector_in_delay[i] * operand[i];
-        alu_sub[i] =  vector_in_delay[i] - operand[i];
+        alu_add[i] = vector_in_delay[i] + operand[i];
+        alu_mul[i] = vector_in_delay[i] * operand[i];
+        alu_sub[i] = vector_in_delay[i] - operand[i];
+        if (vector_in_delay[i]>operand[i]) begin
+          alu_max[i] = vector_in_delay[i];
+        end
+        else begin
+          alu_max[i] = operand[i];
+        end
       end
       case (firmware_op_delay)
         0 : alu_result = vector_in_delay;
         1 : alu_result = alu_add;
         2 : alu_result = alu_mul;
+        3 : alu_result = alu_max;
         default : alu_result = alu_sub;
       endcase
 
@@ -194,15 +202,3 @@
     end
  
  endmodule 
-
-
-
-
-
-
-
-
-
-
-
-
