@@ -18,8 +18,8 @@
   input logic clk,
   input logic tracing,
   input logic valid_in,
-  input logic eof_in,
-  input logic bof_in,
+  input logic [1:0] eof_in,
+  input logic [1:0] bof_in,
   input logic [$clog2(MAX_CHAINS)-1:0] chainId_in,
   input logic [7:0] configId,
   input logic [7:0] configData,
@@ -27,8 +27,8 @@
   output reg [DATA_WIDTH-1:0] vector_out [N-1:0],
   output reg [$clog2(MAX_CHAINS)-1:0] chainId_out,
   output reg valid_out,
-  output reg eof_out,
-  output reg bof_out
+  output reg [1:0] eof_out,
+  output reg [1:0] bof_out
  );
 
     //----------Internal Variables------------
@@ -42,8 +42,8 @@
     reg [7:0] firmware_reduce_axis   [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_REDUCE_AXIS;
 
     reg valid_in_delay = 1'b0;
-    reg eof_in_delay = 1'b0;
-    reg bof_in_delay = 1'b0;
+    reg [1:0] eof_in_delay = 2'b00;
+    reg [1:0] bof_in_delay = 2'b00;
     reg [DATA_WIDTH-1:0] operand [M-1:0];
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
     reg filter_result [M-1:0] [N-1:0];
@@ -141,6 +141,10 @@
         for(j=0; j<M; j=j+1) begin
           if (j<M-1) begin
             filter_result[j][i] = vector_in_delay[i]>operand[j] & vector_in_delay[i]<=operand[j+1];
+          end
+          else if (M==1) begin
+            // If M==1 this is a very special scenario. In this scenario, we just assume that the distance between bins is constant (hardcoded 1 here)
+            filter_result[j][i] = vector_in_delay[i]>operand[j] & vector_in_delay[i]<=(operand[j]+1);
           end
           else begin
             // In order to be able to split the distribution into many Ms we assume that the steps between bins is constant for the last bin of every M

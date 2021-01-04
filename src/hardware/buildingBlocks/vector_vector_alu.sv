@@ -19,8 +19,8 @@
   input logic clk,
   input logic tracing,
   input logic valid_in,
-  input logic eof_in,
-  input logic bof_in,
+  input logic [1:0] eof_in,
+  input logic [1:0] bof_in,
   input logic [$clog2(MAX_CHAINS)-1:0] chainId_in,
   input logic [7:0] configId,
   input logic [7:0] configData,
@@ -28,8 +28,8 @@
   output reg [DATA_WIDTH-1:0] vector_out [N-1:0],
   output reg [$clog2(MAX_CHAINS)-1:0] chainId_out,
   output reg valid_out,
-  output reg eof_out,
-  output reg bof_out
+  output reg [1:0] eof_out,
+  output reg [1:0] bof_out
  );
 
     //----------Internal Variables------------
@@ -43,8 +43,8 @@
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
     reg valid_in_delay = 1'b0;
     reg valid_in_delay_2 = 1'b0;
-    reg eof_in_delay = 1'b0;
-    reg bof_in_delay = 1'b0;
+    reg [1:0] eof_in_delay = 2'b00;
+    reg [1:0] bof_in_delay = 2'b00;
     reg [7:0] firmware_op_delay = 0;
     reg [7:0] firmware_cache_delay = 0;
     reg [7:0] firmware_cache_delay_2 = 0;
@@ -184,7 +184,16 @@
 
       // Only perform operation if condition is valid
       // none=0, last=1, notlast=2, first=3, notfirst=4
-      if (firmware_cond_delay==8'd0 | (firmware_cond_delay==8'd1 & eof_in_delay==1'b1) | (firmware_cond_delay==8'd2 & eof_in_delay==1'b0) |  (firmware_cond_delay==8'd3 & bof_in_delay==1'b1) | (firmware_cond_delay==8'd4 & bof_in_delay==1'b0)) begin
+      if ( (firmware_cond[chainId_in]==8'd0) | 
+           (firmware_cond[chainId_in]==8'd1 & eof_in[0]==1'b1) | 
+           (firmware_cond[chainId_in]==8'd2 & eof_in[0]==1'b0) | 
+           (firmware_cond[chainId_in]==8'd3 & bof_in[0]==1'b1) | 
+           (firmware_cond[chainId_in]==8'd4 & bof_in[0]==1'b0) | 
+           (firmware_cond[chainId_in]==8'd5 & eof_in[1]==1'b1) | 
+           (firmware_cond[chainId_in]==8'd6 & eof_in[1]==1'b0) | 
+           (firmware_cond[chainId_in]==8'd7 & bof_in[1]==1'b1) | 
+           (firmware_cond[chainId_in]==8'd8 & bof_in[1]==1'b0) 
+           ) begin
         cond_valid = 1'b1;
       end
       else begin
@@ -202,3 +211,15 @@
     end
  
  endmodule 
+
+
+
+
+
+
+
+
+
+
+
+

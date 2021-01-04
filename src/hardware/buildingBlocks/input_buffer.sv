@@ -15,14 +15,14 @@
   (
   input logic clk,
   input logic enqueue,
-  input logic eof_in,
+  input logic [1:0] eof_in,
   input logic tracing,
   input logic [7:0] configId,
   input logic [7:0] configData,
   input logic [DATA_WIDTH-1:0] vector_in [N-1:0],
   output reg valid_out,
-  output reg eof_out,
-  output reg bof_out,
+  output reg [1:0] eof_out,
+  output reg [1:0] bof_out,
   output reg [DATA_WIDTH-1:0] vector_out [N-1:0],
   output reg [$clog2(MAX_CHAINS)-1:0] chainId_out
  );
@@ -33,7 +33,7 @@
     reg [7:0] valid_chains = INITIAL_FIRMWARE;
     reg [$clog2(MAX_CHAINS)-1:0] chainId=0;
     reg [$clog2(MAX_CHAINS)-1:0] chainId_delay=0;
-    reg frame_ended=1'b1;
+    reg [1:0] frame_ended=2'b11;
 
     parameter LATENCY = 2;
     parameter RAM_LATENCY = LATENCY-1;
@@ -46,7 +46,7 @@
     reg [$clog2(IB_DEPTH)-1:0] mem_address_b=0;
     wire mem_write_enable_a;
     reg mem_write_enable_b=0;
-    reg bof_out_delay=0;
+    reg [1:0] bof_out_delay=2'b00;
     wire [MEM_WIDTH-1:0] mem_in_a;
     reg [MEM_WIDTH-1:0] mem_in_b=0;
     wire [MEM_WIDTH-1:0] mem_out_a;
@@ -77,10 +77,10 @@
     defparam mem.init_file = "inputBuffer.mif";
 
     // Instantiate memory to implement queue
-    wire eof_mem_in_a;
-    wire eof_mem_in_b;
-    wire eof_mem_out_a;
-    wire eof_mem_out_b;
+    wire [1:0] eof_mem_in_a;
+    wire [1:0] eof_mem_in_b;
+    wire [1:0] eof_mem_out_a;
+    wire [1:0] eof_mem_out_b;
     ram_dual_port mem_eof (
       .clk( clk ),
       .clken( 1'b1 ),
@@ -95,8 +95,8 @@
       .q_a( eof_mem_out_a ),
       .q_b( eof_mem_out_b)
     );
-    defparam mem_eof.width_a = 1;
-    defparam mem_eof.width_b = 1;
+    defparam mem_eof.width_a = 2;
+    defparam mem_eof.width_b = 2;
     defparam mem_eof.widthad_a = $clog2(IB_DEPTH);
     defparam mem_eof.widthad_b = $clog2(IB_DEPTH);
     defparam mem_eof.width_be_a = 1;
@@ -106,6 +106,7 @@
     defparam mem_eof.latency = RAM_LATENCY;
     defparam mem_eof.init_file = "inputBuffer_eof.mif";
 
+    integer i;
     always @(posedge clk) begin
 
       if (tracing==1'b1) begin
@@ -119,21 +120,23 @@
           if (empty==1'b0) begin
             mem_address_b <= mem_address_b<IB_DEPTH-1 ? mem_address_b+1'b1 : 0;
             valid_out_delay <= 1'b1;
-            if (frame_ended==1'b1) begin
-              bof_out_delay <= 1'b1;
-              frame_ended<=1'b0;
-            end
-            else if (eof_out==1'b1) begin
-              bof_out_delay <= 1'b1;
-              frame_ended<=1'b1;
-            end
-            else begin
-              bof_out_delay <= 1'b0;
+            for (i=0;i<2;i++) begin
+              if (frame_ended[i]==1'b1) begin
+                bof_out_delay[i] <= 1'b1;
+                frame_ended[i]<=1'b0;
+              end
+              else if (eof_out[i]==1'b1) begin
+                bof_out_delay[i] <= 1'b1;
+                frame_ended[i]<=1'b1;
+              end
+              else begin
+                bof_out_delay[i] <= 1'b0;
+              end
             end
           end
           else begin
             valid_out_delay <= 1'b0;
-            bof_out_delay <= 1'b0;
+            bof_out_delay <= 2'b0;
           end
         end
 
