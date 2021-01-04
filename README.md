@@ -122,3 +122,8 @@ Each example is composed of those main files:
 - compiler
   - Shoudl be able to handle all ISA instructions and compile() at the end
 
+### FIXME:
+
+- Max function has been implemented, but there is no corresponding firmware for it
+- Second eof signal implemented, but not tested
+- Writable implementation of memory in FFRU not tested
