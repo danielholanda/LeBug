@@ -4,10 +4,12 @@
  //-----------------------------------------------------
 
   module  reconfigUnit     #(
-      N=8,
+      M=8,
+      N=4,
       TB_SIZE=8,
       DATA_WIDTH=32,
-      MAX_CHAINS=4
+      MAX_CHAINS=4,
+      FUVRF_SIZE=4
   )
   (
   input logic clk,
@@ -53,7 +55,7 @@
   assign tracing= (dbg_state == DBG_TRACING);
 
   parameter BYTES_IB=1;
-  parameter BYTES_FRU=3*MAX_CHAINS;
+  parameter BYTES_FRU=3*MAX_CHAINS+FUVRF_SIZE*M*DATA_WIDTH/8;
   parameter BYTES_VVALU=5*MAX_CHAINS;
   parameter BYTES_VSRU=MAX_CHAINS;
   parameter BYTES_DP=2*MAX_CHAINS;
