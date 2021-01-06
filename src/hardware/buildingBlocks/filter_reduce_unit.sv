@@ -44,14 +44,22 @@
     reg valid_in_delay = 1'b0;
     reg [1:0] eof_in_delay = 2'b00;
     reg [1:0] bof_in_delay = 2'b00;
-    reg [DATA_WIDTH-1:0] operand [M-1:0];
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
-    reg filter_result [M-1:0] [N-1:0];
-    reg reduce_input [N-1:0] [N-1:0];
-    reg [FRU_WIDTH-1:0] reduce_result [N-1:0];
-    reg [DATA_WIDTH-1:0] reduce_result_wide [N-1:0];
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
     reg [7:0] firmware_filter_op_delay;
+    reg valid_in_delay2 = 1'b0;
+    reg [1:0] eof_in_delay2 = 2'b00;
+    reg [1:0] bof_in_delay2 = 2'b00;
+    reg [DATA_WIDTH-1:0] vector_in_delay2 [N-1:0];
+    reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay2=0;
+    reg [7:0] firmware_filter_op_delay2;
+    reg [DATA_WIDTH-1:0] operand [M-1:0];
+    reg [DATA_WIDTH-1:0] selected_operand;
+    reg filter_result [M-1:0] [N-1:0];
+    reg reduce_input [N-1:0] [N-1:0];
+    reg reduce_input_delay [N-1:0] [N-1:0];
+    reg [FRU_WIDTH-1:0] reduce_result [N-1:0];
+    reg [DATA_WIDTH-1:0] reduce_result_wide [N-1:0];
     reg [7:0] firmware_reduce_axis_delay;
     reg [7:0] byte_counter=0;
     reg [7:0] FRU_reconfig_byte_counter=0;
@@ -101,11 +109,11 @@
 
       if (tracing==1'b1) begin
         // Logic for output
-        vector_out <= firmware_filter_op_delay==8'b1 ? reduce_result_wide : vector_in_delay;
-        valid_out <= valid_in_delay;
-        eof_out <= eof_in_delay;
-        bof_out <= bof_in_delay;
-        chainId_out <= chainId_in_delay;
+        vector_out <= firmware_filter_op_delay2==8'b1 ? reduce_result_wide : vector_in_delay2;
+        valid_out <= valid_in_delay2;
+        eof_out <= eof_in_delay2;
+        bof_out <= bof_in_delay2;
+        chainId_out <= chainId_in_delay2;
 
       end
       else begin // If we are not tracing, we are reconfiguring the instrumentation
@@ -122,18 +130,18 @@
               firmware_reduce_axis[byte_counter]<=configData;
             end
             else if (byte_counter<MAX_CHAINS*3+FUVRF_SIZE*(M*DATA_WIDTH/8)) begin
-            	FRU_reconfig_vector<={FRU_reconfig_vector[M*DATA_WIDTH-8-1:0],configData};
-            	if (FRU_reconfig_byte_counter==M*DATA_WIDTH/8-1) begin
-            		FRU_reconfig_byte_counter<=0;
-            		FRU_reconfig_M_counter<=FRU_reconfig_M_counter+1;
-            		mem_write_enable_b<=1;
-					mem_address_b<=FRU_reconfig_M_counter;
-					mem_in_b<=FRU_reconfig_vector;
-        		end
-            	else begin 
-            		mem_write_enable_b<=0;
-            		FRU_reconfig_byte_counter<=FRU_reconfig_byte_counter+1;
-        		end
+              FRU_reconfig_vector<={FRU_reconfig_vector[M*DATA_WIDTH-8-1:0],configData};
+              if (FRU_reconfig_byte_counter==M*DATA_WIDTH/8-1) begin
+                FRU_reconfig_byte_counter<=0;
+                FRU_reconfig_M_counter<=FRU_reconfig_M_counter+1;
+                mem_write_enable_b<=1;
+          mem_address_b<=FRU_reconfig_M_counter;
+          mem_in_b<=FRU_reconfig_vector;
+            end
+              else begin 
+                mem_write_enable_b<=0;
+                FRU_reconfig_byte_counter<=FRU_reconfig_byte_counter+1;
+            end
             end
           end
           else begin
@@ -152,6 +160,13 @@
       eof_in_delay <= eof_in;
       bof_in_delay <= bof_in;
       chainId_in_delay <= chainId_in;
+      reduce_input_delay<=reduce_input;
+      firmware_filter_op_delay2<=firmware_filter_op_delay;
+    vector_in_delay2<=vector_in_delay;
+    valid_in_delay2<=valid_in_delay;
+    eof_in_delay2<=eof_in_delay;
+    bof_in_delay2<=bof_in_delay;
+    chainId_in_delay2<=chainId_in_delay;
     end
 
     // Logic for filter unit
@@ -160,16 +175,17 @@
       for(i=0; i<N; i=i+1) begin
         for(j=0; j<M; j=j+1) begin
           if (j<M-1) begin
-            filter_result[j][i] = vector_in_delay[i]>operand[j] & vector_in_delay[i]<=operand[j+1];
+            selected_operand=operand[j+1];
           end
           else if (M==1) begin
             // If M==1 this is a very special scenario. In this scenario, we just assume that the distance between bins is constant (hardcoded 1 here)
-            filter_result[j][i] = vector_in_delay[i]>operand[j] & vector_in_delay[i]<=(operand[j]+1);
+            selected_operand=operand[j]+1;
           end
           else begin
             // In order to be able to split the distribution into many Ms we assume that the steps between bins is constant for the last bin of every M
-            filter_result[j][i] = vector_in_delay[i]>operand[j] & vector_in_delay[i]<=(operand[j]+operand[1]-operand[0]);
+            selected_operand=(operand[j]+operand[1]-operand[0]);
           end
+          filter_result[j][i] = vector_in_delay[i]>operand[j] & vector_in_delay[i]<=selected_operand;
         end
       end
     end
@@ -206,10 +222,12 @@
       mem_address_a = firmware_filter_addr[chainId_in];
     end
 
+
+
     // Logic for reduce unit
     generate 
       for (g=0;g<N;g++) begin
-        adderTree1Bit #(.N(N))adder_tree_inst(.vector(reduce_input[g]), .result(reduce_result[g]));
+        adderTree1Bit #(.N(N))adder_tree_inst(.vector(reduce_input_delay[g]), .result(reduce_result[g]));
       end
     endgenerate
 
@@ -221,14 +239,3 @@
     end
  
  endmodule 
-
-
-
-
-
-
-
-
-
-
-
