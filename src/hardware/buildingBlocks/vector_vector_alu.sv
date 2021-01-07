@@ -9,6 +9,7 @@
   parameter MAX_CHAINS=4,
   parameter PERSONAL_CONFIG_ID=0,
   parameter VVVRF_SIZE=8,
+  parameter DATA_TYPE=0,
   parameter [7:0] INITIAL_FIRMWARE_OP         [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_ADDR_RD    [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_COND       [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
@@ -56,6 +57,7 @@
     reg [DATA_WIDTH-1:0] alu_result [N-1:0];
     reg [DATA_WIDTH-1:0] alu_add [N-1:0];
     reg [DATA_WIDTH-1:0] alu_mul [N-1:0];
+    reg [DATA_WIDTH*2-1:0] alu_mul_wide [N-1:0];
     reg [DATA_WIDTH-1:0] alu_sub [N-1:0];
     reg [DATA_WIDTH-1:0] alu_max [N-1:0];
     reg [7:0] byte_counter=0;
@@ -163,23 +165,53 @@
       else begin
         operand = {>>{mem_out_a}};
       end
-      for(i=0; i<N; i=i+1) begin
-        alu_add[i] = vector_in_delay[i] + operand[i];
-        alu_mul[i] = vector_in_delay[i] * operand[i];
-        alu_sub[i] = vector_in_delay[i] - operand[i];
-        if (vector_in_delay[i]>operand[i]) begin
-          alu_max[i] = vector_in_delay[i];
-        end
-        else begin
-          alu_max[i] = operand[i];
+
+      // Math for integer data type
+      if (DATA_TYPE==0) begin
+        for(i=0; i<N; i=i+1) begin
+          alu_add[i] = vector_in_delay[i] + operand[i];
+          alu_mul[i] = vector_in_delay[i] * operand[i];
+          alu_sub[i] = vector_in_delay[i] - operand[i];
+          if (vector_in_delay[i]>operand[i]) begin
+            alu_max[i] = vector_in_delay[i];
+          end
+          else begin
+            alu_max[i] = operand[i];
+          end
         end
       end
+      // Math for fixed point data type
+      else begin
+        for(i=0; i<N; i=i+1) begin
+          alu_add[i] = vector_in_delay[i] + operand[i];
+          alu_mul_wide[i] = (vector_in_delay[i] * operand[i]);
+          alu_mul[i]=alu_mul_wide[i]>>(DATA_WIDTH/2);
+          alu_sub[i] = vector_in_delay[i] - operand[i];
+          if (vector_in_delay[i][DATA_WIDTH]==operand[i][DATA_WIDTH]) begin
+            if (vector_in_delay[i]>operand[i] ) begin
+              alu_max[i] = vector_in_delay[i];
+            end
+            else begin
+              alu_max[i] = operand[i];
+            end
+          end
+          else begin
+            if (vector_in_delay[i][DATA_WIDTH]==0) begin
+              alu_max[i] = vector_in_delay[i];
+            end
+            else begin
+              alu_max[i] = operand[i];
+            end
+          end
+        end
+      end
+
       case (firmware_op_delay)
         0 : alu_result = vector_in_delay;
         1 : alu_result = alu_add;
         2 : alu_result = alu_mul;
-        3 : alu_result = alu_max;
-        default : alu_result = alu_sub;
+        3 : alu_result = alu_sub;
+        default : alu_result = alu_max;
       endcase
 
       // Only perform operation if condition is valid
