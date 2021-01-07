@@ -288,7 +288,7 @@ class rtlHw():
             ['uart_rxd','logic',1],
             ['reset','logic',1],
             ['enqueue','logic',1],
-            ['eof_in','logic',1],
+            ['eof_in','logic',2],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.addOutput([
             ['uart_txd','logic',1],
@@ -359,12 +359,12 @@ class rtlHw():
         top.mod.inputBuffer.addInput([
             ['clk','logic',1],
             ['enqueue','logic',1],
-            ['eof_in','logic',1],
+            ['eof_in','logic',2],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.mod.inputBuffer.addOutput([
             ['valid_out','logic',1],
-            ['eof_out','logic',1],
-            ['bof_out','logic',1],
+            ['eof_out','logic',2],
+            ['bof_out','logic',2],
             ['vector_out','logic','DATA_WIDTH','N'],
             ['chainId_out','logic','$clog2(MAX_CHAINS)']])
         top.mod.inputBuffer.addParameter([
@@ -375,7 +375,7 @@ class rtlHw():
             ['INITIAL_FIRMWARE'],
             ['PERSONAL_CONFIG_ID']])
         top.mod.inputBuffer.addMemory("inputBuffer",self.IB_DEPTH,self.DATA_WIDTH*self.N)
-        top.mod.inputBuffer.addMemory("inputBuffer_eof",self.IB_DEPTH,self.N)
+        top.mod.inputBuffer.addMemory("inputBuffer_eof",self.IB_DEPTH,2)
         top.mod.inputBuffer.setAsConfigurable(configurable_parameters=4)
 
 
@@ -384,14 +384,14 @@ class rtlHw():
         top.mod.filterReduceUnit.addInput([
             ['clk','logic',1],
             ['valid_in','logic',1],
-            ['eof_in','logic',1],
-            ['bof_in','logic',1],
+            ['eof_in','logic',2],
+            ['bof_in','logic',2],
             ['chainId_in','logic','$clog2(MAX_CHAINS)'],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.mod.filterReduceUnit.addOutput([
             ['valid_out','logic',1],
-            ['eof_out','logic',1],
-            ['bof_out','logic',1],
+            ['eof_out','logic',2],
+            ['bof_out','logic',2],
             ['chainId_out','logic','$clog2(MAX_CHAINS)'],
             ['vector_out','logic','DATA_WIDTH','N']])
         top.mod.filterReduceUnit.addParameter([
@@ -412,14 +412,14 @@ class rtlHw():
         top.mod.vectorVectorALU.addInput([
             ['clk','logic',1],
             ['valid_in','logic',1],
-            ['eof_in','logic',1],
-            ['bof_in','logic',1],
+            ['eof_in','logic',2],
+            ['bof_in','logic',2],
             ['chainId_in','logic','$clog2(MAX_CHAINS)'],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.mod.vectorVectorALU.addOutput([
             ['valid_out','logic',1],
-            ['eof_out','logic',1],
-            ['bof_out','logic',1],
+            ['eof_out','logic',2],
+            ['bof_out','logic',2],
             ['chainId_out','logic','$clog2(MAX_CHAINS)'],
             ['vector_out','logic','DATA_WIDTH','N']])
         top.mod.vectorVectorALU.addParameter([
@@ -441,14 +441,14 @@ class rtlHw():
         top.mod.vectorScalarReduceUnit.addInput([
             ['clk','logic',1],
             ['valid_in','logic',1],
-            ['eof_in','logic',1],
-            ['bof_in','logic',1],
+            ['eof_in','logic',2],
+            ['bof_in','logic',2],
             ['chainId_in','logic','$clog2(MAX_CHAINS)'],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.mod.vectorScalarReduceUnit.addOutput([
             ['valid_out','logic',1],
-            ['eof_out','logic',1],
-            ['bof_out','logic',1],
+            ['eof_out','logic',2],
+            ['bof_out','logic',2],
             ['chainId_out','logic','$clog2(MAX_CHAINS)'],
             ['vector_out','logic','DATA_WIDTH','N']])
         top.mod.vectorScalarReduceUnit.addParameter([
@@ -464,8 +464,8 @@ class rtlHw():
         top.mod.dataPacker.addInput([
             ['clk','logic',1],
             ['valid_in','logic',1],
-            ['eof_in','logic',1],
-            ['bof_in','logic',1],
+            ['eof_in','logic',2],
+            ['bof_in','logic',2],
             ['chainId_in','logic','$clog2(MAX_CHAINS)'],
             ['vector_in','logic','DATA_WIDTH','N']])
         top.mod.dataPacker.addOutput([
@@ -721,7 +721,7 @@ class rtlHw():
             // Declare inputs
             reg clk=1'b0;
             reg valid=1'b0;
-            reg eof=1'b0;
+            reg [1:0] eof=2'b00;
             reg [DATA_WIDTH-1:0] vector [N-1:0];
             reg uart_rxd = 1'b0;
             reg reset = 1'b1;
@@ -783,8 +783,8 @@ class rtlHw():
                 $fclose(write_data);
                 write_data2 = $fopen("simulation_results_tb.txt");
                 for (i=0; i<dbg.tb.TB_SIZE; i=i+1) begin
-                    //tmp = dbg.tb.mem.altera_syncram_component.mem_data[i];
-                    tmp = dbg.tb.mem.altsyncram_component.altera_syncram_inst.mem_data[i];
+                    tmp = dbg.tb.mem.altera_syncram_component.mem_data[i];
+                    //tmp = dbg.tb.mem.altsyncram_component.altera_syncram_inst.mem_data[i];
                     //tmp = dbg.tb.mem.altsyncram_component.mem_data[i];
                     for (j=0; j<N; j=j+1) begin
                         // Verilog you can't have two variable expressions in a range, even if they evaluate to a constant difference.  

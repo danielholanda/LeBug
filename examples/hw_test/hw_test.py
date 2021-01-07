@@ -34,7 +34,7 @@ def raw():
     # Create common input values
     np.random.seed(0)
     input_vectors=[]
-    num_input_vectors=1
+    num_input_vectors=3
     print("********** Input vectors **********")
     for i in range(num_input_vectors):
         input_vectors.append(np.random.randint(5, size=N))
@@ -53,7 +53,7 @@ def raw():
 
     # Run HW simulation and emulation
     steps=30
-    hw_results = hw_proc.run(steps=steps,gui=False,log=False)
+    hw_results = hw_proc.run(steps=steps,gui=False,log=True)
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results
