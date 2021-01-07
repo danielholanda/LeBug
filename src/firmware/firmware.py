@@ -159,7 +159,6 @@ def conditions(cp):
     cp.vv_add(0,'last')
     cp.v_cache(0)
     cp.v_commit(8,'notfirst')
-    cp.v_commit()
     cp.end_chain()
     return cp.compile()
 

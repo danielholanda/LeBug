@@ -184,15 +184,16 @@
 
       // Only perform operation if condition is valid
       // none=0, last=1, notlast=2, first=3, notfirst=4
-      if ( (firmware_cond[chainId_in]==8'd0) | 
-           (firmware_cond[chainId_in]==8'd1 & eof_in[0]==1'b1) | 
-           (firmware_cond[chainId_in]==8'd2 & eof_in[0]==1'b0) | 
-           (firmware_cond[chainId_in]==8'd3 & bof_in[0]==1'b1) | 
-           (firmware_cond[chainId_in]==8'd4 & bof_in[0]==1'b0) | 
-           (firmware_cond[chainId_in]==8'd5 & eof_in[1]==1'b1) | 
-           (firmware_cond[chainId_in]==8'd6 & eof_in[1]==1'b0) | 
-           (firmware_cond[chainId_in]==8'd7 & bof_in[1]==1'b1) | 
-           (firmware_cond[chainId_in]==8'd8 & bof_in[1]==1'b0) 
+      
+      if ( (firmware_cond_delay==8'd0) | 
+           (firmware_cond_delay==8'd1 & eof_in_delay[0]==1'b1) | 
+           (firmware_cond_delay==8'd2 & eof_in_delay[0]==1'b0) | 
+           (firmware_cond_delay==8'd3 & bof_in_delay[0]==1'b1) | 
+           (firmware_cond_delay==8'd4 & bof_in_delay[0]==1'b0) | 
+           (firmware_cond_delay==8'd5 & eof_in_delay[1]==1'b1) | 
+           (firmware_cond_delay==8'd6 & eof_in_delay[1]==1'b0) | 
+           (firmware_cond_delay==8'd7 & bof_in_delay[1]==1'b1) | 
+           (firmware_cond_delay==8'd8 & bof_in_delay[1]==1'b0) 
            ) begin
         cond_valid = 1'b1;
       end
