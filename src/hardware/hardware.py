@@ -783,8 +783,8 @@ class rtlHw():
                 $fclose(write_data);
                 write_data2 = $fopen("simulation_results_tb.txt");
                 for (i=0; i<dbg.tb.TB_SIZE; i=i+1) begin
-                    tmp = dbg.tb.mem.altera_syncram_component.mem_data[i];
-                    //tmp = dbg.tb.mem.altsyncram_component.altera_syncram_inst.mem_data[i];
+                    //tmp = dbg.tb.mem.altera_syncram_component.mem_data[i];
+                    tmp = dbg.tb.mem.altsyncram_component.altera_syncram_inst.mem_data[i];
                     //tmp = dbg.tb.mem.altsyncram_component.mem_data[i];
                     for (j=0; j<N; j=j+1) begin
                         // Verilog you can't have two variable expressions in a range, even if they evaluate to a constant difference.  
