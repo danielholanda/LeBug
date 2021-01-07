@@ -17,7 +17,9 @@ readConf()
 def toInt(lst):
     return [list(map(int, l)) for l in lst]
 
-print("BUG: STRATIX10 DUAL_PORT_RAM IS WORKING DIFFERENTLY FROM CYCLONE V DUAL_PORT_RAM")
+print("BUG1: STRATIX10 DUAL_PORT_RAM IS WORKING DIFFERENTLY FROM CYCLONE V DUAL_PORT_RAM")
+print("BUG2: ENCODE/DECODE ONLY WORK FOR POSITIVE NUMBERS")
+
 def floatToEncodedInt(float_array,DATA_WIDTH):
     return [encode(x,DATA_WIDTH) for x in float_array]
     
