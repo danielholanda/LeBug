@@ -10,6 +10,7 @@
   parameter MAX_CHAINS=4,
   parameter PERSONAL_CONFIG_ID=0,
   parameter FUVRF_SIZE=4,
+  parameter DATA_TYPE=0,
   parameter [7:0] INITIAL_FIRMWARE_FILTER_OP    [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_FILTER_ADDR  [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_REDUCE_AXIS  [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
@@ -231,11 +232,20 @@
       end
     endgenerate
 
+    // Make data type adjustments
     always @(*) begin
-      // Pad result with zeros
-      for (i=0;i<N;i++) begin
-        reduce_result_wide[i]=reduce_result[i]+{DATA_WIDTH{1'b0}};
+      if (DATA_TYPE==0) begin // Integer data type
+        // Pad result with zeros
+        for (i=0;i<N;i++) begin
+          reduce_result_wide[i]=reduce_result[i]+{DATA_WIDTH{1'b0}};
+        end
       end
+      else begin //Fixed point
+        for (i=0;i<N;i++) begin
+          reduce_result_wide[i]=reduce_result[i]<<DATA_WIDTH/2+{DATA_WIDTH{1'b0}};
+        end
+      end
+
     end
  
  endmodule 

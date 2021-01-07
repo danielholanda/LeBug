@@ -5,6 +5,7 @@ from hardware.hardware import rtlHw
 import firmware.firmware as firm
 import math, yaml
 import numpy as np
+np.set_printoptions(precision=3, suppress=False)
 
 # Read YAML configuration file and declare those as global variables
 def readConf():
@@ -18,7 +19,6 @@ def toInt(lst):
 
 print("BUG: STRATIX10 DUAL_PORT_RAM IS WORKING DIFFERENTLY FROM CYCLONE V DUAL_PORT_RAM")
 def floatToEncodedInt(float_array,DATA_WIDTH):
-    #return [fxp(x,DATA_WIDTH,int(DATA_WIDTH/2)).base_repr(10) for x in float_array]
     return [encode(x,DATA_WIDTH) for x in float_array]
     
 def encode(value,DATA_WIDTH):
@@ -30,7 +30,8 @@ def encode(value,DATA_WIDTH):
     return int(min_value if x<min_value else max_value if x > max_value else x)
 
 def encodedIntTofloat(encoded_int,DATA_WIDTH):
-    return [[float(encoded_value) / (1 << int(DATA_WIDTH/2)) for encoded_value in l] for l in encoded_int]
+    frac_bits=int(DATA_WIDTH/2)
+    return [[float(encoded_value) / (1 << frac_bits) for encoded_value in l] for l in encoded_int]
 
 def raw():
 
@@ -42,7 +43,7 @@ def raw():
     MAX_CHAINS=4
     IB_DEPTH=32
     TB_SIZE=8
-    hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS)
+    hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,DATA_TYPE)
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
     # Create common input values
@@ -62,11 +63,6 @@ def raw():
             emu_proc.push([input_vectors[i],False])
             input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
             hw_proc.push([input_vectors[i],False])
-        
-
-    # Initialize the memories the same way
-    emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
-    hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[list(range(FUVRF_SIZE))]*M
 
     # Configure firmware - Both HW and Emulator work with the same firmware
     fw = firm.raw(hw_proc.compiler)
@@ -109,7 +105,7 @@ def multipleChains():
     MAX_CHAINS=4
     IB_DEPTH=32
     TB_SIZE=8
-    hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS)
+    hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,DATA_TYPE)
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
     # Create common input values
@@ -118,14 +114,24 @@ def multipleChains():
     num_input_vectors=1
     print("********** Input vectors **********")
     for i in range(num_input_vectors):
-        input_vectors.append(np.random.randint(5, size=N))
-        hw_proc.push([input_vectors[i],False])
-        emu_proc.push([input_vectors[i],False])
-        print(f'Cycle {i}:\t{input_vectors[i]}')
+        if DATA_TYPE=='int':
+            input_vectors.append(np.random.randint(5, size=N))
+            print(f'Cycle {i}:\t{input_vectors[i]}')
+            emu_proc.push([input_vectors[i],False])
+            hw_proc.push([input_vectors[i],False])
+        elif DATA_TYPE=='fixed_point':
+            input_vectors.append(5*np.random.random(N))
+            print(f'Cycle {i}:\t{input_vectors[i]}')
+            emu_proc.push([input_vectors[i],False])
+            input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
+            hw_proc.push([input_vectors[i],False])
 
     # Initialize the memories the same way
     emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
-    hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[list(range(FUVRF_SIZE))]*M
+    if DATA_TYPE=='int':
+        hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[list(range(FUVRF_SIZE))]*M
+    elif DATA_TYPE=='fixed_point':
+        hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[floatToEncodedInt(list(range(FUVRF_SIZE)),DATA_WIDTH)]*M
 
     # Configure firmware - Both HW and Emulator work with the same firmware
     fw = firm.multipleChains(hw_proc.compiler)
@@ -139,8 +145,10 @@ def multipleChains():
 
     # Filter Results
     emu_trace_buffer = emu_results['tb'][-1];
-    hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
-    #hw_trace_buffer = np.array(hw_results['tb']['mem_data'])
+    if DATA_TYPE=='int':
+        hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
+    elif DATA_TYPE=='fixed_point':
+        hw_trace_buffer = np.array(encodedIntTofloat(hw_results['tb']['mem_data'],DATA_WIDTH))
 
     # Print Results
     print("\n\n********** Emulation results **********")
@@ -149,12 +157,12 @@ def multipleChains():
     print(hw_trace_buffer)
 
     # Verify that results are equal
-    assert np.allclose(emu_trace_buffer,hw_trace_buffer)
+    assert np.allclose(emu_trace_buffer,hw_trace_buffer, rtol=0.01)
     print("Passed test #2")
 
 multipleChains()
 
-
+exit()
 def correlation():
 
     # Overwrite YAML file to define how components are attached to eachother

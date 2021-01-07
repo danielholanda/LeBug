@@ -301,7 +301,8 @@ class rtlHw():
             ['FUVRF_SIZE',self.FUVRF_SIZE],
             ['VVVRF_SIZE',self.VVVRF_SIZE],
             ['MAX_CHAINS',self.MAX_CHAINS],
-            ['TB_SIZE',self.TB_SIZE]])
+            ['TB_SIZE',self.TB_SIZE],
+            ['DATA_TYPE',self.DATA_TYPE]])
 
         # Adds includes to the beginning of the file
         top.include("input_buffer.sv")
@@ -401,6 +402,7 @@ class rtlHw():
             ['MAX_CHAINS'],
             ['FUVRF_SIZE'],
             ['PERSONAL_CONFIG_ID'],
+            ['DATA_TYPE'],
             ['INITIAL_FIRMWARE_FILTER_OP'],
             ['INITIAL_FIRMWARE_FILTER_ADDR'],
             ['INITIAL_FIRMWARE_REDUCE_AXIS']])
@@ -581,6 +583,7 @@ class rtlHw():
             ['MAX_CHAINS','MAX_CHAINS'],
             ['FUVRF_SIZE','FUVRF_SIZE'],
             ['PERSONAL_CONFIG_ID','1'],
+            ['DATA_TYPE','DATA_TYPE'],
             ['INITIAL_FIRMWARE_FILTER_OP',FRU_INITIAL_FIRMWARE_OP],
             ['INITIAL_FIRMWARE_FILTER_ADDR',FRU_INITIAL_FIRMWARE_ADDR],
             ['INITIAL_FIRMWARE_REDUCE_AXIS',FRU_INITIAL_FIRMWARE_REDUCE_AXIS]])
@@ -717,6 +720,7 @@ class rtlHw():
             parameter TB_SIZE={self.TB_SIZE};
             parameter FUVRF_SIZE={self.FUVRF_SIZE};
             parameter VVVRF_SIZE={self.VVVRF_SIZE};
+            parameter DATA_TYPE={self.DATA_TYPE};
    
             // Declare inputs
             reg clk=1'b0;
@@ -750,7 +754,8 @@ class rtlHw():
               .MAX_CHAINS(MAX_CHAINS),
               .TB_SIZE(TB_SIZE),
               .FUVRF_SIZE(FUVRF_SIZE),
-              .VVVRF_SIZE(VVVRF_SIZE)
+              .VVVRF_SIZE(VVVRF_SIZE),
+              .DATA_TYPE(DATA_TYPE)
             )
             dbg(
               .clk(clk),
@@ -890,7 +895,7 @@ class rtlHw():
     def push(self,pushed_values):
         self.testbench_inputs.append(pushed_values)
 
-    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS):
+    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,DATA_TYPE):
         ''' Verifying parameters '''
         assert math.log(N, 2).is_integer(), "N must be a power of 2" 
         assert math.log(M, 2).is_integer(), "N must be a power of 2" 
@@ -904,6 +909,13 @@ class rtlHw():
         self.TB_SIZE=TB_SIZE
         self.VVVRF_SIZE=VVVRF_SIZE
         self.FUVRF_SIZE=FUVRF_SIZE
+        if DATA_TYPE=='int':
+            self.DATA_TYPE=0
+        elif DATA_TYPE=='fixed_point':
+            self.DATA_TYPE=1
+        else:
+            print("unknown data type")
+            exit()
         self.hwFolder = os.path.dirname(os.path.realpath(__file__))
         self.testbench_inputs=[]    # Stores inputs to testbench
         self.steps=0 # Number of steps for testbench 
