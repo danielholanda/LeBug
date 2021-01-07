@@ -5,7 +5,6 @@ from hardware.hardware import rtlHw
 import firmware.firmware as firm
 import math, yaml
 import numpy as np
-from fxpmath import Fxp as fxp
 
 # Read YAML configuration file and declare those as global variables
 def readConf():
@@ -19,10 +18,19 @@ def toInt(lst):
 
 print("BUG: STRATIX10 DUAL_PORT_RAM IS WORKING DIFFERENTLY FROM CYCLONE V DUAL_PORT_RAM")
 def floatToEncodedInt(float_array,DATA_WIDTH):
-    return [fxp(x,DATA_WIDTH,int(DATA_WIDTH/2)).base_repr(10) for x in float_array]
+    #return [fxp(x,DATA_WIDTH,int(DATA_WIDTH/2)).base_repr(10) for x in float_array]
+    return [encode(x,DATA_WIDTH) for x in float_array]
+    
+def encode(value,DATA_WIDTH):
+    int_bits=int(DATA_WIDTH/2)
+    frac_bits=int(DATA_WIDTH/2)
+    max_value = (1<<(int_bits-1+frac_bits))-1
+    min_value = -(1<<(int_bits-1+frac_bits))
+    x =  round(value * (1<< frac_bits))
+    return int(min_value if x<min_value else max_value if x > max_value else x)
 
 def encodedIntTofloat(encoded_int,DATA_WIDTH):
-    return [[fxp(int(x),DATA_WIDTH,int(DATA_WIDTH/2))>>int(DATA_WIDTH/2) for x in l] for l in encoded_int]
+    return [[float(encoded_value) / (1 << int(DATA_WIDTH/2)) for encoded_value in l] for l in encoded_int]
 
 def raw():
 
@@ -53,10 +61,7 @@ def raw():
             print(f'Cycle {i}:\t{input_vectors[i]}')
             emu_proc.push([input_vectors[i],False])
             input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
-            print(input_vectors[i])
             hw_proc.push([input_vectors[i],False])
-
-        
         
 
     # Initialize the memories the same way
@@ -88,7 +93,7 @@ def raw():
     print(hw_trace_buffer)
 
     # Verify that results are equal
-    assert np.allclose(emu_trace_buffer,hw_trace_buffer)
+    assert np.allclose(emu_trace_buffer,hw_trace_buffer,rtol=0.01)
     print("Passed test #1")
 
 raw()
