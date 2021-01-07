@@ -3,13 +3,17 @@
 ---
 
 # Parameters to define the architecture
-N: 8            # Input vector width
-M: 4            # Number of range filters in filter unit
-IB_DEPTH: 8     # Input buffer depth
-FUVRF_SIZE: 4   # Size of FUVRF in M*elements
-VVVRF_SIZE: 8   # Size of VVVRF in N*elements
-TB_SIZE: 64     # Size of Trace Buffer in N*elements
-MAX_CHAINS: 8   # Maximum number of chains of the firmware
+N: 8                      # Input vector width
+M: 4                      # Number of range filters in filter unit
+IB_DEPTH: 8               # Input buffer depth
+FUVRF_SIZE: 4             # Size of FUVRF in M*elements
+VVVRF_SIZE: 8             # Size of VVVRF in N*elements
+TB_SIZE: 64               # Size of Trace Buffer in N*elements
+MAX_CHAINS: 8             # Maximum number of chains of the firmware
+DATA_TYPE: 'fixed_point'  # Data type (can be int, fixed_point, MSFP)
+DATA_WIDTH: 32            # The use of DATA_WIDTH depends on the DATA_TYPE being used
+                          #   - For fixed_point, decimal part is DATA_WIDTH/2 
+                          #   - For MSFP, exponent is always 8 bits and sign+mentissa is the rest
 
 # Define how instruments are connected
 BUILDING_BLOCKS: 

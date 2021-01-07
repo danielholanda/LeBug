@@ -5,6 +5,7 @@ from hardware.hardware import rtlHw
 import firmware.firmware as firm
 import math, yaml
 import numpy as np
+from fxpmath import Fxp as fxp
 
 # Read YAML configuration file and declare those as global variables
 def readConf():
@@ -17,6 +18,11 @@ def toInt(lst):
     return [list(map(int, l)) for l in lst]
 
 print("BUG: STRATIX10 DUAL_PORT_RAM IS WORKING DIFFERENTLY FROM CYCLONE V DUAL_PORT_RAM")
+def floatToEncodedInt(float_array,DATA_WIDTH):
+    return [fxp(x,DATA_WIDTH,int(DATA_WIDTH/2)).base_repr(10) for x in float_array]
+
+def encodedIntTofloat(encoded_int,DATA_WIDTH):
+    return [[fxp(int(x),DATA_WIDTH,int(DATA_WIDTH/2))>>int(DATA_WIDTH/2) for x in l] for l in encoded_int]
 
 def raw():
 
@@ -37,10 +43,21 @@ def raw():
     num_input_vectors=3
     print("********** Input vectors **********")
     for i in range(num_input_vectors):
-        input_vectors.append(np.random.randint(5, size=N))
-        hw_proc.push([input_vectors[i],False])
-        emu_proc.push([input_vectors[i],False])
-        print(f'Cycle {i}:\t{input_vectors[i]}')
+        if DATA_TYPE=='int':
+            input_vectors.append(np.random.randint(5, size=N))
+            print(f'Cycle {i}:\t{input_vectors[i]}')
+            emu_proc.push([input_vectors[i],False])
+            hw_proc.push([input_vectors[i],False])
+        elif DATA_TYPE=='fixed_point':
+            input_vectors.append(5*np.random.random(N))
+            print(f'Cycle {i}:\t{input_vectors[i]}')
+            emu_proc.push([input_vectors[i],False])
+            input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
+            print(input_vectors[i])
+            hw_proc.push([input_vectors[i],False])
+
+        
+        
 
     # Initialize the memories the same way
     emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
@@ -53,12 +70,15 @@ def raw():
 
     # Run HW simulation and emulation
     steps=30
-    hw_results = hw_proc.run(steps=steps,gui=False,log=True)
+    hw_results = hw_proc.run(steps=steps,gui=False,log=False)
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results
     emu_trace_buffer = emu_results['tb'][-1];
-    hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
+    if DATA_TYPE=='int':
+        hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
+    elif DATA_TYPE=='fixed_point':
+        hw_trace_buffer = np.array(encodedIntTofloat(hw_results['tb']['mem_data'],DATA_WIDTH))
     #hw_trace_buffer = np.array(hw_results['tb']['mem_data'])
 
     # Print Results
@@ -184,7 +204,6 @@ def correlation():
     print("Passed test #3")
 
 correlation()
-
 
 
 def conditions():
