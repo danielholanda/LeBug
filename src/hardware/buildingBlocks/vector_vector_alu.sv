@@ -120,10 +120,14 @@ module MSFPmul #(
   always @(*) begin
     // Convert (ignore sign)
     for (i=0;i<N;i++) begin
+
       vector_out_wide=vector_in_a[i][MSFP_WIDTH-2:0]*vector_in_b[i][MSFP_WIDTH-2:0];
-      vector_out[i]= {vector_in_a[i][MSFP_WIDTH-1]^vector_in_b[i][MSFP_WIDTH-1],vector_out_wide};
+      vector_out[i]= {vector_in_a[i][MSFP_WIDTH-1]^vector_in_b[i][MSFP_WIDTH-1],vector_out_wide[(MSFP_WIDTH-1)*2-1:MSFP_WIDTH-1]};
+      if (valid==1 & i==0) begin
+        $display("Wide: %b",vector_out_wide);
+      end
     end
-    exp_out=exp_in_a-EXP_BIAS+exp_in_b-1;
+    exp_out=exp_in_a-EXP_BIAS+exp_in_b;
   end
 
 endmodule
@@ -211,6 +215,7 @@ endmodule
       .exp_out(msfp_exp) 
       );
 
+    /*
     reg [DATA_WIDTH-1:0] vector_out_converted [N-1:0];
     MSFPtoFixedP #(
       .FP_WIDTH(DATA_WIDTH),
@@ -224,8 +229,8 @@ endmodule
       .vector_out(vector_out_converted),
       .exp_in(msfp_exp) 
       );
-
-    /*
+    */
+    
     reg [MSFP_WIDTH-1:0] mul_result [N-1:0];
     reg [EXP_WIDTH-1:0] mul_result_exp;
     MSFPmul #(
@@ -256,7 +261,7 @@ endmodule
       .vector_out(vector_out_converted),
       .exp_in(mul_result_exp) 
       );
-    */
+    
 
     //-------------Code Start-----------------
 
