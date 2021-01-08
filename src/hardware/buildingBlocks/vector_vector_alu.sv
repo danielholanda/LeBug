@@ -3,6 +3,26 @@
  // Function    : Performs simple vector ops
  //-----------------------------------------------------
 
+module FixedPtoMSFP #(
+  FP_WIDTH=32,
+  MSFP_WIDTH=4,
+  EXP_WIDTH=8,
+  N=8
+  )
+  (
+  input logic [FP_WIDTH-1:0] vector_in [N-1:0],
+  output reg [MSFP_WIDTH-1:0] vector_out [N-1:0],
+  output reg [EXP_WIDTH-1:0] exp_out 
+  );
+  integer i;
+  always @(*) begin
+    for (i=0;i<N;i++) begin
+      vector_out[i]=vector_in[i][MSFP_WIDTH-1:0];
+    end
+    exp_out=0;
+  end
+endmodule
+
  module  vectorVectorALU #(
   parameter N=8,
   parameter DATA_WIDTH=32,
@@ -10,7 +30,7 @@
   parameter PERSONAL_CONFIG_ID=0,
   parameter VVVRF_SIZE=8,
   parameter DATA_TYPE=0,
-  parameter EXP_WIDTH=0,
+  parameter EXP_WIDTH=8,
   parameter [7:0] INITIAL_FIRMWARE_OP         [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_ADDR_RD    [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_COND       [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
