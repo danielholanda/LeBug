@@ -3,6 +3,7 @@
  // Function    : Performs simple vector ops
  //-----------------------------------------------------
 
+// This is a test module that currently only works with positive numbers ans should not be synthesized
 module FixedPtoMSFP #(
   FP_WIDTH=32,
   MSFP_WIDTH=4,
@@ -11,15 +12,57 @@ module FixedPtoMSFP #(
   )
   (
   input logic [FP_WIDTH-1:0] vector_in [N-1:0],
+  input logic valid,
   output reg [MSFP_WIDTH-1:0] vector_out [N-1:0],
   output reg [EXP_WIDTH-1:0] exp_out 
   );
+
+  //parameter FP_EXP_WIDTH=FP_WIDTH/2;
+  parameter EXP_BIAS=(2**EXP_WIDTH)/2-1;
+  reg [7:0] min_shifts;
+  reg [FP_WIDTH-1:0] tmp;
+
+  reg [FP_WIDTH-1:0] max_in=0;
+  reg [FP_WIDTH-1:0] max_in_shifted=0;
   integer i;
   always @(*) begin
+    // Get largest value (only works for positive numbers)
     for (i=0;i<N;i++) begin
-      vector_out[i]=vector_in[i][MSFP_WIDTH-1:0];
+      if (vector_in[i]>max_in) begin
+        max_in=vector_in[i];
+      end
+      else begin
+        max_in=max_in;
+      end
     end
-    exp_out=0;
+
+    // Check how many shifts we have to do until we find the first 1
+    max_in_shifted=max_in;
+    min_shifts=FP_WIDTH;
+    for (i=0;i<FP_WIDTH;i++) begin
+      if (max_in_shifted[FP_WIDTH-2]==1 & min_shifts>i) begin
+        min_shifts=i;
+      end
+      max_in_shifted=max_in_shifted<<1;
+    end
+
+    // Get exponent part
+    exp_out=EXP_BIAS+2**(FP_WIDTH/2-3-min_shifts);
+
+    // Get sign+mantissa (Assuming sign is always zero for this silly test module)
+    for (i=0;i<N;i++) begin
+      tmp={vector_in[i]<<(min_shifts)};
+      vector_out[i]=tmp[FP_WIDTH-1:FP_WIDTH-MSFP_WIDTH];
+      if (valid==1) begin
+        $display("vector_in:  %b.%b", vector_in[i][FP_WIDTH-1:FP_WIDTH/2],vector_in[i][FP_WIDTH/2-1:0]);
+        $display("vector_out: %b %b\n", exp_out,vector_out[i]);
+      end
+    end
+
+    if (valid==1) begin
+      $display("------------");
+    end
+
   end
 endmodule
 
@@ -88,6 +131,23 @@ endmodule
     parameter MEM_WIDTH = N*DATA_WIDTH;
 
     integer i;
+
+
+    parameter MSFP_WIDTH=8;
+    reg [MSFP_WIDTH-1:0] msfp_vector [N-1:0];
+    reg [EXP_WIDTH-1:0] msfp_exp;
+    FixedPtoMSFP #(
+      .FP_WIDTH(DATA_WIDTH),
+      .MSFP_WIDTH(MSFP_WIDTH),
+      .EXP_WIDTH(EXP_WIDTH),
+      .N(8)
+      )
+      testInstance (
+      .vector_in(vector_in),
+      .valid(valid_in),
+      .vector_out(msfp_vector),
+      .exp_out(msfp_exp) 
+      );
 
     //-------------Code Start-----------------
 
