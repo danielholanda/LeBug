@@ -53,7 +53,7 @@ module FixedPtoMSFP #(
     for (i=0;i<N;i++) begin
       tmp={vector_in[i]<<(min_shifts)};
       vector_out[i]=tmp[FP_WIDTH-1:FP_WIDTH-MSFP_WIDTH];
-      if (valid==1) begin
+      if (valid==1 & i==0) begin
         $display("Encoding",);
         $display("\tvector_in:  %b.%b", vector_in[i][FP_WIDTH-1:FP_WIDTH/2],vector_in[i][FP_WIDTH/2-1:0]);
         $display("\tvector_out: %b %b", exp_out,vector_out[i]);
@@ -86,7 +86,7 @@ module MSFPtoFixedP #(
     // Convert (ignore sign)
     for (i=0;i<N;i++) begin
       vector_out[i]= {vector_in[i]+32'd0}<<(exp_in-EXP_BIAS+MSFP_WIDTH+2);
-      if (valid==1) begin
+      if (valid==1 & i==0) begin
         $display("Decoding",);
         $display("\tvector_in: %b %b", exp_in,vector_in[i]);
         $display("\tvector_out:  %b.%b", vector_out[i][FP_WIDTH-1:FP_WIDTH/2],vector_out[i][FP_WIDTH/2-1:0]);
@@ -95,6 +95,35 @@ module MSFPtoFixedP #(
     if (valid==1) begin
       $display("------------");
     end
+  end
+
+endmodule
+
+module MSFPmul #(
+  MSFP_WIDTH=4,
+  EXP_WIDTH=8,
+  N=8
+  )
+  (
+  input logic valid,
+  input logic [MSFP_WIDTH-1:0] vector_in_a [N-1:0],
+  input logic [EXP_WIDTH-1:0] exp_in_a,
+  input logic [MSFP_WIDTH-1:0] vector_in_b [N-1:0],
+  input logic [EXP_WIDTH-1:0] exp_in_b,
+  output reg [MSFP_WIDTH-1:0] vector_out [N-1:0],
+  output reg [EXP_WIDTH-1:0] exp_out 
+  );
+
+  parameter EXP_BIAS=(2**EXP_WIDTH)/2-1;
+  integer i;
+  reg [(MSFP_WIDTH-1)*2:0] vector_out_wide;
+  always @(*) begin
+    // Convert (ignore sign)
+    for (i=0;i<N;i++) begin
+      vector_out_wide=vector_in_a[i][MSFP_WIDTH-2:0]*vector_in_b[i][MSFP_WIDTH-2:0];
+      vector_out[i]= {vector_in_a[i][MSFP_WIDTH-1]^vector_in_b[i][MSFP_WIDTH-1],vector_out_wide};
+    end
+    exp_out=exp_in_a-EXP_BIAS+exp_in_b-1;
   end
 
 endmodule
@@ -195,6 +224,39 @@ endmodule
       .vector_out(vector_out_converted),
       .exp_in(msfp_exp) 
       );
+      
+    /*
+    reg [MSFP_WIDTH-1:0] mul_result [N-1:0];
+    reg [EXP_WIDTH-1:0] mul_result_exp;
+    MSFPmul #(
+      .MSFP_WIDTH(MSFP_WIDTH),
+      .EXP_WIDTH(EXP_WIDTH),
+      .N(8)
+      )
+      mul (
+      .vector_in_a(msfp_vector),
+      .vector_in_b(msfp_vector),
+      .valid(valid_in),
+      .vector_out(mul_result),
+      .exp_in_a(msfp_exp),
+      .exp_in_b(msfp_exp),
+      .exp_out(mul_result_exp) 
+      );
+
+    reg [DATA_WIDTH-1:0] vector_out_converted [N-1:0];
+    MSFPtoFixedP #(
+      .FP_WIDTH(DATA_WIDTH),
+      .MSFP_WIDTH(MSFP_WIDTH),
+      .EXP_WIDTH(EXP_WIDTH),
+      .N(8)
+      )
+      fromMSFP (
+      .vector_in(mul_result),
+      .valid(valid_in),
+      .vector_out(vector_out_converted),
+      .exp_in(mul_result_exp) 
+      );
+    */
 
     //-------------Code Start-----------------
 
