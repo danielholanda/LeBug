@@ -54,8 +54,9 @@ module FixedPtoMSFP #(
       tmp={vector_in[i]<<(min_shifts)};
       vector_out[i]=tmp[FP_WIDTH-1:FP_WIDTH-MSFP_WIDTH];
       if (valid==1) begin
-        $display("vector_in:  %b.%b", vector_in[i][FP_WIDTH-1:FP_WIDTH/2],vector_in[i][FP_WIDTH/2-1:0]);
-        $display("vector_out: %b %b\n", exp_out,vector_out[i]);
+        $display("Encoding",);
+        $display("\tvector_in:  %b.%b", vector_in[i][FP_WIDTH-1:FP_WIDTH/2],vector_in[i][FP_WIDTH/2-1:0]);
+        $display("\tvector_out: %b %b", exp_out,vector_out[i]);
       end
     end
 
@@ -64,6 +65,38 @@ module FixedPtoMSFP #(
     end
 
   end
+endmodule
+
+module MSFPtoFixedP #(
+  FP_WIDTH=32,
+  MSFP_WIDTH=4,
+  EXP_WIDTH=8,
+  N=8
+  )
+  (
+  output reg [FP_WIDTH-1:0] vector_out [N-1:0],
+  input logic valid,
+  input logic [MSFP_WIDTH-1:0] vector_in [N-1:0],
+  input logic [EXP_WIDTH-1:0] exp_in 
+  );
+
+  parameter EXP_BIAS=(2**EXP_WIDTH)/2-1;
+  integer i;
+  always @(*) begin
+    // Convert (ignore sign)
+    for (i=0;i<N;i++) begin
+      vector_out[i]= {vector_in[i]+32'd0}<<(exp_in-EXP_BIAS+MSFP_WIDTH+2);
+      if (valid==1) begin
+        $display("Decoding",);
+        $display("\tvector_in: %b %b", exp_in,vector_in[i]);
+        $display("\tvector_out:  %b.%b", vector_out[i][FP_WIDTH-1:FP_WIDTH/2],vector_out[i][FP_WIDTH/2-1:0]);
+      end
+    end
+    if (valid==1) begin
+      $display("------------");
+    end
+  end
+
 endmodule
 
  module  vectorVectorALU #(
@@ -142,11 +175,25 @@ endmodule
       .EXP_WIDTH(EXP_WIDTH),
       .N(8)
       )
-      testInstance (
+      toMSFP (
       .vector_in(vector_in),
       .valid(valid_in),
       .vector_out(msfp_vector),
       .exp_out(msfp_exp) 
+      );
+
+    reg [DATA_WIDTH-1:0] vector_out_converted [N-1:0];
+    MSFPtoFixedP #(
+      .FP_WIDTH(DATA_WIDTH),
+      .MSFP_WIDTH(MSFP_WIDTH),
+      .EXP_WIDTH(EXP_WIDTH),
+      .N(8)
+      )
+      fromMSFP (
+      .vector_in(msfp_vector),
+      .valid(valid_in),
+      .vector_out(vector_out_converted),
+      .exp_in(msfp_exp) 
       );
 
     //-------------Code Start-----------------
