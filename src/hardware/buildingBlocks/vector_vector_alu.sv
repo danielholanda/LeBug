@@ -47,7 +47,7 @@ module FixedPtoMSFP #(
     end
 
     // Get exponent part
-    exp_out=EXP_BIAS+2**(FP_WIDTH/2-3-min_shifts);
+    exp_out=EXP_BIAS+FP_WIDTH/2-1-min_shifts;
 
     // Get sign+mantissa (Assuming sign is always zero for this silly test module)
     for (i=0;i<N;i++) begin
@@ -85,7 +85,7 @@ module MSFPtoFixedP #(
   always @(*) begin
     // Convert (ignore sign)
     for (i=0;i<N;i++) begin
-      vector_out[i]= {vector_in[i]+32'd0}<<(exp_in-EXP_BIAS+MSFP_WIDTH+2);
+      vector_out[i]= {vector_in[i]+32'd0}<<(exp_in-EXP_BIAS+MSFP_WIDTH+1);
       if (valid==1 & i==0) begin
         $display("Decoding",);
         $display("\tvector_in: %b %b", exp_in,vector_in[i]);
@@ -224,7 +224,7 @@ endmodule
       .vector_out(vector_out_converted),
       .exp_in(msfp_exp) 
       );
-      
+
     /*
     reg [MSFP_WIDTH-1:0] mul_result [N-1:0];
     reg [EXP_WIDTH-1:0] mul_result_exp;
