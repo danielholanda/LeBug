@@ -14,7 +14,7 @@ DATA_TYPE: 'fixed_point'  # Data type (can be int, fixed_point, MSFP)
 DATA_WIDTH: 32            # The use of DATA_WIDTH depends on the DATA_TYPE being used
                           #   - For fixed_point, decimal part is DATA_WIDTH/2 
                           #   - For MSFP, DATA_WIDTH correspond to the bits in the sign+mantissa
-EXP_WIDTH: 8              # Width of the shared exponent - Only used for MSFP 
+EXP_WIDTH: 0              # Width of the shared exponent - Only used for MSFP 
 
 # Define how instruments are connected
 BUILDING_BLOCKS: 

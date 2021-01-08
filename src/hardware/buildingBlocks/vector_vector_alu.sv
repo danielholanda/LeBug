@@ -10,6 +10,7 @@
   parameter PERSONAL_CONFIG_ID=0,
   parameter VVVRF_SIZE=8,
   parameter DATA_TYPE=0,
+  parameter EXP_WIDTH=0,
   parameter [7:0] INITIAL_FIRMWARE_OP         [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_ADDR_RD    [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_COND       [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
