@@ -302,8 +302,7 @@ class rtlHw():
             ['VVVRF_SIZE',self.VVVRF_SIZE],
             ['MAX_CHAINS',self.MAX_CHAINS],
             ['TB_SIZE',self.TB_SIZE],
-            ['DATA_TYPE',self.DATA_TYPE],
-            ['EXP_WIDTH',self.EXP_WIDTH]])
+            ['DATA_TYPE',self.DATA_TYPE]])
 
         # Adds includes to the beginning of the file
         top.include("input_buffer.sv")
@@ -431,7 +430,6 @@ class rtlHw():
             ['MAX_CHAINS'],
             ['VVVRF_SIZE'],
             ['DATA_TYPE'],
-            ['EXP_WIDTH'],
             ['PERSONAL_CONFIG_ID'],
             ['INITIAL_FIRMWARE_OP'],
             ['INITIAL_FIRMWARE_ADDR_RD'],
@@ -599,7 +597,6 @@ class rtlHw():
             ['PERSONAL_CONFIG_ID','2'],
             ['VVVRF_SIZE','VVVRF_SIZE'],
             ['DATA_TYPE','DATA_TYPE'],
-            ['EXP_WIDTH','EXP_WIDTH'],
             ['INITIAL_FIRMWARE_OP',VVALU_INITIAL_FIRMWARE_OP],
             ['INITIAL_FIRMWARE_ADDR_RD',VVALU_INITIAL_FIRMWARE_ADDR_RD],
             ['INITIAL_FIRMWARE_COND',VVALU_INITIAL_FIRMWARE_COND],
@@ -726,7 +723,6 @@ class rtlHw():
             parameter FUVRF_SIZE={self.FUVRF_SIZE};
             parameter VVVRF_SIZE={self.VVVRF_SIZE};
             parameter DATA_TYPE={self.DATA_TYPE};
-            parameter EXP_WIDTH={self.EXP_WIDTH};
    
             // Declare inputs
             reg clk=1'b0;
@@ -901,7 +897,7 @@ class rtlHw():
     def push(self,pushed_values):
         self.testbench_inputs.append(pushed_values)
 
-    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,DATA_TYPE,EXP_WIDTH=0):
+    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,DATA_TYPE):
         ''' Verifying parameters '''
         assert math.log(N, 2).is_integer(), "N must be a power of 2" 
         assert math.log(M, 2).is_integer(), "N must be a power of 2" 
@@ -922,7 +918,6 @@ class rtlHw():
         else:
             print("unknown data type")
             exit()
-        self.EXP_WIDTH=EXP_WIDTH
         self.hwFolder = os.path.dirname(os.path.realpath(__file__))
         self.testbench_inputs=[]    # Stores inputs to testbench
         self.steps=0 # Number of steps for testbench 
