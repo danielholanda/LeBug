@@ -131,7 +131,12 @@
               firmware_reduce_axis[byte_counter]<=configData;
             end
             else if (byte_counter<MAX_CHAINS*3+FUVRF_SIZE*(M*DATA_WIDTH/8)) begin
-              FRU_reconfig_vector<={FRU_reconfig_vector[M*DATA_WIDTH-8-1:0],configData};
+              if (M*DATA_WIDTH<=8) begin
+                FRU_reconfig_vector<=configData;
+              end
+              else begin
+                FRU_reconfig_vector<={FRU_reconfig_vector[M*DATA_WIDTH-8-1:0],configData};
+              end
               if (FRU_reconfig_byte_counter==M*DATA_WIDTH/8-1) begin
                 FRU_reconfig_byte_counter<=0;
                 FRU_reconfig_M_counter<=FRU_reconfig_M_counter+1;
