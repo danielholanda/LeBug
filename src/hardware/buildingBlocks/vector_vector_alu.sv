@@ -187,7 +187,7 @@
           alu_mul_wide[i] = (vector_in_delay[i] * operand[i]);
           alu_mul[i]=alu_mul_wide[i]>>(DATA_WIDTH/2);
           alu_sub[i] = vector_in_delay[i] - operand[i];
-          if (vector_in_delay[i][DATA_WIDTH]==operand[i][DATA_WIDTH]) begin
+          if (vector_in_delay[i][DATA_WIDTH-1]==operand[i][DATA_WIDTH-1]) begin
             if (vector_in_delay[i]>operand[i] ) begin
               alu_max[i] = vector_in_delay[i];
             end
@@ -196,7 +196,7 @@
             end
           end
           else begin
-            if (vector_in_delay[i][DATA_WIDTH]==0) begin
+            if (vector_in_delay[i][DATA_WIDTH-1]==0) begin
               alu_max[i] = vector_in_delay[i];
             end
             else begin
@@ -244,15 +244,3 @@
     end
  
  endmodule 
-
-
-
-
-
-
-
-
-
-
-
-
