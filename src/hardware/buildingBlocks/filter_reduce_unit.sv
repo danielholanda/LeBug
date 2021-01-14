@@ -143,7 +143,7 @@
 
       end
       else begin // If we are not tracing, we are reconfiguring the instrumentation
-        valid_out<=0;
+        valid_out_delay[0]<=0;
           if (configId==PERSONAL_CONFIG_ID) begin
             byte_counter<=byte_counter+1;
             if (byte_counter<MAX_CHAINS)begin
