@@ -67,7 +67,7 @@
     reg [$clog2(FUVRF_SIZE)-1:0] FRU_reconfig_M_counter=0;
     reg [M*DATA_WIDTH-1:0] FRU_reconfig_vector =0;
 
-    integer i,j,k;
+    integer i,j;
     genvar g;
 
     //-------------Code Start-----------------
@@ -106,44 +106,19 @@
     defparam furf.latency = RAM_LATENCY;
     defparam furf.init_file = "furf.mif";
 
-    // Trade off area and speed
-    parameter output_delays=2;
-
-    reg [DATA_WIDTH-1:0] vector_out_delay [output_delays:0] [N-1:0];
-    reg [$clog2(MAX_CHAINS)-1:0] chainId_out_delay [output_delays:0];
-    reg valid_out_delay [output_delays:0];
-    reg [1:0] eof_out_delay [output_delays:0];
-    reg [1:0] bof_out_delay [output_delays:0];
-
-    always @(*) begin
-        vector_out = vector_out_delay[output_delays];
-        valid_out = valid_out_delay[output_delays];
-        eof_out = eof_out_delay[output_delays];
-        bof_out = bof_out_delay[output_delays];
-        chainId_out = chainId_out_delay[output_delays];
-    end
-
     always @(posedge clk) begin
-      
-      for (k=0;k<output_delays;k++) begin
-        vector_out_delay[k+1]<=vector_out_delay[k];
-        valid_out_delay[k+1] <=valid_out_delay[k];
-        eof_out_delay[k+1]   <=eof_out_delay[k];
-        bof_out_delay[k+1]   <=bof_out_delay[k];
-        chainId_out_delay[k+1]     <=chainId_out_delay[k];
-      end
 
       if (tracing==1'b1) begin
         // Logic for output
-        vector_out_delay[0] <= firmware_filter_op_delay2==8'b1 ? reduce_result_wide : vector_in_delay2;
-        valid_out_delay[0] <= valid_in_delay2;
-        eof_out_delay[0] <= eof_in_delay2;
-        bof_out_delay[0] <= bof_in_delay2;
-        chainId_out_delay[0] <= chainId_in_delay2;
+        vector_out <= firmware_filter_op_delay2==8'b1 ? reduce_result_wide : vector_in_delay2;
+        valid_out <= valid_in_delay2;
+        eof_out <= eof_in_delay2;
+        bof_out <= bof_in_delay2;
+        chainId_out <= chainId_in_delay2;
 
       end
       else begin // If we are not tracing, we are reconfiguring the instrumentation
-        valid_out_delay[0]<=0;
+        valid_out<=0;
           if (configId==PERSONAL_CONFIG_ID) begin
             byte_counter<=byte_counter+1;
             if (byte_counter<MAX_CHAINS)begin
@@ -252,6 +227,7 @@
 
       mem_address_a = firmware_filter_addr[chainId_in];
     end
+
 
 
     // Logic for reduce unit
