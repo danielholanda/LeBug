@@ -37,6 +37,7 @@
     parameter RAM_LATENCY = LATENCY-1;
     parameter MEM_WIDTH = M*DATA_WIDTH;
     parameter FRU_WIDTH = $clog2(N+1);
+    parameter reduce_delays = 2;
 
     reg [7:0] firmware_filter_op     [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_FILTER_OP;
     reg [7:0] firmware_filter_addr   [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_FILTER_ADDR;
@@ -48,17 +49,17 @@
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
     reg [7:0] firmware_filter_op_delay;
-    reg valid_in_delay2 = 1'b0;
-    reg [1:0] eof_in_delay2 = 2'b00;
-    reg [1:0] bof_in_delay2 = 2'b00;
-    reg [DATA_WIDTH-1:0] vector_in_delay2 [N-1:0];
-    reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay2=0;
-    reg [7:0] firmware_filter_op_delay2;
+    reg valid_in_delay_variable [reduce_delays:0];// = 1'b0;
+    reg [1:0] eof_in_delay_variable [reduce_delays:0];//= 2'b00;
+    reg [1:0] bof_in_delay_variable [reduce_delays:0];//= 2'b00;
+    reg [DATA_WIDTH-1:0] vector_in_delay_variable [reduce_delays:0] [N-1:0];
+    reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay_variable [reduce_delays:0];//=0;
+    reg [7:0] firmware_filter_op_delay_variable [reduce_delays:0];
     reg [DATA_WIDTH-1:0] operand [M-1:0];
     reg [DATA_WIDTH-1:0] selected_operand;
     reg filter_result [M-1:0] [N-1:0];
     reg reduce_input [N-1:0] [N-1:0];
-    reg reduce_input_delay [N-1:0] [N-1:0];
+    reg reduce_input_delay [reduce_delays:0] [N-1:0] [N-1:0];
     reg [FRU_WIDTH-1:0] reduce_result [N-1:0];
     reg [DATA_WIDTH-1:0] reduce_result_wide [N-1:0];
     reg [7:0] firmware_reduce_axis_delay;
@@ -67,7 +68,18 @@
     reg [$clog2(FUVRF_SIZE)-1:0] FRU_reconfig_M_counter=0;
     reg [M*DATA_WIDTH-1:0] FRU_reconfig_vector =0;
 
-    integer i,j;
+    integer i,j,k;
+
+    reg [9:0] count;
+    initial begin
+      count = 0;
+      for (i=0;i<=reduce_delays;i=i+1)
+        valid_in_delay_variable[i] = 1'b0;
+        eof_in_delay_variable[i]=2'b00;
+        bof_in_delay_variable[i]=2'b00;
+        chainId_in_delay_variable[i]=0;
+    end
+
     genvar g;
 
     //-------------Code Start-----------------
@@ -110,11 +122,11 @@
 
       if (tracing==1'b1) begin
         // Logic for output
-        vector_out <= firmware_filter_op_delay2==8'b1 ? reduce_result_wide : vector_in_delay2;
-        valid_out <= valid_in_delay2;
-        eof_out <= eof_in_delay2;
-        bof_out <= bof_in_delay2;
-        chainId_out <= chainId_in_delay2;
+        vector_out <= firmware_filter_op_delay_variable[reduce_delays]==8'b1 ? reduce_result_wide : vector_in_delay_variable[reduce_delays];
+        valid_out <= valid_in_delay_variable[reduce_delays];
+        eof_out <= eof_in_delay_variable[reduce_delays];
+        bof_out <= bof_in_delay_variable[reduce_delays];
+        chainId_out <= chainId_in_delay_variable[reduce_delays];
 
       end
       else begin // If we are not tracing, we are reconfiguring the instrumentation
@@ -141,13 +153,13 @@
                 FRU_reconfig_byte_counter<=0;
                 FRU_reconfig_M_counter<=FRU_reconfig_M_counter+1;
                 mem_write_enable_b<=1;
-          mem_address_b<=FRU_reconfig_M_counter;
-          mem_in_b<=FRU_reconfig_vector;
-            end
+                mem_address_b<=FRU_reconfig_M_counter;
+                mem_in_b<=FRU_reconfig_vector;
+              end
               else begin 
                 mem_write_enable_b<=0;
                 FRU_reconfig_byte_counter<=FRU_reconfig_byte_counter+1;
-            end
+              end
             end
           end
           else begin
@@ -156,24 +168,33 @@
             FRU_reconfig_byte_counter<=0;
             FRU_reconfig_M_counter<=0;
           end
-      end
+        end
 
-      // Delay values until we can read the value to perform the op
-      valid_in_delay <= valid_in;
-      vector_in_delay <= vector_in; 
-      firmware_filter_op_delay <= firmware_filter_op[chainId_in];
-      firmware_reduce_axis_delay <= firmware_reduce_axis[chainId_in];
-      eof_in_delay <= eof_in;
-      bof_in_delay <= bof_in;
-      chainId_in_delay <= chainId_in;
-      reduce_input_delay<=reduce_input;
-      firmware_filter_op_delay2<=firmware_filter_op_delay;
-    vector_in_delay2<=vector_in_delay;
-    valid_in_delay2<=valid_in_delay;
-    eof_in_delay2<=eof_in_delay;
-    bof_in_delay2<=bof_in_delay;
-    chainId_in_delay2<=chainId_in_delay;
-    end
+        // Delay values until we can read the value to perform the op
+        valid_in_delay <= valid_in;
+        vector_in_delay <= vector_in; 
+        firmware_filter_op_delay <= firmware_filter_op[chainId_in];
+        firmware_reduce_axis_delay <= firmware_reduce_axis[chainId_in];
+        eof_in_delay <= eof_in;
+        bof_in_delay <= bof_in;
+        chainId_in_delay <= chainId_in;
+        reduce_input_delay[0]<=reduce_input;
+        firmware_filter_op_delay_variable[0]<=firmware_filter_op_delay;
+        for (k=0;k<reduce_delays;k++) begin
+          reduce_input_delay[k+1]<=reduce_input_delay[k];
+          firmware_filter_op_delay_variable[k+1]<=firmware_filter_op_delay_variable[k];
+          vector_in_delay_variable[k+1]<=vector_in_delay_variable[k];
+          valid_in_delay_variable[k+1]<=valid_in_delay_variable[k];
+          eof_in_delay_variable[k+1]<=eof_in_delay_variable[k];
+          bof_in_delay_variable[k+1]<=bof_in_delay_variable[k];
+          chainId_in_delay_variable[k+1]<=chainId_in_delay_variable[k];
+        end
+        vector_in_delay_variable[0]<=vector_in_delay;
+        valid_in_delay_variable[0]<=valid_in_delay;
+        eof_in_delay_variable[0]<=eof_in_delay;
+        bof_in_delay_variable[0]<=bof_in_delay;
+        chainId_in_delay_variable[0]<=chainId_in_delay;
+      end
 
     // Logic for filter unit
     always @(*) begin
@@ -233,7 +254,7 @@
     // Logic for reduce unit
     generate 
       for (g=0;g<N;g++) begin
-        adderTree1Bit #(.N(N))adder_tree_inst(.vector(reduce_input_delay[g]), .result(reduce_result[g]));
+        adderTree1Bit #(.N(N))adder_tree_inst(.vector(reduce_input_delay[reduce_delays][g]), .result(reduce_result[g]));
       end
     endgenerate
 
