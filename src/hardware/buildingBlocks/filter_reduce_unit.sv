@@ -73,7 +73,7 @@
     reg [9:0] count;
     initial begin
       count = 0;
-      for (i=0;i<=reduce_delays;i=i+1)
+      for (i=0;i<reduce_delays;i=i+1)
         valid_in_delay_variable[i] = 1'b0;
         eof_in_delay_variable[i]=2'b00;
         bof_in_delay_variable[i]=2'b00;
