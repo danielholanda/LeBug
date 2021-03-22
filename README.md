@@ -5,7 +5,6 @@ This first version of the documentation explains the basics of how to get starte
 ## Understanding how it works
 
 
-
 <img src="img/sample_hw.png" alt="drawing" width="300"/>
 
 #### Bulding Blocks
@@ -17,22 +16,22 @@ The debug processor can be composed out of the following building blocks:
   - **ISA instructions:** None
 - **Filter Unit** (N,M,FUVRF_SIZE) 
   - **Description:** For each of the N elements received, output M elements. Each of those M elements is a binary indicator of wether the value is within a certain range. All ranges are stored in the fu_mem and the same range is applies to all elements of the input vector N.
-  - **ISA instructions: ** vv_filter(addr)
+  - **ISA instructions:** vv_filter(addr)
 - **Matrix Vector Reduce** (N,M) 
   - **Description:** This block receives a N*M input and reduces the result either in the M or N axis. The only type of reduction that is currently made is the sum. This block is mandatory when the filter unit is instantiated.
-  - **ISA instructions: ** m_reduce(axis)
+  - **ISA instructions:** m_reduce(axis)
 - **Vector Scalar Reduce** (N) 
   - **Description:** Reduce values along a given axis and output either 1, M or N values
-  - **ISA instructions: **v_reduce
+  - **ISA instructions:**v_reduce
 - **Vector Vector ALU** (N,VVVRF_SIZE) 
   - **Description:** Performs basic vector-vector operations and offers the option to store things in a scratchpad.
-  - **ISA instructions: **vv_add(addr), vv_mul(addr), vv_sub(addr), v_cache(addr)
+  - **ISA instructions:**vv_add(addr), vv_mul(addr), vv_sub(addr), v_cache(addr)
 - **Data Packer** (N,M)
   - **Description:** Receives 1, N or M values and sends it to the trace buffer N at a time
-  - **ISA instructions: ** None
+  - **ISA instructions:** None
 - **Trace Buffer** (N,TB_SIZE)
   - **Description:** Circular Trace Buffer
-  - **ISA instructions: ** None
+  - **ISA instructions:** None
 
 #### Parameters
 
@@ -122,8 +121,31 @@ Each example is composed of those main files:
 - compiler
   - Shoudl be able to handle all ISA instructions and compile() at the end
 
-### FIXME:
+## Contents:
+- src -- includes source code for LeBug
+- test -- simple examples that be run to test the tool
+- examples -- complicated examples that can take a significant amount of time to run 
 
-- Max function has been implemented, but there is no corresponding firmware for it
-- Second eof signal implemented, but not tested
-- Writable implementation of memory in FFRU not tested
+## Authors
+
+* **Daniel Holanda Noronha** - *danielhn-at-ece.ubc.ca* 
+* **Zhiqiang Que**
+* **Wayne Luk**
+* **Steve Wilton**
+
+## Citing LeBug
+
+Please cite LeBug in your publications if it helps your research work:
+
+```
+@INPROCEEDINGS{LeBug,
+     author = {{Holanda Noronha}, D. and {Que}, Z. and {Luk}, W. and {Wilton}, S.~J.~E.},
+     booktitle={2021 IEEE 29th Annual International Symposium on Field-Programmable Custom Computing Machines (FCCM)}, 
+     title = "{Flexible Instrumentation for Live On-Chip Debug of Machine Learning Training on FPGAs}",
+     year = {2021}
+} 
+```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
