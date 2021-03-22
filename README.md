@@ -10,11 +10,14 @@ The manuscript related to LeBug is to appear at [The 29th IEEE International Sym
 
 ### Testing your installation
 
-- To test your installation, go into the examples/minimal directory and run
+- To test the emulator, go into the examples/emu_test directory and run
     ``` 
-    python3 test_emulator
+    python3 emu_test.py
     ```
-
+- To test hardware generation and modelsim, go into the examples/hw_test directory and run
+    ``` 
+    python3 hw_test.py
+    ```
 ## Getting Started
 
 ### Simulation with iVerilog
@@ -42,8 +45,7 @@ Each example is composed of those main files:
 
 ## Contents:
 - src -- includes source code for LeBug
-- test -- simple examples that be run to test the tool
-- examples -- complex examples that can take a significant amount of time to run 
+- examples -- examples used for testing both emulator and generated hardware 
 - docs -- additional documentation on this repository
 
 ## Authors
