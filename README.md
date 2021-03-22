@@ -22,10 +22,10 @@ The debug processor can be composed out of the following building blocks:
   - **ISA instructions:** m_reduce(axis)
 - **Vector Scalar Reduce** (N) 
   - **Description:** Reduce values along a given axis and output either 1, M or N values
-  - **ISA instructions:**v_reduce
+  - **ISA instructions:** v_reduce
 - **Vector Vector ALU** (N,VVVRF_SIZE) 
   - **Description:** Performs basic vector-vector operations and offers the option to store things in a scratchpad.
-  - **ISA instructions:**vv_add(addr), vv_mul(addr), vv_sub(addr), v_cache(addr)
+  - **ISA instructions:** vv_add(addr), vv_mul(addr), vv_sub(addr), v_cache(addr)
 - **Data Packer** (N,M)
   - **Description:** Receives 1, N or M values and sends it to the trace buffer N at a time
   - **ISA instructions:** None
