@@ -1,8 +1,8 @@
-# This YAML file is used to configure the instrumentation
+# This YAML file is used to generate the instrumentation
 
 ---
 
-# Parameters to define the architecture
+# Parameters to define the architecture (see full description of parameters in the docs folder)
 N: 8                      # Input vector width
 M: 4                      # Number of range filters in filter unit
 IB_DEPTH: 8               # Input buffer depth
@@ -10,12 +10,11 @@ FUVRF_SIZE: 4             # Size of FUVRF in M*elements
 VVVRF_SIZE: 8             # Size of VVVRF in N*elements
 TB_SIZE: 64               # Size of Trace Buffer in N*elements
 MAX_CHAINS: 8             # Maximum number of chains of the firmware
-DATA_TYPE: 'fixed_point'  # Data type (can be int, fixed_point, MSFP)
+DATA_TYPE: 'fixed_point'  # Data type (currently only fixed-point is supported)
 DATA_WIDTH: 32            # The use of DATA_WIDTH depends on the DATA_TYPE being used
                           #   - For fixed_point, decimal part is DATA_WIDTH/2 
-                          #   - For MSFP, exponent is always 8 bits and sign+mentissa is the rest
 
-# Define how instruments are connected
+# Define how building blocks are connected
 BUILDING_BLOCKS: 
     - InputBuffer
     - FilterReduceUnit
@@ -24,5 +23,5 @@ BUILDING_BLOCKS:
     - DataPacker
     - TraceBuffer
 
-# Define the initial firmware
+# Define the initial firmware (see complete list at src/firmware/firmware.py)
 FIRM: distribution
