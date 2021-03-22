@@ -26,14 +26,27 @@ def floatToEncodedInt(float_array,DATA_WIDTH):
 def encode(value,DATA_WIDTH):
     int_bits=int(DATA_WIDTH/2)
     frac_bits=int(DATA_WIDTH/2)
+    is_negative = value<0
     max_value = (1<<(int_bits-1+frac_bits))-1
-    min_value = -(1<<(int_bits-1+frac_bits))
-    x =  round(value * (1<< frac_bits))
-    return int(min_value if x<min_value else max_value if x > max_value else x)
+    x = round(value * (1<< frac_bits))
+    x = int(max_value if x > max_value else -max_value if x< -max_value else x)
+    if is_negative:
+        x = -(x - (1 << DATA_WIDTH-1))
+    return x
+
+def decode(value,DATA_WIDTH):
+    int_bits=int(DATA_WIDTH/2)
+    frac_bits=int(DATA_WIDTH/2)
+    value=float(value)
+    max_value = (1<<(int_bits-1+frac_bits))-1
+    is_negative = value>max_value
+    if is_negative:
+        value = -(value-(1<< DATA_WIDTH-1))
+    return value / (1 << frac_bits)
 
 def encodedIntTofloat(encoded_int,DATA_WIDTH):
     frac_bits=int(DATA_WIDTH/2)
-    return [[float(encoded_value) / (1 << frac_bits) for encoded_value in l] for l in encoded_int]
+    return [[decode(encoded_value,DATA_WIDTH) for encoded_value in l] for l in encoded_int] 
 
 def raw():
 
@@ -60,7 +73,7 @@ def raw():
             emu_proc.push([input_vectors[i],False])
             hw_proc.push([input_vectors[i],False])
         elif DATA_TYPE=='fixed_point':
-            input_vectors.append(5*np.random.random(N))
+            input_vectors.append(5*np.random.random(N)-2)
             print(f'Cycle {i}:\t{input_vectors[i]}')
             emu_proc.push([input_vectors[i],False])
             input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
@@ -96,7 +109,6 @@ def raw():
 
 raw()
 
-
 def multipleChains():
 
     # Overwrite YAML file to define how components are attached to eachother
@@ -122,7 +134,7 @@ def multipleChains():
             emu_proc.push([input_vectors[i],False])
             hw_proc.push([input_vectors[i],False])
         elif DATA_TYPE=='fixed_point':
-            input_vectors.append(5*np.random.random(N))
+            input_vectors.append(5*np.random.random(N)-3)
             print(f'Cycle {i}:\t{input_vectors[i]}')
             emu_proc.push([input_vectors[i],False])
             input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
@@ -163,7 +175,6 @@ def multipleChains():
     print("Passed test #2")
 
 multipleChains()
-
 
 def correlation():
 
