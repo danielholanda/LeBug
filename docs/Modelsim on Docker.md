@@ -13,7 +13,7 @@ LeBug doesn't require using Docker to generate RTL. However, we do use Docker to
 - Multiple containers can be assigned to an image
 - An image is a "snapshot" of a container
 
-###Basic docker commands
+### Basic docker commands
 
 - Show all images we have
 
