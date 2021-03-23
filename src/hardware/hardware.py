@@ -821,7 +821,7 @@ class rtlHw():
         if self.DEVICE_FAM == "Cyclone V":
             copyfile(self.hwFolder+"/buildingBlocks/device-specific/ram_dual_port_cycloneV.sv", rtl_folder+"/ram_dual_port.sv")
         elif self.DEVICE_FAM == "Stratix 10":
-            cachecopyfile(self.hwFolder+"/buildingBlocks/device-specific/ram_dual_port_stratix10.sv", rtl_folder+"/ram_dual_port.sv")
+            copyfile(self.hwFolder+"/buildingBlocks/device-specific/ram_dual_port_stratix10.sv", rtl_folder+"/ram_dual_port.sv")
         else:
             assert False, f"Currently only 'Cyclone V' and 'Stratix 10' are supported (received {self.DEVICE_FAM})"
         copy_tree(self.hwFolder+"/simulationBlocks", rtl_folder)
