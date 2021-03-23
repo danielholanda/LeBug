@@ -41,6 +41,7 @@
     reg [7:0] firmware_cache_addr [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_CACHE_ADDR;
     reg [DATA_WIDTH-1:0] valid_result [N-1:0];
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
+    reg [DATA_WIDTH*2-1:0] vector_in_delay_se [N-1:0];
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
     reg valid_in_delay = 1'b0;
     reg valid_in_delay_2 = 1'b0;
@@ -54,10 +55,11 @@
     reg [7:0] firmware_cond_delay =0;
     reg cond_valid;
     reg [DATA_WIDTH-1:0] operand [N-1:0];
+    reg [DATA_WIDTH*2-1:0] operand_se [N-1:0];
     reg [DATA_WIDTH-1:0] alu_result [N-1:0];
     reg [DATA_WIDTH-1:0] alu_add [N-1:0];
     reg [DATA_WIDTH-1:0] alu_mul [N-1:0];
-    reg [DATA_WIDTH*2-1:0] alu_mul_wide [N-1:0];
+    reg [DATA_WIDTH*4-1:0] alu_mul_wide [N-1:0];
     reg [DATA_WIDTH-1:0] alu_sub [N-1:0];
     reg [DATA_WIDTH-1:0] alu_max [N-1:0];
     reg [7:0] byte_counter=0;
@@ -184,7 +186,9 @@
       else begin
         for(i=0; i<N; i=i+1) begin
           alu_add[i] = vector_in_delay[i] + operand[i];
-          alu_mul_wide[i] = (vector_in_delay[i] * operand[i]);
+          vector_in_delay_se[i] =  { {DATA_WIDTH{vector_in_delay[i][DATA_WIDTH-1]}}, vector_in_delay[i][DATA_WIDTH-1:0] };
+          operand_se[i] = { {DATA_WIDTH{operand[i][DATA_WIDTH-1]}}, operand[i][DATA_WIDTH-1:0] };
+          alu_mul_wide[i] = (vector_in_delay_se[i] * operand_se[i]);
           alu_mul[i]=alu_mul_wide[i]>>(DATA_WIDTH/2);
           alu_sub[i] = vector_in_delay[i] - operand[i];
           if (vector_in_delay[i][DATA_WIDTH-1]==operand[i][DATA_WIDTH-1]) begin
