@@ -818,7 +818,12 @@ class rtlHw():
             shutil.rmtree(rtl_folder)
         os.mkdir(rtl_folder)
         copy_tree(self.hwFolder+"/buildingBlocks/general", rtl_folder)
-        copyfile(self.hwFolder+"/buildingBlocks/device-specific/ram_dual_port_cycloneV.sv", rtl_folder+"/ram_dual_port.sv")
+        if self.DEVICE_FAM == "Cyclone V":
+            copyfile(self.hwFolder+"/buildingBlocks/device-specific/ram_dual_port_cycloneV.sv", rtl_folder+"/ram_dual_port.sv")
+        elif self.DEVICE_FAM == "Stratix 10":
+            cachecopyfile(self.hwFolder+"/buildingBlocks/device-specific/ram_dual_port_stratix10.sv", rtl_folder+"/ram_dual_port.sv")
+        else:
+            assert False, f"Currently only 'Cyclone V' and 'Stratix 10' are supported (received {self.DEVICE_FAM})"
         copy_tree(self.hwFolder+"/simulationBlocks", rtl_folder)
 
         # Writes debugProcessor to file
@@ -899,7 +904,7 @@ class rtlHw():
     def push(self,pushed_values):
         self.testbench_inputs.append(pushed_values)
 
-    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,DATA_TYPE):
+    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,DATA_TYPE,DEVICE_FAM):
         ''' Verifying parameters '''
         assert math.log(N, 2).is_integer(), "N must be a power of 2" 
         assert math.log(M, 2).is_integer(), "N must be a power of 2" 
@@ -913,6 +918,7 @@ class rtlHw():
         self.TB_SIZE=TB_SIZE
         self.VVVRF_SIZE=VVVRF_SIZE
         self.FUVRF_SIZE=FUVRF_SIZE
+        self.DEVICE_FAM=DEVICE_FAM
         if DATA_TYPE=='int':
             self.DATA_TYPE=0
         elif DATA_TYPE=='fixed_point':
