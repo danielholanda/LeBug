@@ -98,8 +98,8 @@ module  ram_dual_port  (
         altera_syncram_component.outdata_sclr_a  = "NONE",
         altera_syncram_component.outdata_aclr_b  = "NONE",
         altera_syncram_component.outdata_sclr_b  = "NONE",
-        altera_syncram_component.outdata_reg_a  = "CLOCK0", // This was "UNREGISTERED"
-        altera_syncram_component.outdata_reg_b  = "CLOCK0", // This was "UNREGISTERED"
+        altera_syncram_component.outdata_reg_a  = "UNREGISTERED", 
+        altera_syncram_component.outdata_reg_b  = "UNREGISTERED",
         altera_syncram_component.power_up_uninitialized  = "FALSE",
         altera_syncram_component.read_during_write_mode_mixed_ports  = "DONT_CARE", // This was "OLD_DATA"
         altera_syncram_component.read_during_write_mode_port_a  = "NEW_DATA_NO_NBE_READ",

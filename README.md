@@ -37,10 +37,14 @@ Each example is composed of those main files:
   - Initializes the processor using either emulatedHw class or rtlHw class
   - After initializing the processor, all inputs functions that interact with the processor should be supported by both emulator and rtlHw
 
-## Contents:
-- src -- includes source code for LeBug
-- examples -- examples used for testing both emulator and generated hardware 
-- docs -- additional documentation on this repository
+## Documentation
+
+The [docs folder](docs/README.md) contains the following additional documentation:
+
+- [Description of hardware blocks and overall flow](docs/Overall flow.md)
+- [Understanding and writing your own firmware](docs/Understanding firmware.md)
+- [Testing our debugger using Modelsim through Docker](docs/Modelsim on Docker.md)
+- [Debugging the debugger](docs/Debugging the debugger.md)
 
 ## Authors
 
