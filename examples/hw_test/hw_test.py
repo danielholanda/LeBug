@@ -18,7 +18,6 @@ def toInt(lst):
     return [list(map(int, l)) for l in lst]
 
 print("BUG1: STRATIX10 DUAL_PORT_RAM IS WORKING DIFFERENTLY FROM CYCLONE V DUAL_PORT_RAM")
-print("BUG2: ENCODE/DECODE ONLY WORK FOR POSITIVE NUMBERS")
 
 def floatToEncodedInt(float_array,DATA_WIDTH):
     return [encode(x,DATA_WIDTH) for x in float_array]
@@ -202,7 +201,7 @@ def correlation():
             emu_proc.push([input_vectors[i],False])
             hw_proc.push([input_vectors[i],False])
         elif DATA_TYPE=='fixed_point':
-            input_vectors.append(5*np.random.random(N))
+            input_vectors.append(5*np.random.random(N)-3)
             print(f'Cycle {i}:\t{input_vectors[i]}')
             emu_proc.push([input_vectors[i],False])
             input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
@@ -239,7 +238,7 @@ def correlation():
     print(hw_trace_buffer)
 
     # Verify that results are equal
-    assert np.allclose(emu_trace_buffer,hw_trace_buffer, rtol=0.01)
+    assert np.allclose(emu_trace_buffer,hw_trace_buffer, rtol=0.05)
     print("Passed test #3")
 
 correlation()
@@ -272,7 +271,7 @@ def conditions():
             emu_proc.push([input_vectors[i],eof])
             hw_proc.push([input_vectors[i],eof])
         elif DATA_TYPE=='fixed_point':
-            input_vectors.append(5*np.random.random(N))
+            input_vectors.append(5*np.random.random(N)-3)
             print(f'Cycle {i}:\t{input_vectors[i]}')
             emu_proc.push([input_vectors[i],eof])
             input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
@@ -309,7 +308,7 @@ def conditions():
     print(hw_trace_buffer)
 
     # Verify that results are equal
-    assert np.allclose(emu_trace_buffer,hw_trace_buffer)
+    assert np.allclose(emu_trace_buffer,hw_trace_buffer, rtol=0.05)
     print("Passed test #4")
 
 conditions()
@@ -342,7 +341,7 @@ def distribution():
             emu_proc.push([input_vectors[i],eof])
             hw_proc.push([input_vectors[i],eof])
         elif DATA_TYPE=='fixed_point':
-            input_vectors.append(9*np.random.random(N))
+            input_vectors.append(9*np.random.random(N)-5)
             print(f'Cycle {i}:\t{input_vectors[i]}')
             emu_proc.push([input_vectors[i],eof])
             input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
