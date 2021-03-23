@@ -41,9 +41,9 @@ Each example is composed of those main files:
 
 The [docs folder](docs/README.md) contains the following additional documentation:
 
-- [Description of hardware blocks and overall flow](docs/Overall flow.md)
-- [Understanding and writing your own firmware](docs/Understanding firmware.md)
-- [Testing our debugger using Modelsim through Docker](docs/Modelsim on Docker.md)
+- [Description of hardware blocks and overall flow](docs/Overall\ flow.md)
+- [Understanding and writing your own firmware](docs/Understanding\ firmware.md)
+- [Testing our debugger using Modelsim through Docker](docs/Modelsim\ on\ Docker.md)
 - [Debugging the debugger](docs/Debugging the debugger.md)
 
 ## Authors
