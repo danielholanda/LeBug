@@ -13,7 +13,7 @@ MAX_CHAINS: 8             # Maximum number of chains of the firmware
 DATA_TYPE: 'fixed_point'  # Data type (currently only fixed-point is supported)
 DATA_WIDTH: 32            # The use of DATA_WIDTH depends on the DATA_TYPE being used
                           #   - For fixed_point, decimal part is DATA_WIDTH/2 
-DEVICE_FAM: 'Cyclone V'   # Currently only 'Cyclone V' and 'Stratix 10' are supported
+DEVICE_FAM: 'Stratix 10'  # Currently only 'Cyclone V' and 'Stratix 10' are supported
 
 # Define how building blocks are connected
 BUILDING_BLOCKS: 
