@@ -711,6 +711,15 @@ class rtlHw():
         # Add includes
         testbench='`include "debugProcessor.sv"\n'
 
+        # Change altsyncram path depending on device family
+        if self.DEVICE_FAM == "Cyclone V":
+            altsyncram_data_path = "altsyncram_component.altera_syncram_inst.mem_data"
+        elif self.DEVICE_FAM == "Stratix 10":
+            #altsyncram_data_path = "altsyncram_component.mem_data"
+            altsyncram_data_path = "altera_syncram_component.mem_data"
+        else:
+            assert False, f"Currently only 'Cyclone V' and 'Stratix 10' are supported (received {self.DEVICE_FAM})"
+        
         testbench=[testbench+textwrap.dedent(f"""
         `timescale 1 ns/10 ps  // time-unit = 1 ns, precision = 10 ps
         module testbench;
@@ -791,9 +800,7 @@ class rtlHw():
                 $fclose(write_data);
                 write_data2 = $fopen("simulation_results_tb.txt");
                 for (i=0; i<dbg.tb.TB_SIZE; i=i+1) begin
-                    //tmp = dbg.tb.mem.altera_syncram_component.mem_data[i];
-                    tmp = dbg.tb.mem.altsyncram_component.altera_syncram_inst.mem_data[i];
-                    //tmp = dbg.tb.mem.altsyncram_component.mem_data[i];
+                    tmp = dbg.tb.mem.{altsyncram_data_path}[i];
                     for (j=0; j<N; j=j+1) begin
                         // Verilog you can't have two variable expressions in a range, even if they evaluate to a constant difference.  
                         // Specifically: [j*DATA_WIDTH+DATA_WIDTH-1:j*DATA_WIDTH] should be:[j*DATA_WIDTH +: DATA_WIDTH]
@@ -806,6 +813,7 @@ class rtlHw():
             end
         endmodule
         """)]
+
 
         self.tb_var_names=tb_var_names
         return testbench
