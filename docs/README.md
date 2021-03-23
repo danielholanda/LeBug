@@ -7,8 +7,8 @@ Please choose one of the following resources to get started:
 ## Main Documentation
 
 - [Intro](https://github.com/danielholanda/LeBug/blob/master/README.md) (Takes you back to the main GitHub Page)
-- [Description of hardware blocks and overall flow](Overall&#32;flow.md)
-- [Understanding and writing your own firmware](Understanding&#32;firmware.md)
+- [Description of hardware blocks and overall flow](Overall&#32;Flow.md)
+- [Understanding and writing your own firmware](Understanding&#32;Firmware.md)
 - [Debugging the debugger](Debugging&#32;the&#32;debugger.md)
 
 ## Additional Documentation
