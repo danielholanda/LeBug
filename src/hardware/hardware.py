@@ -1,6 +1,7 @@
 import logging as log
 import sys, math, os, shutil, textwrap, subprocess,shlex
 from distutils.dir_util import copy_tree
+from shutil import copyfile
 from firmware.compiler import compiler
 from misc.misc import *
 import numpy as np
@@ -816,7 +817,8 @@ class rtlHw():
         if os.path.isdir(rtl_folder):
             shutil.rmtree(rtl_folder)
         os.mkdir(rtl_folder)
-        copy_tree(self.hwFolder+"/buildingBlocks", rtl_folder)
+        copy_tree(self.hwFolder+"/buildingBlocks/general", rtl_folder)
+        copyfile(self.hwFolder+"/buildingBlocks/device-specific/ram_dual_port_cycloneV.sv", rtl_folder+"/ram_dual_port.sv")
         copy_tree(self.hwFolder+"/simulationBlocks", rtl_folder)
 
         # Writes debugProcessor to file

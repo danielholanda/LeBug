@@ -1,9 +1,9 @@
 //-----------------------------------------------------
 // Design Name : Ram Dual Port
-// Function    : Dual port ram for Intel FPGAs
+// Function    : Dual port ram for Intel for Cyclone V FPGAs
 //-----------------------------------------------------
 
-module ram_dual_port //_cycloneV
+module ram_dual_port
 (
   clk,
   clken,
