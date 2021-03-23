@@ -31,7 +31,7 @@ def encode(value,DATA_WIDTH):
     x = round(value * (1<< frac_bits))
     x = int(max_value if x > max_value else -max_value if x< -max_value else x)
     if is_negative:
-        x = -(x - (1 << DATA_WIDTH-1))
+        x = (1<<DATA_WIDTH) + x
     return x
 
 def decode(value,DATA_WIDTH):
@@ -41,12 +41,13 @@ def decode(value,DATA_WIDTH):
     max_value = (1<<(int_bits-1+frac_bits))-1
     is_negative = value>max_value
     if is_negative:
-        value = -(value-(1<< DATA_WIDTH-1))
+        value = -((1<<DATA_WIDTH) - value)
     return value / (1 << frac_bits)
 
 def encodedIntTofloat(encoded_int,DATA_WIDTH):
     frac_bits=int(DATA_WIDTH/2)
     return [[decode(encoded_value,DATA_WIDTH) for encoded_value in l] for l in encoded_int] 
+
 
 def raw():
 
