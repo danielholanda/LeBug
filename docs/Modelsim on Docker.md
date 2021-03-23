@@ -1,32 +1,19 @@
 
 
-## Instructions on how to interface with Modelsim docker image
+# Testing Debugger Using Modelsim Through Docker
 
-You can find details on the container at this website:
+LeBug doesn't require using Docker to generate RTL. However, we do use Docker to run Modelsim, allowing users to test and build up on LeBug on Mac, Windows or Linux.
 
-- https://github.com/goldenSniperOS/modelsim-docker
+## Docker Basics
 
-### Commands to run:
-
-- Initialize container
-  - ```sudo docker run --net=host --env="DISPLAY"  -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=unix$DISPLAY  --volume="​$HOME/.Xauthority:/root/.Xauthority:ro" --rm -it goldensniper/modelsim-docker```
-- Create modelsim project
-  - ```vlib work```
-- Compile files
-  - ```vlog debugProcessor.sv```
-- Run modelsim and exit
-  - ```vsim -c -do run -do exit testbench```
-
-
-
-## Docker image vs. Container
+### Docker image vs. Container
 
 - You can imagine that a container is an instance of an image
 - A container is made from an image
 - Multiple containers can be assigned to an image
 - An image is a "snapshot" of a container
 
-## Basic docker commands
+###Basic docker commands
 
 - Show all images we have
 
@@ -66,8 +53,30 @@ You can find details on the container at this website:
 
     
 
+## Using Modelsim on Docker 
+
+We use the following Modelsim image used for docker:
+
+- https://github.com/goldenSniperOS/modelsim-docker
+
+Note that this image will automatically be downloaded when you try to run the "hw_test" on the examples folder. 
+
+### Manually starting Modelsim
+
+The instructions below are designed for Mac users, but commands for other operational systems should be fairly similar. Note that manually initializing the docker container is not needed in most scenarios.
+
+- Initialize container
+  - ```sudo docker run --net=host --env="DISPLAY"  -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=unix$DISPLAY  --volume="$HOME/.Xauthority:/root/.Xauthority:ro" --rm -it goldensniper/modelsim-docker```
+- Create modelsim project
+  - ```vlib work```
+- Compile files
+  - ```vlog debugProcessor.sv```
+- Run modelsim and exit
+  - ```vsim -c -do run -do exit testbench```
 
 ### Running a GUI on a container 
+
+If you want to use the Modelsim GUI without using LeBug, you can do it with the following commands if you are using MacOS. Note, however, that LeBug automatically allows you to open the GUI of projects that you are running through our automated flow as discussed [here](Debugging&#32;the&#32;debugger.md).
 
 - Step 1 - Open socat in your MacOS
   - ```socat TCP-LISTEN:6000,reuseaddr,fork UNIX-CLIENT:\"$DISPLAY\"```
