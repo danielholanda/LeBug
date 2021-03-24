@@ -1,93 +1,42 @@
-# Description of Hardware Blocks and Overall Flow
+# Debugging the Debugger
 
-This first version of the documentation explains the basics of how to get started generating RTL instrumentation that can be emulated or simulated.
+LeBug uses a Docker container to test the generated RTL when using different firmware. When modifying source files, errors might occur in the container and the root-cause of the problem will not be shown outside of the container. This document describes how to have better visibility into the computation that happens inside the container.
 
-## Understanding how it works
 
-<img src="../img/sample_hw.png" alt="drawing" width="300"/>
 
-#### Bulding Blocks
+## Visualizing Modelsim compilation messages
 
-The debug processor can be composed out of the following building blocks:
+After instantiating the rtlHw class, the user is able to insert sample input vectors to be tapped by the instrumentation. Those input vectors are mapped into a testbench used to test the generated.
 
-- **Input Buffer** (N,IB_DEPTH)
-  - **Description:** Stores IB_DEPTH tensors while other tensors are still being processed
-  - **ISA instructions:** None
-- **Filter Unit** (N,M,FUVRF_SIZE) 
-  - **Description:** For each of the N elements received, output M elements. Each of those M elements is a binary indicator of wether the value is within a certain range. All ranges are stored in the fu_mem and the same range is applies to all elements of the input vector N.
-  - **ISA instructions:** vv_filter(addr)
-- **Matrix Vector Reduce** (N,M) 
-  - **Description:** This block receives a N*M input and reduces the result either in the M or N axis. The only type of reduction that is currently made is the sum. This block is mandatory when the filter unit is instantiated.
-  - **ISA instructions:** m_reduce(axis)
-- **Vector Scalar Reduce** (N) 
-  - **Description:** Reduce values along a given axis and output either 1, M or N values
-  - **ISA instructions:** v_reduce
-- **Vector Vector ALU** (N,VVVRF_SIZE) 
-  - **Description:** Performs basic vector-vector operations and offers the option to store things in a scratchpad.
-  - **ISA instructions:** vv_add(addr), vv_mul(addr), vv_sub(addr), v_cache(addr)
-- **Data Packer** (N,M)
-  - **Description:** Receives 1, N or M values and sends it to the trace buffer N at a time
-  - **ISA instructions:** None
-- **Trace Buffer** (N,TB_SIZE)
-  - **Description:** Circular Trace Buffer
-  - **ISA instructions:** None
+``` python
+# Instantiate rltHw
+hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,DATA_TYPE,DEVICE_FAM)
 
-#### Parameters
+# Create a set of N random inputs
+input_vector = np.random.randint(5, size=N)
 
-Every time that the we emulate the processor or create RTL for it, we have to define the following parameters:
+# Add the random inputs as inputs in the testbench
+eof=False
+hw_proc.push([input_vector,eof])
+```
 
-- **N**: Input tensor width
-- **M:** Number of binary ranges that will be avaluated by the filter unit (M<=N)
-- **IB_DEPTH:** Number of tensors we can store in the input buffer
-- **FUVRF_SIZE:** Number of different ranges we can have for the FIlter Unit (VRF size is FUVRF_SIZE*M)
-- **VVVRF_SIZE:** Number of tensors we can store in the vector-vector scratchpad of the Filter Unit
-- **TB_SIZE:** Number of tensors we can store in the trace buffer
-- **DATA_WIDTH**: Input/output data width
-- **MAX_CHAINS:** Maximum number of firmware chains the hardware is able to execute.
+Once the hardware has been generated, the command run() may be used to test the hardware on Modelsim. A useful optional argument for the run() function is "log", which shows the entire compilation process of Modelsim on the screen, including possible compilation errors.
 
-#### Firmware
-
-The firmware is used to configure the instrumentation at debug time. When creating a firmware, you need to obey the following rules:
-
-- All ISA instructions must be chained the same whay that the hardware is chained
-- All chains must start with begin_chain() and must end with end_chain()
-- All ISA instructions may also receive a condition that enables/disables this operation according to the "end of frame" signal. Those conditions may be "first", "notfirst", "last", and "notlast".
-
-So far, we our list of firmware includes:
-
-- Distribution
-- Summary Statistics (sum)
-- Spatial Sparsity
-- Vector Change
-- Self Correlation
-- Invalid values
-
-**Example:**
-
-```    python
-def distribution(cp,bins,M):
-    assert bins%M==0, "Number of bins must be divisible by M"
-    for i in range(int(bins/M)):       
-        begin_chain()
-        vv_filter(i)
-        m_reduce('M')
-        vv_add(i,'notfirst')
-        v_cache(i)
-        v_commit(M,'last')
-        end_chain()
+``` python
+# Generate RTL and start tests on Modelsim with logging mode enabled
+hw_results = hw_proc.run(steps=50,log=True)
 ```
 
 
 
-## Functions supported by both emulatedHw and rtlHw
+## Enabling Modelsim GUI through Docker
 
-- config()
-  - Sets up run-time parameters including
-    - Firmware
-    - Memory initializations
-- run()
-  - Starts either simulation or emulation
-  - Returns results from simulation/emulation
-- compiler
-  - Shoudl be able to handle all ISA instructions and compile() at the end
+LeBug also allows the option to open the Modelsim GUI through Docker for better debugging.
+
+``` python
+# Generate RTL and start tests on Modelsim and open GUI
+hw_results = hw_proc.run(steps=50,gui=True)
+```
+
+For more information about this setup, please see our documentation on [Testing our debugger using Modelsim through Docker](Modelsim&#32;on&#32;Docker.md).
 
