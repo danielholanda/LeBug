@@ -168,13 +168,14 @@ def minicache(cp):
     cp.begin_chain()
     cp.vv_add(0,condition1='notfirst')
     cp.v_cache(0)
-    #cp.v_mc_save()
+    cp.v_mc_save()
     cp.end_chain()
 
     cp.begin_chain()
-    #cp.v_mc_load()
+    cp.v_mc_load()
     cp.v_commit()
     cp.end_chain()
+    return cp.compile()
 
 # Activation Predictiveness
 def activationPredictiveness(cp,VVVRF_SIZE):
@@ -197,5 +198,7 @@ def activationPredictiveness(cp,VVVRF_SIZE):
     cp.v_cache(1,condition1='last')
     cp.v_commit(1,condition2='last')
     cp.end_chain()
+
+    return cp.compile()
 
 
