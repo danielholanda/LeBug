@@ -534,29 +534,37 @@ class rtlHw():
                     return 0
                 else:
                     assert False
-            def encodeCond(cond):
-                if cond['last']:
+            def encodeCond(cond1,cond2):
+                if cond1['last']:
                     return 1
-                elif cond['notlast']:
+                elif cond1['notlast']:
                     return 2
-                elif cond['first']:
+                elif cond1['first']:
                     return 3
-                elif cond['notfirst']:
+                elif cond1['notfirst']:
                     return 4
+                elif cond2['last']:
+                    return 5
+                elif cond2['notlast']:
+                    return 6
+                elif cond2['first']:
+                    return 7
+                elif cond2['notfirst']:
+                    return 8
                 else:
                     return 0
             VSRU_INITIAL_FIRMWARE=str([chain.op for chain in self.firmware['vsru']]).replace("[", "'{").replace("]", "}")
             DP_INITIAL_FIRMWARE = str([encodeDpFirmware(chain.commit,chain.size) for chain in self.firmware['dp']]).replace("[", "'{").replace("]", "}")
             VVALU_INITIAL_FIRMWARE_OP=str([chain.op for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
             VVALU_INITIAL_FIRMWARE_ADDR_RD=str([chain.addr for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
-            VVALU_INITIAL_FIRMWARE_COND=str([encodeCond(chain.cond) for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
+            VVALU_INITIAL_FIRMWARE_COND=str([encodeCond(chain.cond1,chain.cond2) for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
             VVALU_INITIAL_FIRMWARE_CACHE=str([chain.cache for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
             VVALU_INITIAL_FIRMWARE_CACHE_ADDR=str([chain.cache_addr for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
             FRU_INITIAL_FIRMWARE_OP=str([chain.filter for chain in self.firmware['fu']]).replace("[", "'{").replace("]", "}")
             FRU_INITIAL_FIRMWARE_ADDR=str([chain.addr for chain in self.firmware['fu']]).replace("[", "'{").replace("]", "}")
             FRU_INITIAL_FIRMWARE_REDUCE_AXIS=str([chain.axis for chain in self.firmware['mvru']]).replace("[", "'{").replace("]", "}")
             IB_INITIAL_FIRMWARE=self.firmware['valid_chains']
-            DP_INITIAL_FIRMWARE_COND = str([encodeCond(chain.cond) for chain in self.firmware['dp']]).replace("[", "'{").replace("]", "}")
+            DP_INITIAL_FIRMWARE_COND = str([encodeCond(chain.cond1,chain.cond2) for chain in self.firmware['dp']]).replace("[", "'{").replace("]", "}")
 
         # Instantiate modules
         top.instantiateModule(top.mod.uart,"comm")

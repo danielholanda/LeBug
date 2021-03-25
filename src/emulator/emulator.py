@@ -199,10 +199,10 @@ class emulatedHw():
             self.chainId_out_d1  = self.chainId_in
 
             cfg=self.config[self.chainId_in]
-            condition_met = ((not cfg.cond['last']     or (cfg.cond['last']     and     self.eof_in)) and
-                    		 (not cfg.cond['notlast']  or (cfg.cond['notlast']  and not self.eof_in)) and
-                    		 (not cfg.cond['first']    or (cfg.cond['first']    and     self.bof_in)) and
-                    		 (not cfg.cond['notfirst'] or (cfg.cond['notfirst'] and not self.bof_in)))
+            condition_met = ((not cfg.cond1['last']     or (cfg.cond1['last']     and     self.eof_in)) and
+                    		 (not cfg.cond1['notlast']  or (cfg.cond1['notlast']  and not self.eof_in)) and
+                    		 (not cfg.cond1['first']    or (cfg.cond1['first']    and     self.bof_in)) and
+                    		 (not cfg.cond1['notfirst'] or (cfg.cond1['notfirst'] and not self.bof_in)))
             if cfg.op==0 or not condition_met:
                 log.debug('ALU is passing values through')
                 self.v_out_d1 = self.v_in
@@ -238,10 +238,10 @@ class emulatedHw():
         def step(self,input_value):
             cfg=self.config[self.chainId_in]
             if (cfg.commit and 
-                (not cfg.cond['last']     or (cfg.cond['last']     and     self.eof_in)) and
-                (not cfg.cond['notlast']  or (cfg.cond['notlast']  and not self.eof_in)) and
-                (not cfg.cond['first']    or (cfg.cond['first']    and     self.bof_in)) and
-                (not cfg.cond['notfirst'] or (cfg.cond['notfirst'] and not self.bof_in))):
+                (not cfg.cond1['last']     or (cfg.cond1['last']     and     self.eof_in)) and
+                (not cfg.cond1['notlast']  or (cfg.cond1['notlast']  and not self.eof_in)) and
+                (not cfg.cond1['first']    or (cfg.cond1['first']    and     self.bof_in)) and
+                (not cfg.cond1['notfirst'] or (cfg.cond1['notfirst'] and not self.bof_in))):
                 if self.v_out_size==0:
                     self.v_out = self.v_in[:cfg.size]
                 else:
@@ -315,8 +315,8 @@ class emulatedHw():
         self.fu.config=[struct(filter=0,addr=0)]
         self.mvru.config=[struct(axis=0)]
         self.vsru.config=[struct(op=0)]
-        self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0,cond=cond)]
-        self.dp.config=[struct(commit=0,size=0,cond=cond)]
+        self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0,cond1=cond)]
+        self.dp.config=[struct(commit=0,size=0,cond1=cond)]
         self.ib.config=struct(num_chains=1)
         if fw is not None:
             self.ib.config=struct(num_chains=fw['valid_chains']+1)

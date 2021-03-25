@@ -10,8 +10,8 @@ class compiler():
         self.fu    = struct(filter=0,addr=0)
         self.mvru  = struct(axis=0)
         self.vsru  = struct(op=0)
-        self.vvalu = struct(op=0,addr=0,cond=copy(no_cond),cache=0,cache_addr=0)
-        self.dp    = struct(commit=0,size=0,cond=copy(no_cond))
+        self.vvalu = struct(op=0,addr=0,cond1=copy(no_cond),cond2=copy(no_cond),cache=0,cache_addr=0)
+        self.dp    = struct(commit=0,size=0,cond1=copy(no_cond),cond2=copy(no_cond))
     def vv_filter(self,addr):
         self.fu.filter=1
         self.fu.addr=addr
@@ -24,38 +24,30 @@ class compiler():
             assert False, "Unknown axis for instruction m_reduce"
     def v_reduce(self):
         self.vsru.op=1
-    def vv_add(self,addr,condition=None):
+    def vv_add(self,addr,condition1=None, condition2=None):
         self.vvalu.op=1
         self.vvalu.addr=addr
-        if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
-            self.vvalu.cond[condition]=True
-        else:
-            assert False, "Condition not understood"
-    def vv_mul(self,addr,condition=None):
+        self.vvalu.cond1[condition1]=self.__process_condition(condition1)
+        self.vvalu.cond2[condition2]=self.__process_condition(condition2)
+    def vv_mul(self,addr,condition1=None, condition2=None):
         self.vvalu.op=2
         self.vvalu.addr=addr
-        if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
-            self.vvalu.cond[condition]=True
-        else:
-            assert False, "Condition not understood"
-    def vv_sub(self,addr,condition=None):
+        self.vvalu.cond1[condition1]=self.__process_condition(condition1)
+        self.vvalu.cond2[condition2]=self.__process_condition(condition2)
+    def vv_sub(self,addr,condition1=None, condition2=None):
         self.vvalu.op=3
         self.vvalu.addr=addr
-        if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
-            self.vvalu.cond[condition]=True
-        else:
-            assert False, "Condition not understood"
-    def vv_max(self,addr,condition=None):
+        self.vvalu.cond1[condition1]=self.__process_condition(condition1)
+        self.vvalu.cond2[condition2]=self.__process_condition(condition2)
+    def vv_max(self,addr,condition1=None, condition2=None):
         self.vvalu.op=4
         self.vvalu.addr=addr
-        if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
-            self.vvalu.cond[condition]=True
-        else:
-            assert False, "Condition not understood"
+        self.vvalu.cond1[condition1]=self.__process_condition(condition1)
+        self.vvalu.cond2[condition2]=self.__process_condition(condition2)
     def v_cache(self,cache_addr):
         self.vvalu.cache=1
         self.vvalu.cache_addr=cache_addr
-    def v_commit(self,size=None,condition=None):
+    def v_commit(self,size=None,condition1=None, condition2=None):
         if size is None:
             size = self.N
         self.dp.commit=1
@@ -63,10 +55,8 @@ class compiler():
             self.dp.size=size
         else:
             assert False, "Cannot commit "+str(size)+" elements"
-        if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
-            self.dp.cond[condition]=True
-        else:
-            assert False, "Condition not understood"
+        self.dp.cond1[condition1]=self.__process_condition(condition1)
+        self.dp.cond2[condition2]=self.__process_condition(condition2)
     def end_chain(self):
         self.firmware['fu'].append(copy(self.fu))
         self.firmware['mvru'].append(copy(self.mvru))
@@ -81,6 +71,12 @@ class compiler():
             self.end_chain()
         # Return final firmware    
         return self.firmware
+
+    def __process_condition(self,condition):
+        if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None :
+            return True
+        else:
+            assert False, "Condition not understood"
 
     def __init__(self,N,M,MAX_CHAINS):
         self.N = N
