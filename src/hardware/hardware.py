@@ -540,17 +540,17 @@ class rtlHw():
                 elif cond1['notlast']:
                     return 2
                 elif cond1['first']:
-                    return 3
-                elif cond1['notfirst']:
                     return 4
-                elif cond2['last']:
-                    return 5
-                elif cond2['notlast']:
-                    return 6
-                elif cond2['first']:
-                    return 7
-                elif cond2['notfirst']:
+                elif cond1['notfirst']:
                     return 8
+                elif cond2['last']:
+                    return 16
+                elif cond2['notlast']:
+                    return 32
+                elif cond2['first']:
+                    return 64
+                elif cond2['notfirst']:
+                    return 128
                 else:
                     return 0
             VSRU_INITIAL_FIRMWARE=str([chain.op for chain in self.firmware['vsru']]).replace("[", "'{").replace("]", "}")
