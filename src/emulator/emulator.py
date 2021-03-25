@@ -205,7 +205,11 @@ class emulatedHw():
             condition_met = ((not cfg.cond1['last']     or (cfg.cond1['last']     and     self.eof_in[0])) and
                     		 (not cfg.cond1['notlast']  or (cfg.cond1['notlast']  and not self.eof_in[0])) and
                     		 (not cfg.cond1['first']    or (cfg.cond1['first']    and     self.bof_in[0])) and
-                    		 (not cfg.cond1['notfirst'] or (cfg.cond1['notfirst'] and not self.bof_in[0])))
+                    		 (not cfg.cond1['notfirst'] or (cfg.cond1['notfirst'] and not self.bof_in[0])) and
+                             (not cfg.cond2['last']     or (cfg.cond2['last']     and     self.eof_in[1])) and
+                             (not cfg.cond2['notlast']  or (cfg.cond2['notlast']  and not self.eof_in[1])) and
+                             (not cfg.cond2['first']    or (cfg.cond2['first']    and     self.bof_in[1])) and
+                             (not cfg.cond2['notfirst'] or (cfg.cond2['notfirst'] and not self.bof_in[1])))
             if cfg.op==0 or not condition_met:
                 log.debug('ALU is passing values through')
                 self.v_out_d1 = self.v_in
@@ -244,7 +248,11 @@ class emulatedHw():
                 (not cfg.cond1['last']     or (cfg.cond1['last']     and     self.eof_in[0])) and
                 (not cfg.cond1['notlast']  or (cfg.cond1['notlast']  and not self.eof_in[0])) and
                 (not cfg.cond1['first']    or (cfg.cond1['first']    and     self.bof_in[0])) and
-                (not cfg.cond1['notfirst'] or (cfg.cond1['notfirst'] and not self.bof_in[0]))):
+                (not cfg.cond1['notfirst'] or (cfg.cond1['notfirst'] and not self.bof_in[0])) and
+                (not cfg.cond2['last']     or (cfg.cond2['last']     and     self.eof_in[1])) and
+                (not cfg.cond2['notlast']  or (cfg.cond2['notlast']  and not self.eof_in[1])) and
+                (not cfg.cond2['first']    or (cfg.cond2['first']    and     self.bof_in[1])) and
+                (not cfg.cond2['notfirst'] or (cfg.cond2['notfirst'] and not self.bof_in[1]))):
                 if self.v_out_size==0:
                     self.v_out = self.v_in[:cfg.size]
                 else:
@@ -314,12 +322,12 @@ class emulatedHw():
     def config(self,fw=None):
         # Configure processor
         # Fixme - For some reason I need to append a chain of zeros here
-        cond={'last':False,'notlast':False,'first':False,'notfirst':False}
+        no_cond={'last':False,'notlast':False,'first':False,'notfirst':False}
         self.fu.config=[struct(filter=0,addr=0)]
         self.mvru.config=[struct(axis=0)]
         self.vsru.config=[struct(op=0)]
-        self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0,cond1=cond)]
-        self.dp.config=[struct(commit=0,size=0,cond1=cond)]
+        self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0,cond1=copy(no_cond),cond2=copy(no_cond))]
+        self.dp.config=[struct(commit=0,size=0,cond1=copy(no_cond),cond2=copy(no_cond))]
         self.ib.config=struct(num_chains=1)
         if fw is not None:
             self.ib.config=struct(num_chains=fw['valid_chains']+1)
