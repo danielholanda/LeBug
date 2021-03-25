@@ -162,6 +162,20 @@ def conditions(cp):
     cp.end_chain()
     return cp.compile()
 
+# Mini cahche test
+def minicache(cp):
+
+    cp.begin_chain()
+    cp.vv_add(0,condition1='notfirst')
+    cp.v_cache(0)
+    #cp.v_mc_save()
+    cp.end_chain()
+
+    cp.begin_chain()
+    #cp.v_mc_load()
+    cp.v_commit()
+    cp.end_chain()
+
 # Activation Predictiveness
 def activationPredictiveness(cp,VVVRF_SIZE):
     # First we sum all activations of all nodes in address 0 (we will expect eof[0] to start a new sum)
@@ -172,16 +186,16 @@ def activationPredictiveness(cp,VVVRF_SIZE):
 
     cp.begin_chain()
     #cp.v_reduce() <- use this by reordering HW blocks to get non-proxy predictiveness metric
-    cp.vv_add(0,cond1='notfirst')
+    cp.vv_add(0,condition1='notfirst')
     cp.v_cache(0)
     cp.v_mc_save()
     cp.end_chain()
 
     cp.begin_chain()
     cp.v_mc_load()
-    cp.vv_max(1,cond2='notfirst')
-    cp.v_cache(1,cond1='last')
-    cp.v_commit(1,cond2='last')
+    cp.vv_max(1,condition2='notfirst')
+    cp.v_cache(1,condition1='last')
+    cp.v_commit(1,condition2='last')
     cp.end_chain()
 
 
