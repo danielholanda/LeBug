@@ -20,10 +20,13 @@ class emulatedHw():
             self.size=IB_DEPTH
             self.config=None
             self.chainId_out = 0
-            self.bof_out=True
+            self.bof_out=[True,True]
 
         def push(self,pushed_vals):
-            v_in, eof_in = pushed_vals
+            eof_in = [False,False]
+            if len(pushed_vals)==2:
+                pushed_vals.append(False)
+            v_in, eof_in[0], eof_in[1] = pushed_vals
             assert list(v_in.shape)==[self.N], "Input must be Nx1"
             assert len(self.buffer)<=self.size, "Input buffer overflowed"
             log.debug('Vector inserted into input buffer\n'+str(v_in))
@@ -62,10 +65,10 @@ class emulatedHw():
         def __init__(self,N,M,FUVRF_SIZE):
             self.v_in=np.zeros(N)
             self.m_out=np.zeros((M,N))
-            self.eof_in = False
-            self.eof_out = False
-            self.bof_in = True
-            self.bof_out = True
+            self.eof_in = [False,False]
+            self.eof_out = [False,False]
+            self.bof_in = [True,True]
+            self.bof_out = [True,True]
             self.chainId_in = 0
             self.chainId_out = 0
             self.vrf=np.zeros(FUVRF_SIZE*M)
@@ -102,10 +105,10 @@ class emulatedHw():
         def __init__(self,N,M):
             self.m_in=np.zeros((M,N))
             self.v_out=np.zeros(N)
-            self.eof_in = False
-            self.eof_out = False
-            self.bof_in = True
-            self.bof_out = True
+            self.eof_in = [False,False]
+            self.eof_out = [False,False]
+            self.bof_in = [True,True]
+            self.bof_out = [True,True]
             self.chainId_in = 0
             self.chainId_out = 0
             self.config=None
@@ -137,10 +140,10 @@ class emulatedHw():
         def __init__(self,N):
             self.v_in=np.zeros(N)
             self.v_out=np.zeros(N)
-            self.eof_in = False
-            self.eof_out = False
-            self.bof_in = True
-            self.bof_out = True
+            self.eof_in = [False,False]
+            self.eof_out = [False,False]
+            self.bof_in = [True,True]
+            self.bof_out = [True,True]
             self.chainId_in = 0
             self.chainId_out = 0
             self.config=None
@@ -166,20 +169,20 @@ class emulatedHw():
         def __init__(self,N,VVVRF_SIZE):
             self.v_in=np.zeros(N)
             self.v_out=np.zeros(N)
-            self.eof_in = False
-            self.eof_out = False
-            self.bof_in = False
-            self.bof_out = False
+            self.eof_in = [False,False]
+            self.eof_out = [False,False]
+            self.bof_in = [False,False]
+            self.bof_out = [False,False]
             self.chainId_in = 0
             self.chainId_out = 0
             self.vrf=np.zeros(N*VVVRF_SIZE)
             self.config=None
             self.v_out_d1=np.zeros(N)
             self.v_out_d2=np.zeros(N)
-            self.eof_out_d1 = False
-            self.eof_out_d2 = False
-            self.bof_out_d1 = True
-            self.bof_out_d2 = True
+            self.eof_out_d1 = [False,False]
+            self.eof_out_d2 = [False,False]
+            self.bof_out_d1 = [True,True]
+            self.bof_out_d2 = [True,True]
             self.chainId_out_d2 = 0
             self.chainId_out_d1 = 0
             self.N = N
@@ -199,10 +202,10 @@ class emulatedHw():
             self.chainId_out_d1  = self.chainId_in
 
             cfg=self.config[self.chainId_in]
-            condition_met = ((not cfg.cond1['last']     or (cfg.cond1['last']     and     self.eof_in)) and
-                    		 (not cfg.cond1['notlast']  or (cfg.cond1['notlast']  and not self.eof_in)) and
-                    		 (not cfg.cond1['first']    or (cfg.cond1['first']    and     self.bof_in)) and
-                    		 (not cfg.cond1['notfirst'] or (cfg.cond1['notfirst'] and not self.bof_in)))
+            condition_met = ((not cfg.cond1['last']     or (cfg.cond1['last']     and     self.eof_in[0])) and
+                    		 (not cfg.cond1['notlast']  or (cfg.cond1['notlast']  and not self.eof_in[0])) and
+                    		 (not cfg.cond1['first']    or (cfg.cond1['first']    and     self.bof_in[0])) and
+                    		 (not cfg.cond1['notfirst'] or (cfg.cond1['notfirst'] and not self.bof_in[0])))
             if cfg.op==0 or not condition_met:
                 log.debug('ALU is passing values through')
                 self.v_out_d1 = self.v_in
@@ -227,8 +230,8 @@ class emulatedHw():
         def __init__(self,N,M):
             self.v_in=np.zeros(N)
             self.v_out=np.zeros(N)
-            self.eof_in = False
-            self.bof_in = True
+            self.eof_in = [False,False]
+            self.bof_in = [True,True]
             self.chainId_in = 0
             self.v_out_valid=0
             self.v_out_size=0
@@ -238,10 +241,10 @@ class emulatedHw():
         def step(self,input_value):
             cfg=self.config[self.chainId_in]
             if (cfg.commit and 
-                (not cfg.cond1['last']     or (cfg.cond1['last']     and     self.eof_in)) and
-                (not cfg.cond1['notlast']  or (cfg.cond1['notlast']  and not self.eof_in)) and
-                (not cfg.cond1['first']    or (cfg.cond1['first']    and     self.bof_in)) and
-                (not cfg.cond1['notfirst'] or (cfg.cond1['notfirst'] and not self.bof_in))):
+                (not cfg.cond1['last']     or (cfg.cond1['last']     and     self.eof_in[0])) and
+                (not cfg.cond1['notlast']  or (cfg.cond1['notlast']  and not self.eof_in[0])) and
+                (not cfg.cond1['first']    or (cfg.cond1['first']    and     self.bof_in[0])) and
+                (not cfg.cond1['notfirst'] or (cfg.cond1['notfirst'] and not self.bof_in[0]))):
                 if self.v_out_size==0:
                     self.v_out = self.v_in[:cfg.size]
                 else:
