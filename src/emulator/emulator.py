@@ -186,6 +186,7 @@ class emulatedHw():
             self.chainId_out_d2 = 0
             self.chainId_out_d1 = 0
             self.N = N
+            self.minicache = np.zeros(N)
 
         def step(self,input_value):
             # Delay for 2 cycles, so this FU takes 3 cycles (read, calculate, write)
@@ -210,21 +211,30 @@ class emulatedHw():
                              (not cfg.cond2['notlast']  or (cfg.cond2['notlast']  and not self.eof_in[1])) and
                              (not cfg.cond2['first']    or (cfg.cond2['first']    and     self.bof_in[1])) and
                              (not cfg.cond2['notfirst'] or (cfg.cond2['notfirst'] and not self.bof_in[1])))
+
+            # Checking if we should use minicache or input vector as operand
+            if cfg.minicache == 1 or cfg.minicache==3:
+                operand = self.minicache
+            else:
+                operand = self.v_in
+
             if cfg.op==0 or not condition_met:
                 log.debug('ALU is passing values through')
-                self.v_out_d1 = self.v_in
+                self.v_out_d1 = operand
             elif cfg.op==1:
                 log.debug('Adding using vector-vector ALU')
-                self.v_out_d1 = self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N] + self.v_in
+                self.v_out_d1 = self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N] + operand
             elif cfg.op==2:
                 log.debug('Multiplying using vector-vector ALU')
-                self.v_out_d1 = self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N] * self.v_in
+                self.v_out_d1 = self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N] * operand
             elif cfg.op==3:
                 log.debug('Subtracting using vector-vector ALU')
-                self.v_out_d1 = self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N] - self.v_in
+                self.v_out_d1 = self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N] - operand
 
             if cfg.cache:
                 self.vrf[cfg.cache_addr*self.N:cfg.cache_addr*self.N+self.N] = self.v_out_d1 
+            if cfg.minicache==2 or cfg.minicache==3:
+                self.minicache = copy(self.v_out_d1) 
             
             self.v_in, self.eof_in, self.bof_in, self.chainId_in = copy(input_value)
             return self.v_out, self.eof_out, self.bof_out, self.chainId_out
@@ -326,7 +336,7 @@ class emulatedHw():
         self.fu.config=[struct(filter=0,addr=0)]
         self.mvru.config=[struct(axis=0)]
         self.vsru.config=[struct(op=0)]
-        self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0,cond1=copy(no_cond),cond2=copy(no_cond))]
+        self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0,cond1=copy(no_cond),cond2=copy(no_cond),minicache=0)]
         self.dp.config=[struct(commit=0,size=0,cond1=copy(no_cond),cond2=copy(no_cond))]
         self.ib.config=struct(num_chains=1)
         if fw is not None:
