@@ -14,7 +14,8 @@
   parameter [7:0] INITIAL_FIRMWARE_ADDR_RD    [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_COND       [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_CACHE      [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
-  parameter [7:0] INITIAL_FIRMWARE_CACHE_ADDR [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
+  parameter [7:0] INITIAL_FIRMWARE_CACHE_ADDR [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
+  parameter [7:0] INITIAL_FIRMWARE_MINICACHE  [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
   )
   (
   input logic clk,
@@ -39,7 +40,11 @@
     reg [7:0] firmware_cond       [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_COND;
     reg [7:0] firmware_cache      [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_CACHE;
     reg [7:0] firmware_cache_addr [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_CACHE_ADDR;
+    reg [7:0] firmware_minicache  [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_MINICACHE;
     reg [DATA_WIDTH-1:0] valid_result [N-1:0];
+    reg [DATA_WIDTH-1:0] mini_cache [N-1:0];
+    reg [7:0] firmware_minicache_delay;
+    reg [7:0] firmware_minicache_delay_2;
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
     reg [DATA_WIDTH*2-1:0] vector_in_delay_se [N-1:0];
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
@@ -115,7 +120,6 @@
         eof_out <= eof_in_delay;
         bof_out <= bof_in_delay;
         chainId_out <= chainId_in_delay;
-
       end
       else begin
         valid_out<=0;
@@ -136,6 +140,9 @@
           else if (byte_counter<MAX_CHAINS*5)begin
             firmware_cache_addr[byte_counter]=configData;
           end
+          else if (byte_counter<MAX_CHAINS*6)begin
+            firmware_minicache[byte_counter]=configData;
+          end
         end
         else begin
           byte_counter<=0;
@@ -152,15 +159,26 @@
       firmware_cache_delay_2 <= firmware_cache_delay;
       firmware_cache_addr_delay <= firmware_cache_addr[chainId_in];
       firmware_cache_addr_delay_2 <= firmware_cache_addr_delay;
+      firmware_minicache_delay <= firmware_minicache[chainId_in];
+      firmware_minicache_delay_2 <= firmware_minicache_delay;
       eof_in_delay <= eof_in;
       bof_in_delay <= bof_in;
       chainId_in_delay <= chainId_in;
+
+      // Save velues into mini cache
+      if (firmware_minicache_delay_2[1]==1'b1) begin
+        mini_cache <= valid_result;
+      end
     end
 
     // Perform ALU ops
     always @(*) begin
-      // Select if I'm reading from memory or using value I just calculated (to avoid read after write conflicts in the cache) 
-      if (firmware_cache_delay_2 && valid_in_delay_2 && firmware_cache_addr_delay_2==firmware_cache_addr_delay) begin
+      // First, check if I'm reading from mini cache
+      if (firmware_minicache[chainId_in][0]==1'b1) begin
+        operand = mini_cache;
+      end 
+      // Select if I'm reading from memory or using value I just calculated (to avoid read after write conflicts in the cache)
+      else if (firmware_cache_delay_2 && valid_in_delay_2 && firmware_cache_addr_delay_2==firmware_cache_addr_delay) begin
         operand = vector_out;
       end
       else begin

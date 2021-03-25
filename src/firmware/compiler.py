@@ -10,7 +10,7 @@ class compiler():
         self.fu    = struct(filter=0,addr=0)
         self.mvru  = struct(axis=0)
         self.vsru  = struct(op=0)
-        self.vvalu = struct(op=0,addr=0,cond1=copy(no_cond),cond2=copy(no_cond),cache=0,cache_addr=0)
+        self.vvalu = struct(op=0,addr=0,cond1=copy(no_cond),cond2=copy(no_cond),cache=0,cache_addr=0,minicache=0)
         self.dp    = struct(commit=0,size=0,cond1=copy(no_cond),cond2=copy(no_cond))
     def vv_filter(self,addr):
         self.fu.filter=1
@@ -47,6 +47,16 @@ class compiler():
     def v_cache(self,cache_addr):
         self.vvalu.cache=1
         self.vvalu.cache_addr=cache_addr
+    def v_mc_load(self):
+        if self.vvalu.minicache==0:
+            self.vvalu.minicache=1
+        else:
+            assert False, "Trying to save to load minicache more than once per chain or saving before loading"
+    def v_mc_save(self):
+        if self.vvalu.minicache==0 or self.vvalu.minicache==1:
+            self.vvalu.minicache+=2
+        else:
+            assert False, "Trying to save to save minicache more than once per chain"
     def v_commit(self,size=None,condition1=None, condition2=None):
         if size is None:
             size = self.N
