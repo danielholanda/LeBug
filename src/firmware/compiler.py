@@ -45,6 +45,13 @@ class compiler():
             self.vvalu.cond[condition]=True
         else:
             assert False, "Condition not understood"
+    def vv_max(self,addr,condition=None):
+        self.vvalu.op=4
+        self.vvalu.addr=addr
+        if condition=="last" or condition=="notlast" or condition=="first" or condition=="notfirst" or condition is None:
+            self.vvalu.cond[condition]=True
+        else:
+            assert False, "Condition not understood"
     def v_cache(self,cache_addr):
         self.vvalu.cache=1
         self.vvalu.cache_addr=cache_addr
