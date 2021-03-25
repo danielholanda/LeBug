@@ -33,7 +33,6 @@
     reg [7:0] valid_chains = INITIAL_FIRMWARE;
     reg [$clog2(MAX_CHAINS)-1:0] chainId=0;
     reg [$clog2(MAX_CHAINS)-1:0] chainId_delay=0;
-    reg [1:0] next_bof=2'b11;
 
     parameter LATENCY = 2;
     parameter RAM_LATENCY = LATENCY-1;
@@ -42,7 +41,6 @@
     //-------------Code Start-----------------
 
     // Instantiate memory to implement queue
-    reg [1:0] eof_out_prev=2'b00;
     reg [$clog2(IB_DEPTH)-1:0] mem_address_a=1;
     reg [$clog2(IB_DEPTH)-1:0] mem_address_b=0;
     wire mem_write_enable_a;
@@ -125,7 +123,6 @@
           end
           else begin
             valid_out_delay <= 1'b0;
-            //bof_out_delay <= 2'b0;
           end
         end
 
@@ -140,7 +137,6 @@
         valid_out <= valid_out_delay;
         chainId_delay<=chainId;
         chainId_out <=chainId_delay;        
-        eof_out_prev <= eof_out;
 
         if (valid_out & chainId_out==valid_chains-1) begin
             bof_out <= eof_out;
@@ -169,23 +165,6 @@
     // Module output is the output of the queue
     assign vector_out = { >> { mem_out_b }};
     assign eof_out = valid_out ? eof_mem_out_b : 2'b00;
-
-    /*
-
-        for (i=0;i<2;i++) begin
-              if (frame_ended[i]==1'b1) begin
-                bof_out_delay[i] <= 1'b1;
-                frame_ended[i]<=1'b0;
-              end
-              else if (eof_out[i]==1'b1) begin
-                bof_out_delay[i] <= 1'b1;
-                frame_ended[i]<=1'b1;
-              end
-              else begin
-                bof_out_delay[i] <= 1'b0;
-              end
-            end
-            */
 
     // Check if queue is empty/full
     assign empty = (mem_address_a-mem_address_b==1) | (mem_address_a==0 & mem_address_b==IB_DEPTH-1);
