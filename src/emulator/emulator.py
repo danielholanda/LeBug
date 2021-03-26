@@ -201,7 +201,6 @@ class emulatedHw():
             self.chainId_out  = self.chainId_out_d2
             self.chainId_out_d2  = self.chainId_out_d1
             self.chainId_out_d1  = self.chainId_in
-
             cfg=self.config[self.chainId_in]
             condition_met = ((not cfg.cond1['last']     or (cfg.cond1['last']     and     self.eof_in[0])) and
                     		 (not cfg.cond1['notlast']  or (cfg.cond1['notlast']  and not self.eof_in[0])) and
@@ -212,24 +211,24 @@ class emulatedHw():
                              (not cfg.cond2['first']    or (cfg.cond2['first']    and     self.bof_in[1])) and
                              (not cfg.cond2['notfirst'] or (cfg.cond2['notfirst'] and not self.bof_in[1])))
 
-            # Checking if we should use minicache or input vector as operand
+            # Checking if we should use minicache or input vector as operator
             if cfg.minicache == 1 or cfg.minicache==3:
-                operand = self.minicache
+                operator = self.minicache
             else:
-                operand = self.v_in
+                operator = self.v_in
 
             if cfg.op==0 or not condition_met:
                 log.debug('ALU is passing values through')
-                self.v_out_d1 = operand
+                self.v_out_d1 = operator
             elif cfg.op==1:
                 log.debug('Adding using vector-vector ALU')
-                self.v_out_d1 = self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N] + operand
+                self.v_out_d1 = operator + self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N]
             elif cfg.op==2:
                 log.debug('Multiplying using vector-vector ALU')
-                self.v_out_d1 = self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N] * operand
+                self.v_out_d1 = operator * self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N]
             elif cfg.op==3:
                 log.debug('Subtracting using vector-vector ALU')
-                self.v_out_d1 = self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N] - operand
+                self.v_out_d1 = operator - self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N]
 
             if cfg.cache:
                 self.vrf[cfg.cache_addr*self.N:cfg.cache_addr*self.N+self.N] = self.v_out_d1 

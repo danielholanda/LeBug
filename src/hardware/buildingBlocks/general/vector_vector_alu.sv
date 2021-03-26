@@ -46,7 +46,7 @@
     reg [7:0] firmware_minicache_delay;
     reg [7:0] firmware_minicache_delay_2;
     reg [DATA_WIDTH-1:0] vector_in_delay [N-1:0];
-    reg [DATA_WIDTH*2-1:0] vector_in_delay_se [N-1:0];
+    reg [DATA_WIDTH*2-1:0] operator_se [N-1:0];
     reg [$clog2(MAX_CHAINS)-1:0] chainId_in_delay=0;
     reg valid_in_delay = 1'b0;
     reg valid_in_delay_2 = 1'b0;
@@ -59,6 +59,7 @@
     reg [7:0] firmware_cache_addr_delay_2 = 0;
     reg [7:0] firmware_cond_delay =0;
     reg cond_valid;
+    reg [DATA_WIDTH-1:0] operator [N-1:0];
     reg [DATA_WIDTH-1:0] operand [N-1:0];
     reg [DATA_WIDTH*2-1:0] operand_se [N-1:0];
     reg [DATA_WIDTH-1:0] alu_result [N-1:0];
@@ -175,10 +176,13 @@
     always @(*) begin
       // First, check if I'm reading from mini cache
       if (firmware_minicache_delay[0]==1'b1) begin
-        operand = mini_cache;
-      end 
+        operator = mini_cache;
+      end
+      else begin
+        operator = vector_in_delay;
+      end
       // Select if I'm reading from memory or using value I just calculated (to avoid read after write conflicts in the cache)
-      else if (firmware_cache_delay_2 && valid_in_delay_2 && firmware_cache_addr_delay_2==firmware_cache_addr_delay) begin
+      if (firmware_cache_delay_2 && valid_in_delay_2 && firmware_cache_addr_delay_2==firmware_cache_addr_delay) begin
         operand = vector_out;
       end
       else begin
@@ -188,11 +192,11 @@
       // Math for integer data type
       if (DATA_TYPE==0) begin
         for(i=0; i<N; i=i+1) begin
-          alu_add[i] = vector_in_delay[i] + operand[i];
-          alu_mul[i] = vector_in_delay[i] * operand[i];
-          alu_sub[i] = vector_in_delay[i] - operand[i];
-          if (vector_in_delay[i]>operand[i]) begin
-            alu_max[i] = vector_in_delay[i];
+          alu_add[i] = operator[i] + operand[i];
+          alu_mul[i] = operator[i] * operand[i];
+          alu_sub[i] = operator[i] - operand[i];
+          if (operator[i]>operand[i]) begin
+            alu_max[i] = operator[i];
           end
           else begin
             alu_max[i] = operand[i];
@@ -202,23 +206,23 @@
       // Math for fixed point data type
       else begin
         for(i=0; i<N; i=i+1) begin
-          alu_add[i] = vector_in_delay[i] + operand[i];
-          vector_in_delay_se[i] =  { {DATA_WIDTH{vector_in_delay[i][DATA_WIDTH-1]}}, vector_in_delay[i][DATA_WIDTH-1:0] };
+          alu_add[i] = operator[i] + operand[i];
+          operator_se[i] =  { {DATA_WIDTH{operator[i][DATA_WIDTH-1]}}, operator[i][DATA_WIDTH-1:0] };
           operand_se[i] = { {DATA_WIDTH{operand[i][DATA_WIDTH-1]}}, operand[i][DATA_WIDTH-1:0] };
-          alu_mul_wide[i] = (vector_in_delay_se[i] * operand_se[i]);
+          alu_mul_wide[i] = (operator_se[i] * operand_se[i]);
           alu_mul[i]=alu_mul_wide[i]>>(DATA_WIDTH/2);
-          alu_sub[i] = vector_in_delay[i] - operand[i];
-          if (vector_in_delay[i][DATA_WIDTH-1]==operand[i][DATA_WIDTH-1]) begin
-            if (vector_in_delay[i]>operand[i] ) begin
-              alu_max[i] = vector_in_delay[i];
+          alu_sub[i] = operator[i] - operand[i];
+          if (operator[i][DATA_WIDTH-1]==operand[i][DATA_WIDTH-1]) begin
+            if (operator[i]>operand[i] ) begin
+              alu_max[i] = operator[i];
             end
             else begin
               alu_max[i] = operand[i];
             end
           end
           else begin
-            if (vector_in_delay[i][DATA_WIDTH-1]==0) begin
-              alu_max[i] = vector_in_delay[i];
+            if (operator[i][DATA_WIDTH-1]==0) begin
+              alu_max[i] = operator[i];
             end
             else begin
               alu_max[i] = operand[i];
@@ -228,7 +232,7 @@
       end
 
       case (firmware_op_delay)
-        0 : alu_result = firmware_minicache_delay[0] ? mini_cache : vector_in_delay;
+        0 : alu_result = operator;
         1 : alu_result = alu_add;
         2 : alu_result = alu_mul;
         3 : alu_result = alu_sub;
@@ -253,7 +257,7 @@
       else begin
         cond_valid = 1'b0;
       end
-      valid_result = cond_valid ? alu_result : vector_in_delay;
+      valid_result = cond_valid ? alu_result : operator;
 
     end
 
