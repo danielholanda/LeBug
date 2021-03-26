@@ -680,7 +680,11 @@ class rtlHw():
         tb_inputs=[]
         for i, inp in enumerate(self.testbench_inputs):
             tb_inputs.append("valid = 1;")
-            tb_inputs.append(f"eof = {int(inp[1])};")
+            tb_inputs.append(f"eof[0] = {int(inp[1])};")
+            if len(inp)>2:
+                tb_inputs.append(f"eof[1] = {int(inp[2])};")
+            else:
+                tb_inputs.append(f"eof[1] = 0;")
             for idx,ele in enumerate(inp[0]):
                 tb_inputs.append(f"vector[{idx}]=32'd{ele};")
             tb_inputs.append("#half_period;")
