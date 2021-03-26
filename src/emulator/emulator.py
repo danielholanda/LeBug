@@ -229,6 +229,9 @@ class emulatedHw():
             elif cfg.op==3:
                 log.debug('Subtracting using vector-vector ALU')
                 self.v_out_d1 = operator - self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N]
+            elif cfg.op==4:
+                log.debug('Subtracting using vector-vector ALU')
+                self.v_out_d1 = np.maximum(operator, self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N])
 
             if cfg.cache:
                 self.vrf[cfg.cache_addr*self.N:cfg.cache_addr*self.N+self.N] = self.v_out_d1 
