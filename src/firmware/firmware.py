@@ -166,7 +166,7 @@ def conditions(cp):
 def minicache(cp):
 
     cp.begin_chain()
-    cp.vv_add(0,condition1='notfirst')
+    cp.vv_add(0)
     cp.v_cache(0)
     cp.v_mc_save()
     cp.end_chain()

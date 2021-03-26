@@ -37,7 +37,7 @@ class rtlHw():
                 if instance_parameter_name in module_parameter_names:
                     self.parameter[instance_parameter_name]=instance_parameter_value
                 else:
-                    assert False, f'{parameter_name} is not a parameter from {self.module_class.name}'
+                    assert False, f'{instance_parameter_name} is not a parameter from {self.module_class.name}'
 
         # Connect inputs of instance
         def connectInputs(self,top_module_or_instance=None):
@@ -436,8 +436,9 @@ class rtlHw():
             ['INITIAL_FIRMWARE_ADDR_RD'],
             ['INITIAL_FIRMWARE_COND'],
             ['INITIAL_FIRMWARE_CACHE'],
-            ['INITIAL_FIRMWARE_CACHE_ADDR']])
-        top.mod.vectorVectorALU.setAsConfigurable(configurable_parameters=5)
+            ['INITIAL_FIRMWARE_CACHE_ADDR'],
+            ['INITIAL_FIRMWARE_MINICACHE']])
+        top.mod.vectorVectorALU.setAsConfigurable(configurable_parameters=6)
         top.mod.vectorVectorALU.addMemory("vvrf",self.VVVRF_SIZE,self.DATA_WIDTH*self.N,packed_elements=self.N)
 
         # Vector Scalar Reduce unit
@@ -517,6 +518,7 @@ class rtlHw():
             VVALU_INITIAL_FIRMWARE_COND = EMPTY_FIRMWARE
             VVALU_INITIAL_FIRMWARE_CACHE = EMPTY_FIRMWARE
             VVALU_INITIAL_FIRMWARE_CACHE_ADDR = EMPTY_FIRMWARE
+            VVALU_INITIAL_FIRMWARE_MINICACHE = EMPTY_FIRMWARE
             FRU_INITIAL_FIRMWARE_OP = EMPTY_FIRMWARE
             FRU_INITIAL_FIRMWARE_ADDR = EMPTY_FIRMWARE
             FRU_INITIAL_FIRMWARE_REDUCE_AXIS = EMPTY_FIRMWARE
@@ -560,6 +562,7 @@ class rtlHw():
             VVALU_INITIAL_FIRMWARE_COND=str([encodeCond(chain.cond1,chain.cond2) for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
             VVALU_INITIAL_FIRMWARE_CACHE=str([chain.cache for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
             VVALU_INITIAL_FIRMWARE_CACHE_ADDR=str([chain.cache_addr for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
+            VVALU_INITIAL_FIRMWARE_MINICACHE=str([chain.minicache for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
             FRU_INITIAL_FIRMWARE_OP=str([chain.filter for chain in self.firmware['fu']]).replace("[", "'{").replace("]", "}")
             FRU_INITIAL_FIRMWARE_ADDR=str([chain.addr for chain in self.firmware['fu']]).replace("[", "'{").replace("]", "}")
             FRU_INITIAL_FIRMWARE_REDUCE_AXIS=str([chain.axis for chain in self.firmware['mvru']]).replace("[", "'{").replace("]", "}")
@@ -610,7 +613,8 @@ class rtlHw():
             ['INITIAL_FIRMWARE_ADDR_RD',VVALU_INITIAL_FIRMWARE_ADDR_RD],
             ['INITIAL_FIRMWARE_COND',VVALU_INITIAL_FIRMWARE_COND],
             ['INITIAL_FIRMWARE_CACHE',VVALU_INITIAL_FIRMWARE_CACHE],
-            ['INITIAL_FIRMWARE_CACHE_ADDR',VVALU_INITIAL_FIRMWARE_CACHE_ADDR]])
+            ['INITIAL_FIRMWARE_CACHE_ADDR',VVALU_INITIAL_FIRMWARE_CACHE_ADDR],
+            ['INITIAL_FIRMWARE_MINICACHE',VVALU_INITIAL_FIRMWARE_MINICACHE]])
 
         top.instantiateModule(top.mod.vectorScalarReduceUnit,"vsru")
         top.inst.vsru.setParameters([

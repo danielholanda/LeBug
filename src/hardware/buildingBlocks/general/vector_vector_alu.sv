@@ -165,8 +165,8 @@
       bof_in_delay <= bof_in;
       chainId_in_delay <= chainId_in;
 
-      // Save velues into mini cache
-      if (firmware_minicache_delay_2[1]==1'b1) begin
+      // Save values into mini cache
+      if (firmware_minicache_delay[1]==1'b1 & valid_in_delay) begin
         mini_cache <= valid_result;
       end
     end
@@ -174,7 +174,7 @@
     // Perform ALU ops
     always @(*) begin
       // First, check if I'm reading from mini cache
-      if (firmware_minicache[chainId_in][0]==1'b1) begin
+      if (firmware_minicache_delay[0]==1'b1) begin
         operand = mini_cache;
       end 
       // Select if I'm reading from memory or using value I just calculated (to avoid read after write conflicts in the cache)
@@ -228,7 +228,7 @@
       end
 
       case (firmware_op_delay)
-        0 : alu_result = vector_in_delay;
+        0 : alu_result = firmware_minicache_delay[0] ? mini_cache : vector_in_delay;
         1 : alu_result = alu_add;
         2 : alu_result = alu_mul;
         3 : alu_result = alu_sub;
