@@ -173,6 +173,13 @@ def minicache(cp):
 
     cp.begin_chain()
     cp.v_mc_load()
+    cp.vv_add(0)
+    cp.v_cache(0)
+    cp.v_mc_save()
+    cp.end_chain()
+
+    cp.begin_chain()
+    cp.v_mc_load()
     cp.v_commit()
     cp.end_chain()
     return cp.compile()

@@ -382,6 +382,77 @@ def distribution():
 distribution()
 
 
+def minicache_test():
+
+    # Overwrite YAML file to define how components are attached to eachother
+    BUILDING_BLOCKS=['InputBuffer', 'FilterReduceUnit','VectorVectorALU','VectorScalarReduce','DataPacker','TraceBuffer']
+
+    # Instantiate HW and Emulator Processors
+    DATA_WIDTH=32
+    MAX_CHAINS=4
+    IB_DEPTH=32
+    TB_SIZE=8
+    DATA_TYPE='int'
+    hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,DATA_TYPE,DEVICE_FAM)
+    emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
+
+    # Create common input values
+    np.random.seed(0)
+    input_vectors=[]
+    num_input_vectors=3
+    np.random.seed(123)
+    print("********** Input vectors **********")
+    for i in range(num_input_vectors):
+        eof = True;
+        if DATA_TYPE=='int':
+            input_vectors.append(np.random.randint(9, size=N))
+            print(f'Cycle {i}:\t{input_vectors[i]}')
+            emu_proc.push([input_vectors[i],eof])
+            hw_proc.push([input_vectors[i],eof])
+        elif DATA_TYPE=='fixed_point':
+            input_vectors.append(9*np.random.random(N)-5)
+            print(f'Cycle {i}:\t{input_vectors[i]}')
+            emu_proc.push([input_vectors[i],eof])
+            input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
+            hw_proc.push([input_vectors[i],eof])
+
+    # Initialize the memories the same way
+    emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
+    if DATA_TYPE=='int':
+        hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[list(a) for a in np.array_split(list(range(FUVRF_SIZE*M)), FUVRF_SIZE)]
+    elif DATA_TYPE=='fixed_point':
+        hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[floatToEncodedInt(a,DATA_WIDTH) for a in np.array_split(list(range(FUVRF_SIZE*M)), FUVRF_SIZE)]
+
+    # Configure firmware - Both HW and Emulator work with the same firmware
+    fw = firm.minicache(hw_proc.compiler)
+    emu_proc.config(fw)
+    hw_proc.config(fw)
+
+    # Run HW simulation and emulation
+    steps=45
+    hw_results = hw_proc.run(steps=steps,gui=False,log=False)
+    emu_results = emu_proc.run(steps=steps)
+
+    # Filter Results
+    emu_trace_buffer = emu_results['tb'][-1];
+    if DATA_TYPE=='int':
+        hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
+    elif DATA_TYPE=='fixed_point':
+        hw_trace_buffer = np.array(encodedIntTofloat(hw_results['tb']['mem_data'],DATA_WIDTH))
+
+    # Print Results
+    print("\n\n********** Emulation results **********")
+    print(emu_trace_buffer)
+    print("\n********** Hardware results **********")
+    print(hw_trace_buffer)
+
+    # Verify that results are equal
+    assert np.allclose(emu_trace_buffer,hw_trace_buffer,rtol=0.05)
+    print("Passed test #6")
+
+minicache_test()
+
+
 
 
 
