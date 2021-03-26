@@ -437,8 +437,9 @@ class rtlHw():
             ['INITIAL_FIRMWARE_COND'],
             ['INITIAL_FIRMWARE_CACHE'],
             ['INITIAL_FIRMWARE_CACHE_ADDR'],
-            ['INITIAL_FIRMWARE_MINICACHE']])
-        top.mod.vectorVectorALU.setAsConfigurable(configurable_parameters=6)
+            ['INITIAL_FIRMWARE_MINICACHE'],
+            ['INITIAL_FIRMWARE_CACHE_COND']])
+        top.mod.vectorVectorALU.setAsConfigurable(configurable_parameters=7)
         top.mod.vectorVectorALU.addMemory("vvrf",self.VVVRF_SIZE,self.DATA_WIDTH*self.N,packed_elements=self.N)
 
         # Vector Scalar Reduce unit
@@ -519,6 +520,7 @@ class rtlHw():
             VVALU_INITIAL_FIRMWARE_CACHE = EMPTY_FIRMWARE
             VVALU_INITIAL_FIRMWARE_CACHE_ADDR = EMPTY_FIRMWARE
             VVALU_INITIAL_FIRMWARE_MINICACHE = EMPTY_FIRMWARE
+            VVALU_INITIAL_FIRMWARE_CACHE_COND = EMPTY_FIRMWARE
             FRU_INITIAL_FIRMWARE_OP = EMPTY_FIRMWARE
             FRU_INITIAL_FIRMWARE_ADDR = EMPTY_FIRMWARE
             FRU_INITIAL_FIRMWARE_REDUCE_AXIS = EMPTY_FIRMWARE
@@ -563,6 +565,7 @@ class rtlHw():
             VVALU_INITIAL_FIRMWARE_CACHE=str([chain.cache for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
             VVALU_INITIAL_FIRMWARE_CACHE_ADDR=str([chain.cache_addr for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
             VVALU_INITIAL_FIRMWARE_MINICACHE=str([chain.minicache for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
+            VVALU_INITIAL_FIRMWARE_CACHE_COND=str([encodeCond(chain.cache_cond1,chain.cache_cond2) for chain in self.firmware['vvalu']]).replace("[", "'{").replace("]", "}")
             FRU_INITIAL_FIRMWARE_OP=str([chain.filter for chain in self.firmware['fu']]).replace("[", "'{").replace("]", "}")
             FRU_INITIAL_FIRMWARE_ADDR=str([chain.addr for chain in self.firmware['fu']]).replace("[", "'{").replace("]", "}")
             FRU_INITIAL_FIRMWARE_REDUCE_AXIS=str([chain.axis for chain in self.firmware['mvru']]).replace("[", "'{").replace("]", "}")
@@ -614,7 +617,8 @@ class rtlHw():
             ['INITIAL_FIRMWARE_COND',VVALU_INITIAL_FIRMWARE_COND],
             ['INITIAL_FIRMWARE_CACHE',VVALU_INITIAL_FIRMWARE_CACHE],
             ['INITIAL_FIRMWARE_CACHE_ADDR',VVALU_INITIAL_FIRMWARE_CACHE_ADDR],
-            ['INITIAL_FIRMWARE_MINICACHE',VVALU_INITIAL_FIRMWARE_MINICACHE]])
+            ['INITIAL_FIRMWARE_MINICACHE',VVALU_INITIAL_FIRMWARE_MINICACHE],
+            ['INITIAL_FIRMWARE_CACHE_COND',VVALU_INITIAL_FIRMWARE_CACHE_COND]])
 
         top.instantiateModule(top.mod.vectorScalarReduceUnit,"vsru")
         top.inst.vsru.setParameters([

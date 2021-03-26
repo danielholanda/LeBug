@@ -233,7 +233,15 @@ class emulatedHw():
                 log.debug('Subtracting using vector-vector ALU')
                 self.v_out_d1 = np.maximum(operator, self.vrf[cfg.addr*self.N:cfg.addr*self.N+self.N])
 
-            if cfg.cache:
+            cache_condition_met = ((not cfg.cache_cond1['last']     or (cfg.cache_cond1['last']     and     self.eof_in[0])) and
+                             (not cfg.cache_cond1['notlast']  or (cfg.cache_cond1['notlast']  and not self.eof_in[0])) and
+                             (not cfg.cache_cond1['first']    or (cfg.cache_cond1['first']    and     self.bof_in[0])) and
+                             (not cfg.cache_cond1['notfirst'] or (cfg.cache_cond1['notfirst'] and not self.bof_in[0])) and
+                             (not cfg.cache_cond2['last']     or (cfg.cache_cond2['last']     and     self.eof_in[1])) and
+                             (not cfg.cache_cond2['notlast']  or (cfg.cache_cond2['notlast']  and not self.eof_in[1])) and
+                             (not cfg.cache_cond2['first']    or (cfg.cache_cond2['first']    and     self.bof_in[1])) and
+                             (not cfg.cache_cond2['notfirst'] or (cfg.cache_cond2['notfirst'] and not self.bof_in[1])))
+            if cfg.cache & cache_condition_met:
                 self.vrf[cfg.cache_addr*self.N:cfg.cache_addr*self.N+self.N] = self.v_out_d1 
             if cfg.minicache==2 or cfg.minicache==3:
                 self.minicache = copy(self.v_out_d1) 
@@ -338,7 +346,7 @@ class emulatedHw():
         self.fu.config=[struct(filter=0,addr=0)]
         self.mvru.config=[struct(axis=0)]
         self.vsru.config=[struct(op=0)]
-        self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0,cond1=copy(no_cond),cond2=copy(no_cond),minicache=0)]
+        self.vvalu.config=[struct(op=0,addr=0,cache=0,cache_addr=0,cond1=copy(no_cond),cond2=copy(no_cond),minicache=0,cache_cond1=copy(no_cond),cache_cond2=copy(no_cond))]
         self.dp.config=[struct(commit=0,size=0,cond1=copy(no_cond),cond2=copy(no_cond))]
         self.ib.config=struct(num_chains=1)
         if fw is not None:

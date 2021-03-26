@@ -15,7 +15,8 @@
   parameter [7:0] INITIAL_FIRMWARE_COND       [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_CACHE      [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
   parameter [7:0] INITIAL_FIRMWARE_CACHE_ADDR [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
-  parameter [7:0] INITIAL_FIRMWARE_MINICACHE  [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
+  parameter [7:0] INITIAL_FIRMWARE_MINICACHE  [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}},
+  parameter [7:0] INITIAL_FIRMWARE_CACHE_COND [0:MAX_CHAINS-1] = '{MAX_CHAINS{0}}
   )
   (
   input logic clk,
@@ -41,6 +42,7 @@
     reg [7:0] firmware_cache      [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_CACHE;
     reg [7:0] firmware_cache_addr [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_CACHE_ADDR;
     reg [7:0] firmware_minicache  [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_MINICACHE;
+    reg [7:0] firmware_cahce_cond [0:MAX_CHAINS-1] = INITIAL_FIRMWARE_CACHE_COND;
     reg [DATA_WIDTH-1:0] valid_result [N-1:0];
     reg [DATA_WIDTH-1:0] mini_cache [N-1:0];
     reg [7:0] firmware_minicache_delay;
@@ -58,7 +60,9 @@
     reg [7:0] firmware_cache_addr_delay = 0;
     reg [7:0] firmware_cache_addr_delay_2 = 0;
     reg [7:0] firmware_cond_delay =0;
-    reg cond_valid;
+    reg [7:0] firmware_cache_cond =0;
+    reg [7:0] firmware_cache_cond_delay =0;
+    reg cond_valid, cache_cond_valid;
     reg [DATA_WIDTH-1:0] operator [N-1:0];
     reg [DATA_WIDTH-1:0] operand [N-1:0];
     reg [DATA_WIDTH*2-1:0] operand_se [N-1:0];
@@ -144,6 +148,9 @@
           else if (byte_counter<MAX_CHAINS*6)begin
             firmware_minicache[byte_counter]=configData;
           end
+          else if (byte_counter<MAX_CHAINS*7)begin
+            firmware_cache_cond[byte_counter]=configData;
+          end
         end
         else begin
           byte_counter<=0;
@@ -155,6 +162,7 @@
       valid_in_delay_2 <= valid_in_delay;
       vector_in_delay <= vector_in; 
       firmware_cond_delay <= firmware_cond[chainId_in];
+      firmware_cache_cond_delay <= firmware_cache_cond[chainId_in];
       firmware_op_delay <= firmware_op[chainId_in];
       firmware_cache_delay <= firmware_cache[chainId_in];
       firmware_cache_delay_2 <= firmware_cache_delay;
@@ -257,14 +265,32 @@
       else begin
         cond_valid = 1'b0;
       end
+
       valid_result = cond_valid ? alu_result : operator;
 
     end
 
     //Logic for caching
     always @(*) begin 
+
+      if ( (firmware_cache_cond_delay==8'd0) | 
+           (firmware_cache_cond_delay[0] & eof_in_delay[0]==1'b1) | 
+           (firmware_cache_cond_delay[1] & eof_in_delay[0]==1'b0) | 
+           (firmware_cache_cond_delay[2] & bof_in_delay[0]==1'b1) | 
+           (firmware_cache_cond_delay[3] & bof_in_delay[0]==1'b0) | 
+           (firmware_cache_cond_delay[4] & eof_in_delay[1]==1'b1) | 
+           (firmware_cache_cond_delay[5] & eof_in_delay[1]==1'b0) | 
+           (firmware_cache_cond_delay[6] & bof_in_delay[1]==1'b1) | 
+           (firmware_cache_cond_delay[7] & bof_in_delay[1]==1'b0) 
+           ) begin
+        cache_cond_valid = 1'b1;
+      end
+      else begin
+        cache_cond_valid = 1'b0;
+      end
+
       mem_in_b =  {>>{valid_result}};
-      mem_write_enable_b = firmware_cache_delay & valid_in_delay;
+      mem_write_enable_b = firmware_cache_delay & valid_in_delay & cache_cond_valid;
       mem_address_b = firmware_cache_addr_delay;
     end
  

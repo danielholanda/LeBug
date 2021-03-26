@@ -10,7 +10,7 @@ class compiler():
         self.fu    = struct(filter=0,addr=0)
         self.mvru  = struct(axis=0)
         self.vsru  = struct(op=0)
-        self.vvalu = struct(op=0,addr=0,cond1=copy(no_cond),cond2=copy(no_cond),cache=0,cache_addr=0,minicache=0)
+        self.vvalu = struct(op=0,addr=0,cond1=copy(no_cond),cond2=copy(no_cond),cache=0,cache_addr=0,minicache=0,cache_cond1=copy(no_cond),cache_cond2=copy(no_cond))
         self.dp    = struct(commit=0,size=0,cond1=copy(no_cond),cond2=copy(no_cond))
     def vv_filter(self,addr):
         self.fu.filter=1
@@ -44,9 +44,11 @@ class compiler():
         self.vvalu.addr=addr
         self.vvalu.cond1[condition1]=self.__process_condition(condition1)
         self.vvalu.cond2[condition2]=self.__process_condition(condition2)
-    def v_cache(self,cache_addr):
+    def v_cache(self,cache_addr,condition1=None, condition2=None):
         self.vvalu.cache=1
         self.vvalu.cache_addr=cache_addr
+        self.vvalu.cache_cond1[condition1]=self.__process_condition(condition1)
+        self.vvalu.cache_cond2[condition2]=self.__process_condition(condition2)
     def v_mc_load(self):
         if self.vvalu.minicache==0:
             self.vvalu.minicache=1
