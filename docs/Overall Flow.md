@@ -48,7 +48,17 @@ Every time that the we emulate the processor or create RTL for it, we have to de
 - **DATA_TYPE**: Data type that we expect the user circuit to be using.
 - **DEVICE_FAM:** FPGA device family we are targetting (not needed for emulation).
 
-## Complete list of firmware instructions supported
+## Functions supported by both emulatedHw and rtlHw
 
-The firmware instructions supported by the instrumentation is constantly evolving. For a complete list of the firmware instructions currently supported check out the [compiler source code](https://github.com/danielholanda/LeBug/blob/master/src/firmware/compiler.py).
+You can create hardware instrumentation by instatiating the rtlHw class. You can aso instantiat the emulator by instatiating the emulatedHw class. Both classes support the following main functions:
+
+- push(vector,eof)
+  - This function is used to add a new input vector to the testbench
+- config(fw)
+  - Sets up run-time parameters including
+    - Firmware
+    - Memory initializations
+- run(steps)
+  - Run either simulation or emulation for a given number of steps
+  - Returns results from simulation/emulation
 

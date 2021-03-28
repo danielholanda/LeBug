@@ -142,3 +142,7 @@ In this example, the FRU has been configured to store the numbers 0,1,2,3... Thi
 
 The 'notfirst' condition is used in the vv_add to reset each bi to zero every time we start a new frame. Frames are only commited to memory after each frame ends, by using the 'last' condition.
 
+## Complete list of firmware instructions supported
+
+The firmware instructions supported by the instrumentation is constantly evolving. For a complete list of the firmware instructions currently supported check out the [compiler source code](https://github.com/danielholanda/LeBug/blob/master/src/firmware/compiler.py).
+
