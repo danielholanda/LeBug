@@ -209,4 +209,19 @@ def activationPredictiveness(cp):
 
     return cp.compile()
 
+# Norm Check
+# To get better results, use FRU_reconfig_vector to change FRU's filter values according to the range of the percentiles (currently done via UART as a proof-of-concept)
+# A single 64 bin distribution is used to get a proxy of the three percentiles, calculated offline.
+def normCheck(cp,M):
+    bins=64
+    assert bins%M==0, "Number of bins must be divisible by M"
+    for i in range(int(bins/M)):
+        cp.begin_chain()
+        cp.vv_filter(i)
+        cp.m_reduce('M')
+        cp.vv_add(i,'notfirst')
+        cp.v_cache(i)
+        cp.v_commit(M,'last')
+        cp.end_chain()
+    return cp.compile()
 
