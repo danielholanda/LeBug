@@ -358,7 +358,8 @@ class emulatedHw():
                 self.vvalu.config.append(fw['vvalu'][idx])
                 self.dp.config.append(fw['dp'][idx])
 
-        
+    def initialize_fu(vals):
+        self.fu.vrf=vals
 
     def run(self,steps=50):
         # Keep stepping through the circuit as long as we have instructions to execute

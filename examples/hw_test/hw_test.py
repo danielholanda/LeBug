@@ -98,11 +98,8 @@ def multipleChains():
     pushVals(emu_proc,hw_proc,num_input_vectors,neg_vals=True)
 
     # Initialize the memories the same way
-    emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
-    if DATA_TYPE=='int':
-        hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[list(range(FUVRF_SIZE))]*M
-    elif DATA_TYPE=='fixed_point':
-        hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[floatToEncodedInt(list(range(FUVRF_SIZE)),DATA_WIDTH)]*M
+    emu_proc.initialize_fu=list(range(FUVRF_SIZE*M))
+    hw_proc.initialize_fu=list(range(FUVRF_SIZE*M))
 
     # Configure firmware - Both HW and Emulator work with the same firmware
     fw = firm.multipleChains(hw_proc.compiler)
@@ -200,11 +197,8 @@ def distribution():
     pushVals(emu_proc,hw_proc,num_input_vectors,eof1)
 
     # Initialize the memories the same way
-    emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
-    if DATA_TYPE=='int':
-        hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[list(a) for a in np.array_split(list(range(FUVRF_SIZE*M)), FUVRF_SIZE)]
-    elif DATA_TYPE=='fixed_point':
-        hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[floatToEncodedInt(a,DATA_WIDTH) for a in np.array_split(list(range(FUVRF_SIZE*M)), FUVRF_SIZE)]
+    emu_proc.initialize_fu=list(range(FUVRF_SIZE*M))
+    hw_proc.initialize_fu=list(range(FUVRF_SIZE*M))
 
     # Configure firmware - Both HW and Emulator work with the same firmware
     fw = firm.distribution(hw_proc.compiler,16,4)

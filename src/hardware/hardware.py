@@ -942,6 +942,18 @@ class rtlHw():
 
         return results
 
+    def initialize_fu(vals):
+        # Check if the values received have the correct size
+        assert len(vals)==self.FUVRF_SIZE*M, "FU Initialization failed"
+
+        vals = np.array_split(vals, FUVRF_SIZE)
+        # If we are dealing with integers
+        if self.DATA_TYPE==0:
+            hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=vals
+        # If we are dealing with fixed-point
+        elif self.DATA_TYPE==1:
+            hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[floatToEncodedInt(v,DATA_WIDTH) for v in vals]
+
     def push(self,pushed_values):
         self.testbench_inputs.append(pushed_values)
 
