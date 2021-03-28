@@ -663,12 +663,25 @@ class rtlHw():
                                     'configId': 'configId_reconfig', 
                                     'configData': 'configData_reconfig'}
 
-        # Automatically connect remaining modules
-        top.inst.fru.connectInputs(top.inst.ib)
-        top.inst.vvalu.connectInputs(top.inst.fru)
-        top.inst.vsru.connectInputs(top.inst.vvalu)
-        top.inst.dp.connectInputs(top.inst.vsru)
+        # Check if building blocks are not breaking any rules
+        if self.BUILDING_BLOCKS[0] != "InputBuffer" or self.BUILDING_BLOCKS[-2]!="DataPacker" or self.BUILDING_BLOCKS[-1]!="TraceBuffer":
+            assert False, "Building blocks do not follow order currently supported by the hardware generator"
 
+        # Automatically connect remaining modules
+        prev_block = top.inst.ib
+        for buildingBlock in self.BUILDING_BLOCKS[1:-2]:
+            if buildingBlock=='FilterReduceUnit':
+                next_block=top.inst.fru
+            elif buildingBlock=='VectorScalarReduce':
+                next_block=top.inst.vsru
+            elif buildingBlock=='VectorVectorALU':
+                next_block=top.inst.vvalu
+            else:
+                assert False, f"Unknown building block {buildingBlock}"
+            next_block.connectInputs(prev_block)
+            prev_block=next_block
+
+        top.inst.dp.connectInputs(prev_block)
         top.inst.tb.instance_input={'clk': 'clk', 
                                     'valid_in': 'valid_out_dp', 
                                     'vector_in': 'vector_out_dp', 
@@ -932,7 +945,7 @@ class rtlHw():
     def push(self,pushed_values):
         self.testbench_inputs.append(pushed_values)
 
-    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,DATA_TYPE,DEVICE_FAM):
+    def __init__(self,N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,BUILDING_BLOCKS,DATA_TYPE,DEVICE_FAM):
         ''' Verifying parameters '''
         assert math.log(N, 2).is_integer(), "N must be a power of 2" 
         assert math.log(M, 2).is_integer(), "N must be a power of 2" 
@@ -947,6 +960,7 @@ class rtlHw():
         self.VVVRF_SIZE=VVVRF_SIZE
         self.FUVRF_SIZE=FUVRF_SIZE
         self.DEVICE_FAM=DEVICE_FAM
+        self.BUILDING_BLOCKS=BUILDING_BLOCKS
         if DATA_TYPE=='int':
             self.DATA_TYPE=0
         elif DATA_TYPE=='fixed_point':

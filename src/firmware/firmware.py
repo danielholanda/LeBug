@@ -185,15 +185,16 @@ def minicache(cp):
     return cp.compile()
 
 # Activation Predictiveness
-def activationPredictiveness(cp,VVVRF_SIZE):
+def activationPredictiveness(cp):
     # First we sum all activations of all nodes in address 0 (we will expect eof[0] to start a new sum)
     # Once we receive eof[0] we will check the max between this value and the one stored in the cache at address 1.
     # mc_save and mc_load are used to pass the average values from chain1 to chain2
     # Once we receive eof[1] we will commit a single value that corresponds to the max average of the values received.
     # The moving average is computed offline, since computing it on-chip will not reduce the amount of information that needs to be sent off-chip
+    # For a better understanding of how this data gathering technique may be used, please refer to our software experiments
 
     cp.begin_chain()
-    #cp.v_reduce() <- use this by reordering HW blocks to get non-proxy predictiveness metric
+    cp.v_reduce() 
     cp.vv_add(0,condition1='notfirst')
     cp.v_cache(0)
     cp.v_mc_save()
@@ -203,7 +204,7 @@ def activationPredictiveness(cp,VVVRF_SIZE):
     cp.v_mc_load()
     cp.vv_max(1,condition2='notfirst')
     cp.v_cache(1,condition1='last')
-    cp.v_commit(1,condition2='last')
+    cp.v_commit(8,condition2='last') # Change this 8 to 1 to commit only one element at a time. This is currently at 8 only for test purposes.
     cp.end_chain()
 
     return cp.compile()
