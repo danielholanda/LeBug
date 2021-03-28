@@ -135,13 +135,6 @@ def correlation():
     num_input_vectors=5
     pushVals(emu_proc,hw_proc,num_input_vectors,neg_vals=True)
 
-    # Initialize the memories the same way
-    emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
-    if DATA_TYPE=='int':
-        hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[list(range(FUVRF_SIZE))]*M
-    elif DATA_TYPE=='fixed_point':
-        hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[floatToEncodedInt(list(range(FUVRF_SIZE)),DATA_WIDTH)]*M
-
     # Configure firmware - Both HW and Emulator work with the same firmware
     fw = firm.correlation(hw_proc.compiler)
     emu_proc.config(fw)
@@ -173,13 +166,6 @@ def conditions():
     num_input_vectors=5
     eof1=[False,False,True,False,True]
     pushVals(emu_proc,hw_proc,num_input_vectors,eof1)
-
-    # Initialize the memories the same way
-    emu_proc.vvalu.vrf = [1,1,1,1,1,1,1,1]*VVVRF_SIZE
-    if DATA_TYPE=='int':
-        hw_proc.top.mod.vectorVectorALU.mem['vvrf']['init_values']=[[1,1,1,1,1,1,1,1]]*VVVRF_SIZE
-    elif DATA_TYPE=='fixed_point':
-        hw_proc.top.mod.vectorVectorALU.mem['vvrf']['init_values']=[floatToEncodedInt([1,1,1,1,1,1,1,1],DATA_WIDTH)]*VVVRF_SIZE
 
     # Configure firmware - Both HW and Emulator work with the same firmware
     fw = firm.conditions(hw_proc.compiler)
@@ -253,13 +239,6 @@ def minicache_test():
     eof1=num_input_vectors*[True]
     pushVals(emu_proc,hw_proc,num_input_vectors,eof1)
 
-    # Initialize the memories the same way
-    emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
-    if DATA_TYPE=='int':
-        hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[list(a) for a in np.array_split(list(range(FUVRF_SIZE*M)), FUVRF_SIZE)]
-    elif DATA_TYPE=='fixed_point':
-        hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[floatToEncodedInt(a,DATA_WIDTH) for a in np.array_split(list(range(FUVRF_SIZE*M)), FUVRF_SIZE)]
-
     # Configure firmware - Both HW and Emulator work with the same firmware
     fw = firm.minicache(hw_proc.compiler)
     emu_proc.config(fw)
@@ -295,13 +274,6 @@ def predictiveness():
     eof2=[False,False,False,True]
     pushVals(emu_proc,hw_proc,num_input_vectors,eof1,eof2)
 
-    # Initialize the memories the same way
-    emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
-    if DATA_TYPE=='int':
-        hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[list(a) for a in np.array_split(list(range(FUVRF_SIZE*M)), FUVRF_SIZE)]
-    elif DATA_TYPE=='fixed_point':
-        hw_proc.top.mod.filterReduceUnit.mem['furf']['init_values']=[floatToEncodedInt(a,DATA_WIDTH) for a in np.array_split(list(range(FUVRF_SIZE*M)), FUVRF_SIZE)]
-
     # Configure firmware - Both HW and Emulator work with the same firmware
     fw = firm.activationPredictiveness(hw_proc.compiler)
     emu_proc.config(fw)
@@ -320,17 +292,3 @@ def predictiveness():
     print("Passed test #7")
 
 predictiveness()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
