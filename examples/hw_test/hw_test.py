@@ -5,7 +5,6 @@ from hardware.hardware import rtlHw
 import firmware.firmware as firm
 import math, yaml
 import numpy as np
-np.set_printoptions(precision=3, suppress=False)
 
 # Read YAML configuration file and declare those as global variables
 def readConf():
@@ -45,6 +44,20 @@ def encodedIntTofloat(encoded_int,DATA_WIDTH):
     frac_bits=int(DATA_WIDTH/2)
     return [[decode(encoded_value,DATA_WIDTH) for encoded_value in l] for l in encoded_int] 
 
+def filterResults(emu_results, hw_results, DATA_TYPE):
+    emu_results_filtered = emu_results['tb'][-1];
+    if DATA_TYPE=='int':
+        hw_results_filtered = np.array(toInt(hw_results['tb']['mem_data']))
+    elif DATA_TYPE=='fixed_point':
+        hw_results_filtered = np.array(encodedIntTofloat(hw_results['tb']['mem_data'],DATA_WIDTH))
+
+    # Print Results
+    print("\n\n********** Emulation results **********")
+    print(emu_results_filtered)
+    print("\n********** Hardware results **********")
+    print(hw_results_filtered)
+
+    return emu_results_filtered, hw_results_filtered
 
 def raw():
 
@@ -88,21 +101,10 @@ def raw():
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results
-    emu_trace_buffer = emu_results['tb'][-1];
-    if DATA_TYPE=='int':
-        hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
-    elif DATA_TYPE=='fixed_point':
-        hw_trace_buffer = np.array(encodedIntTofloat(hw_results['tb']['mem_data'],DATA_WIDTH))
-    #hw_trace_buffer = np.array(hw_results['tb']['mem_data'])
-
-    # Print Results
-    print("\n\n********** Emulation results **********")
-    print(emu_trace_buffer)
-    print("\n********** Hardware results **********")
-    print(hw_trace_buffer)
+    emu_results_filtered, hw_results_filtered = filterResults(emu_results, hw_results, DATA_TYPE)
 
     # Verify that results are equal
-    assert np.allclose(emu_trace_buffer,hw_trace_buffer,rtol=0.01)
+    assert np.allclose(emu_results_filtered,hw_results_filtered,rtol=0.01)
     print("Passed test #1")
 
 raw()
@@ -156,20 +158,10 @@ def multipleChains():
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results
-    emu_trace_buffer = emu_results['tb'][-1];
-    if DATA_TYPE=='int':
-        hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
-    elif DATA_TYPE=='fixed_point':
-        hw_trace_buffer = np.array(encodedIntTofloat(hw_results['tb']['mem_data'],DATA_WIDTH))
-
-    # Print Results
-    print("\n\n********** Emulation results **********")
-    print(emu_trace_buffer)
-    print("\n********** Hardware results **********")
-    print(hw_trace_buffer)
+    emu_results_filtered, hw_results_filtered = filterResults(emu_results, hw_results, DATA_TYPE)
 
     # Verify that results are equal
-    assert np.allclose(emu_trace_buffer,hw_trace_buffer, rtol=0.01)
+    assert np.allclose(emu_results_filtered,hw_results_filtered, rtol=0.01)
     print("Passed test #2")
 
 multipleChains()
@@ -223,20 +215,10 @@ def correlation():
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results
-    emu_trace_buffer = emu_results['tb'][-1];
-    if DATA_TYPE=='int':
-        hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
-    elif DATA_TYPE=='fixed_point':
-        hw_trace_buffer = np.array(encodedIntTofloat(hw_results['tb']['mem_data'],DATA_WIDTH))
-
-    # Print Results
-    print("\n\n********** Emulation results **********")
-    print(emu_trace_buffer)
-    print("\n********** Hardware results **********")
-    print(hw_trace_buffer)
+    emu_results_filtered, hw_results_filtered = filterResults(emu_results, hw_results, DATA_TYPE)
 
     # Verify that results are equal
-    assert np.allclose(emu_trace_buffer,hw_trace_buffer, rtol=0.05)
+    assert np.allclose(emu_results_filtered,hw_results_filtered, rtol=0.05)
     print("Passed test #3")
 
 correlation()
@@ -293,20 +275,10 @@ def conditions():
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results
-    emu_trace_buffer = emu_results['tb'][-1];
-    if DATA_TYPE=='int':
-        hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
-    elif DATA_TYPE=='fixed_point':
-        hw_trace_buffer = np.array(encodedIntTofloat(hw_results['tb']['mem_data'],DATA_WIDTH))
-
-    # Print Results
-    print("\n\n********** Emulation results **********")
-    print(emu_trace_buffer)
-    print("\n********** Hardware results **********")
-    print(hw_trace_buffer)
+    emu_results_filtered, hw_results_filtered = filterResults(emu_results, hw_results, DATA_TYPE)
 
     # Verify that results are equal
-    assert np.allclose(emu_trace_buffer,hw_trace_buffer, rtol=0.05)
+    assert np.allclose(emu_results_filtered,hw_results_filtered, rtol=0.05)
     print("Passed test #4")
 
 conditions()
@@ -322,13 +294,14 @@ def distribution():
     MAX_CHAINS=4
     IB_DEPTH=32
     TB_SIZE=8
+    DATA_TYPE='fixed_point'
     hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,BUILDING_BLOCKS,DATA_TYPE,DEVICE_FAM)
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
     # Create common input values
     np.random.seed(0)
     input_vectors=[]
-    num_input_vectors=5
+    num_input_vectors=2
     np.random.seed(123)
     print("********** Input vectors **********")
     for i in range(num_input_vectors):
@@ -339,7 +312,7 @@ def distribution():
             emu_proc.push([input_vectors[i],eof])
             hw_proc.push([input_vectors[i],eof])
         elif DATA_TYPE=='fixed_point':
-            input_vectors.append(9*np.random.random(N)-5)
+            input_vectors.append(9*np.random.random(N))
             print(f'Cycle {i}:\t{input_vectors[i]}')
             emu_proc.push([input_vectors[i],eof])
             input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
@@ -363,20 +336,10 @@ def distribution():
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results
-    emu_trace_buffer = emu_results['tb'][-1];
-    if DATA_TYPE=='int':
-        hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
-    elif DATA_TYPE=='fixed_point':
-        hw_trace_buffer = np.array(encodedIntTofloat(hw_results['tb']['mem_data'],DATA_WIDTH))
-
-    # Print Results
-    print("\n\n********** Emulation results **********")
-    print(emu_trace_buffer)
-    print("\n********** Hardware results **********")
-    print(hw_trace_buffer)
+    emu_results_filtered, hw_results_filtered = filterResults(emu_results, hw_results, DATA_TYPE)
 
     # Verify that results are equal
-    assert np.allclose(emu_trace_buffer,hw_trace_buffer)
+    assert np.allclose(emu_results_filtered,hw_results_filtered)
     print("Passed test #5")
 
 distribution()
@@ -434,20 +397,10 @@ def minicache_test():
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results
-    emu_trace_buffer = emu_results['tb'][-1];
-    if DATA_TYPE=='int':
-        hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
-    elif DATA_TYPE=='fixed_point':
-        hw_trace_buffer = np.array(encodedIntTofloat(hw_results['tb']['mem_data'],DATA_WIDTH))
-
-    # Print Results
-    print("\n\n********** Emulation results **********")
-    print(emu_trace_buffer)
-    print("\n********** Hardware results **********")
-    print(hw_trace_buffer)
+    emu_results_filtered, hw_results_filtered = filterResults(emu_results, hw_results, DATA_TYPE)
 
     # Verify that results are equal
-    assert np.allclose(emu_trace_buffer,hw_trace_buffer,rtol=0.05)
+    assert np.allclose(emu_results_filtered,hw_results_filtered,rtol=0.05)
     print("Passed test #6")
 
 minicache_test()
@@ -510,20 +463,10 @@ def predictiveness():
     emu_results = emu_proc.run(steps=steps)
 
     # Filter Results
-    emu_trace_buffer = emu_results['tb'][-1];
-    if DATA_TYPE=='int':
-        hw_trace_buffer = np.array(toInt(hw_results['tb']['mem_data']))
-    elif DATA_TYPE=='fixed_point':
-        hw_trace_buffer = np.array(encodedIntTofloat(hw_results['tb']['mem_data'],DATA_WIDTH))
-
-    # Print Results
-    print("\n\n********** Emulation results **********")
-    print(emu_trace_buffer)
-    print("\n********** Hardware results **********")
-    print(hw_trace_buffer)
+    emu_results_filtered, hw_results_filtered = filterResults(emu_results, hw_results, DATA_TYPE)
 
     # Verify that results are equal
-    assert np.allclose(emu_trace_buffer,hw_trace_buffer,rtol=0.05)
+    assert np.allclose(emu_results_filtered,hw_results_filtered,rtol=0.05)
     print("Passed test #7")
 
 predictiveness()
