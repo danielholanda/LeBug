@@ -172,7 +172,7 @@ def testVectorChange():
     proc.config(fw)
     tb = proc.run()
 
-    assert np.isclose(np.sum(input_vector1-input_vector2),proc.dp.v_out[1])
+    assert np.isclose(np.sum(input_vector2-input_vector1),proc.dp.v_out[1])
 
     print("Passed test #6")
 
