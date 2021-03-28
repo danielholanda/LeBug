@@ -8,6 +8,7 @@ import math
 import numpy as np
 np.set_printoptions(precision=3, suppress=False)
 
+# Filter results after computations
 def filterResults(emu_results, hw_results, DATA_TYPE):
     emu_results_filtered = emu_results['tb'][-1];
     if DATA_TYPE=='int':
@@ -23,11 +24,37 @@ def filterResults(emu_results, hw_results, DATA_TYPE):
 
     return emu_results_filtered, hw_results_filtered
 
-''' Read YAML configuration file and declare those as global variables '''
+# Read YAML configuration file and declare those as global variables
 def readConf():
     with open(r'config.yaml') as file:
         yaml_dict = yaml.load(file, Loader=yaml.FullLoader)
         globals().update(yaml_dict)
+
+# Put input values into testbench
+def pushVals(emu_proc,hw_proc,num_input_vectors,eof1=None,eof2=None,neg_vals=False):
+    np.random.seed(0)
+    input_vectors=[]
+    if eof1 is None:
+        eof1=num_input_vectors*[False]
+    if eof2 is None:
+        eof2=num_input_vectors*[False]
+    print("********** Input vectors **********")
+    for i in range(num_input_vectors):
+        # Integer data type
+        if hw_proc.DATA_TYPE==0:
+            input_vectors.append(np.random.randint(9, size=N))
+            print(f'Cycle {i}:\t{input_vectors[i]}')
+            emu_proc.push([input_vectors[i],eof1[i],eof2[i]])
+        # Fixed-point data type
+        elif hw_proc.DATA_TYPE==1:
+            if neg_vals:
+                input_vectors.append(10*np.random.random(N)-5)
+            else:
+                input_vectors.append(10*np.random.random(N))
+            print(f'Cycle {i}:\t{input_vectors[i]}')
+            emu_proc.push([input_vectors[i],eof1[i],eof2[i]])
+            input_vectors[i] = floatToEncodedInt(input_vectors[i],hw_proc.DATA_WIDTH)
+        hw_proc.push([input_vectors[i],eof1[i],eof2[i]])
 
 def raw():
 
@@ -37,22 +64,8 @@ def raw():
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
     # Create common input values
-    np.random.seed(0)
-    input_vectors=[]
     num_input_vectors=3
-    print("********** Input vectors **********")
-    for i in range(num_input_vectors):
-        if DATA_TYPE=='int':
-            input_vectors.append(np.random.randint(5, size=N))
-            print(f'Cycle {i}:\t{input_vectors[i]}')
-            emu_proc.push([input_vectors[i],False])
-            hw_proc.push([input_vectors[i],False])
-        elif DATA_TYPE=='fixed_point':
-            input_vectors.append(5*np.random.random(N)-2)
-            print(f'Cycle {i}:\t{input_vectors[i]}')
-            emu_proc.push([input_vectors[i],False])
-            input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
-            hw_proc.push([input_vectors[i],False])
+    pushVals(emu_proc,hw_proc,num_input_vectors,neg_vals=True)
 
     # Configure firmware - Both HW and Emulator work with the same firmware
     fw = firm.raw(hw_proc.compiler)
@@ -81,22 +94,8 @@ def multipleChains():
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
     # Create common input values
-    np.random.seed(0)
-    input_vectors=[]
     num_input_vectors=1
-    print("********** Input vectors **********")
-    for i in range(num_input_vectors):
-        if DATA_TYPE=='int':
-            input_vectors.append(np.random.randint(5, size=N))
-            print(f'Cycle {i}:\t{input_vectors[i]}')
-            emu_proc.push([input_vectors[i],False])
-            hw_proc.push([input_vectors[i],False])
-        elif DATA_TYPE=='fixed_point':
-            input_vectors.append(5*np.random.random(N)-3)
-            print(f'Cycle {i}:\t{input_vectors[i]}')
-            emu_proc.push([input_vectors[i],False])
-            input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
-            hw_proc.push([input_vectors[i],False])
+    pushVals(emu_proc,hw_proc,num_input_vectors,neg_vals=True)
 
     # Initialize the memories the same way
     emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
@@ -133,22 +132,8 @@ def correlation():
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
     # Create common input values
-    np.random.seed(0)
-    input_vectors=[]
-    num_input_vectors=3
-    print("********** Input vectors **********")
-    for i in range(num_input_vectors):
-        if DATA_TYPE=='int':
-            input_vectors.append(np.random.randint(5, size=N))
-            print(f'Cycle {i}:\t{input_vectors[i]}')
-            emu_proc.push([input_vectors[i],False])
-            hw_proc.push([input_vectors[i],False])
-        elif DATA_TYPE=='fixed_point':
-            input_vectors.append(5*np.random.random(N)-3)
-            print(f'Cycle {i}:\t{input_vectors[i]}')
-            emu_proc.push([input_vectors[i],False])
-            input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
-            hw_proc.push([input_vectors[i],False])
+    num_input_vectors=5
+    pushVals(emu_proc,hw_proc,num_input_vectors,neg_vals=True)
 
     # Initialize the memories the same way
     emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
@@ -185,24 +170,9 @@ def conditions():
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
     # Create common input values
-    np.random.seed(0)
-    input_vectors=[]
     num_input_vectors=5
-    np.random.seed(123)
-    print("********** Input vectors **********")
-    for i in range(num_input_vectors):
-        eof = (i==3) or (i==5);
-        if DATA_TYPE=='int':
-            input_vectors.append(np.random.randint(5, size=N))
-            print(f'Cycle {i}:\t{input_vectors[i]}')
-            emu_proc.push([input_vectors[i],eof])
-            hw_proc.push([input_vectors[i],eof])
-        elif DATA_TYPE=='fixed_point':
-            input_vectors.append(5*np.random.random(N)-3)
-            print(f'Cycle {i}:\t{input_vectors[i]}')
-            emu_proc.push([input_vectors[i],eof])
-            input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
-            hw_proc.push([input_vectors[i],eof])
+    eof1=[False,False,True,False,True]
+    pushVals(emu_proc,hw_proc,num_input_vectors,eof1)
 
     # Initialize the memories the same way
     emu_proc.vvalu.vrf = [1,1,1,1,1,1,1,1]*VVVRF_SIZE
@@ -239,24 +209,9 @@ def distribution():
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
     # Create common input values
-    np.random.seed(0)
-    input_vectors=[]
     num_input_vectors=2
-    np.random.seed(123)
-    print("********** Input vectors **********")
-    for i in range(num_input_vectors):
-        eof = True;
-        if DATA_TYPE=='int':
-            input_vectors.append(np.random.randint(9, size=N))
-            print(f'Cycle {i}:\t{input_vectors[i]}')
-            emu_proc.push([input_vectors[i],eof])
-            hw_proc.push([input_vectors[i],eof])
-        elif DATA_TYPE=='fixed_point':
-            input_vectors.append(9*np.random.random(N))
-            print(f'Cycle {i}:\t{input_vectors[i]}')
-            emu_proc.push([input_vectors[i],eof])
-            input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
-            hw_proc.push([input_vectors[i],eof])
+    eof1=num_input_vectors*[True]
+    pushVals(emu_proc,hw_proc,num_input_vectors,eof1)
 
     # Initialize the memories the same way
     emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
@@ -294,24 +249,9 @@ def minicache_test():
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
     # Create common input values
-    np.random.seed(0)
-    input_vectors=[]
     num_input_vectors=3
-    np.random.seed(123)
-    print("********** Input vectors **********")
-    for i in range(num_input_vectors):
-        eof = True;
-        if DATA_TYPE=='int':
-            input_vectors.append(np.random.randint(9, size=N))
-            print(f'Cycle {i}:\t{input_vectors[i]}')
-            emu_proc.push([input_vectors[i],eof])
-            hw_proc.push([input_vectors[i],eof])
-        elif DATA_TYPE=='fixed_point':
-            input_vectors.append(9*np.random.random(N)-5)
-            print(f'Cycle {i}:\t{input_vectors[i]}')
-            emu_proc.push([input_vectors[i],eof])
-            input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
-            hw_proc.push([input_vectors[i],eof])
+    eof1=num_input_vectors*[True]
+    pushVals(emu_proc,hw_proc,num_input_vectors,eof1)
 
     # Initialize the memories the same way
     emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
@@ -350,29 +290,10 @@ def predictiveness():
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS) 
 
     # Create common input values
-    np.random.seed(0)
-    input_vectors=[]
     num_input_vectors=4
-    print("********** Input vectors **********")
-    for i in range(num_input_vectors):
-        if i%2==0:
-            eof1=False
-        else:
-            eof1=True
-        eof2=False
-        if i==3:
-            eof2=True
-        if DATA_TYPE=='int':
-            input_vectors.append(np.random.randint(9, size=N))
-            print(f'Cycle {i}:\t{input_vectors[i]}')
-            emu_proc.push([input_vectors[i],eof1,eof2])
-            hw_proc.push([input_vectors[i],eof1,eof2])
-        elif DATA_TYPE=='fixed_point':
-            input_vectors.append(9*np.random.random(N)-5)
-            print(f'Cycle {i}:\t{input_vectors[i]}')
-            emu_proc.push([input_vectors[i],eof1,eof2])
-            input_vectors[i] = floatToEncodedInt(input_vectors[i],DATA_WIDTH)
-            hw_proc.push([input_vectors[i],eof1,eof2])
+    eof1=[False,True,False,True]
+    eof2=[False,False,False,True]
+    pushVals(emu_proc,hw_proc,num_input_vectors,eof1,eof2)
 
     # Initialize the memories the same way
     emu_proc.fu.vrf=list(range(FUVRF_SIZE*M)) # Initializing fuvrf
