@@ -162,7 +162,7 @@ def conditions(cp):
     cp.end_chain()
     return cp.compile()
 
-# Mini cahche test
+# Mini cache test
 def minicache(cp):
 
     cp.begin_chain()
@@ -224,4 +224,3 @@ def normCheck(cp,M):
         cp.v_commit(M,'last')
         cp.end_chain()
     return cp.compile()
-

@@ -5,11 +5,11 @@
 # Parameters to define the architecture (see full description of parameters in the docs folder)
 N: 8                      # Input vector width
 M: 4                      # Number of range filters in filter unit
-IB_DEPTH: 8               # Input buffer depth
+IB_DEPTH: 32              # Input buffer depth
 FUVRF_SIZE: 4             # Size of FUVRF in M*elements
 VVVRF_SIZE: 8             # Size of VVVRF in N*elements
-TB_SIZE: 64               # Size of Trace Buffer in N*elements
-MAX_CHAINS: 8             # Maximum number of chains of the firmware
+TB_SIZE: 8                # Size of Trace Buffer in N*elements
+MAX_CHAINS: 4             # Maximum number of chains of the firmware
 DATA_TYPE: 'fixed_point'  # Data type (currently only fixed-point is supported)
 DATA_WIDTH: 32            # The use of DATA_WIDTH depends on the DATA_TYPE being used
                           #   - For fixed_point, decimal part is DATA_WIDTH/2 

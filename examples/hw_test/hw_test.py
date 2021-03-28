@@ -28,18 +28,11 @@ def readConf():
     with open(r'config.yaml') as file:
         yaml_dict = yaml.load(file, Loader=yaml.FullLoader)
         globals().update(yaml_dict)
-readConf()
 
 def raw():
 
-    # Overwrite YAML file to define how components are attached to eachother
-    BUILDING_BLOCKS=['InputBuffer', 'FilterReduceUnit','VectorVectorALU','VectorScalarReduce','DataPacker','TraceBuffer']
-
     # Instantiate HW and Emulator Processors
-    DATA_WIDTH=32
-    MAX_CHAINS=4
-    IB_DEPTH=32
-    TB_SIZE=8
+    readConf()
     hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,BUILDING_BLOCKS,DATA_TYPE,DEVICE_FAM)
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
@@ -82,14 +75,8 @@ raw()
 
 def multipleChains():
 
-    # Overwrite YAML file to define how components are attached to eachother
-    BUILDING_BLOCKS=['InputBuffer', 'FilterReduceUnit','VectorVectorALU','VectorScalarReduce','DataPacker','TraceBuffer']
-
     # Instantiate HW and Emulator Processors
-    DATA_WIDTH=32
-    MAX_CHAINS=4
-    IB_DEPTH=32
-    TB_SIZE=8
+    readConf()
     hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,BUILDING_BLOCKS,DATA_TYPE,DEVICE_FAM)
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
@@ -139,13 +126,8 @@ multipleChains()
 
 def correlation():
 
-    # Overwrite YAML file to define how components are attached to eachother
-    BUILDING_BLOCKS=['InputBuffer', 'FilterReduceUnit','VectorVectorALU','VectorScalarReduce','DataPacker','TraceBuffer']
-
     # Instantiate HW and Emulator Processors
-    DATA_WIDTH=32
-    MAX_CHAINS=4
-    IB_DEPTH=32
+    readConf()
     TB_SIZE=10
     hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,BUILDING_BLOCKS,DATA_TYPE,DEVICE_FAM)
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
@@ -197,14 +179,8 @@ correlation()
 
 def conditions():
 
-    # Overwrite YAML file to define how components are attached to eachother
-    BUILDING_BLOCKS=['InputBuffer', 'FilterReduceUnit','VectorVectorALU','VectorScalarReduce','DataPacker','TraceBuffer']
-
     # Instantiate HW and Emulator Processors
-    DATA_WIDTH=32
-    MAX_CHAINS=4
-    IB_DEPTH=32
-    TB_SIZE=8
+    readConf()
     hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,BUILDING_BLOCKS,DATA_TYPE,DEVICE_FAM)
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
@@ -257,15 +233,8 @@ conditions()
 
 def distribution():
 
-    # Overwrite YAML file to define how components are attached to eachother
-    BUILDING_BLOCKS=['InputBuffer', 'FilterReduceUnit','VectorVectorALU','VectorScalarReduce','DataPacker','TraceBuffer']
-
     # Instantiate HW and Emulator Processors
-    DATA_WIDTH=32
-    MAX_CHAINS=4
-    IB_DEPTH=32
-    TB_SIZE=8
-    DATA_TYPE='fixed_point'
+    readConf()
     hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,BUILDING_BLOCKS,DATA_TYPE,DEVICE_FAM)
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
 
@@ -318,14 +287,8 @@ distribution()
 
 def minicache_test():
 
-    # Overwrite YAML file to define how components are attached to eachother
-    BUILDING_BLOCKS=['InputBuffer', 'FilterReduceUnit','VectorVectorALU','VectorScalarReduce','DataPacker','TraceBuffer']
-
     # Instantiate HW and Emulator Processors
-    DATA_WIDTH=32
-    MAX_CHAINS=4
-    IB_DEPTH=32
-    TB_SIZE=8
+    readConf()
     DATA_TYPE='int'
     hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,BUILDING_BLOCKS,DATA_TYPE,DEVICE_FAM)
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS)
@@ -379,15 +342,10 @@ minicache_test()
 
 def predictiveness():
 
-    # Overwrite YAML file to define how components are attached to eachother
-    BUILDING_BLOCKS=['InputBuffer', 'FilterReduceUnit','VectorScalarReduce','VectorVectorALU','DataPacker','TraceBuffer']
-
     # Instantiate HW and Emulator Processors
-    DATA_WIDTH=32
-    MAX_CHAINS=4
-    IB_DEPTH=32
-    TB_SIZE=8
+    readConf()
     DATA_TYPE='int'
+    BUILDING_BLOCKS=['InputBuffer', 'FilterReduceUnit','VectorScalarReduce','VectorVectorALU','DataPacker','TraceBuffer']
     hw_proc  = rtlHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,DATA_WIDTH,MAX_CHAINS,BUILDING_BLOCKS,DATA_TYPE,DEVICE_FAM)
     emu_proc = emulatedHw(N,M,IB_DEPTH,FUVRF_SIZE,VVVRF_SIZE,TB_SIZE,MAX_CHAINS,BUILDING_BLOCKS) 
 
