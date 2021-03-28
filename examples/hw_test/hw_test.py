@@ -2,47 +2,11 @@ import sys
 sys.path.insert(1, '../../src/')
 from emulator.emulator import emulatedHw
 from hardware.hardware import rtlHw
+from misc.misc import *
 import firmware.firmware as firm
-import math, yaml
+import math
 import numpy as np
-
-# Read YAML configuration file and declare those as global variables
-def readConf():
-    with open(r'config.yaml') as file:
-        yaml_dict = yaml.load(file, Loader=yaml.FullLoader)
-        globals().update(yaml_dict)
-readConf()
-
-def toInt(lst):
-    return [list(map(int, l)) for l in lst]
-
-def floatToEncodedInt(float_array,DATA_WIDTH):
-    return [encode(x,DATA_WIDTH) for x in float_array]
-    
-def encode(value,DATA_WIDTH):
-    int_bits=int(DATA_WIDTH/2)
-    frac_bits=int(DATA_WIDTH/2)
-    is_negative = value<0
-    max_value = (1<<(int_bits-1+frac_bits))-1
-    x = round(value * (1<< frac_bits))
-    x = int(max_value if x > max_value else -max_value if x< -max_value else x)
-    if is_negative:
-        x = (1<<DATA_WIDTH) + x
-    return x
-
-def decode(value,DATA_WIDTH):
-    int_bits=int(DATA_WIDTH/2)
-    frac_bits=int(DATA_WIDTH/2)
-    value=float(value)
-    max_value = (1<<(int_bits-1+frac_bits))-1
-    is_negative = value>max_value
-    if is_negative:
-        value = -((1<<DATA_WIDTH) - value)
-    return value / (1 << frac_bits)
-
-def encodedIntTofloat(encoded_int,DATA_WIDTH):
-    frac_bits=int(DATA_WIDTH/2)
-    return [[decode(encoded_value,DATA_WIDTH) for encoded_value in l] for l in encoded_int] 
+np.set_printoptions(precision=3, suppress=False)
 
 def filterResults(emu_results, hw_results, DATA_TYPE):
     emu_results_filtered = emu_results['tb'][-1];
@@ -58,6 +22,13 @@ def filterResults(emu_results, hw_results, DATA_TYPE):
     print(hw_results_filtered)
 
     return emu_results_filtered, hw_results_filtered
+
+''' Read YAML configuration file and declare those as global variables '''
+def readConf():
+    with open(r'config.yaml') as file:
+        yaml_dict = yaml.load(file, Loader=yaml.FullLoader)
+        globals().update(yaml_dict)
+readConf()
 
 def raw():
 
